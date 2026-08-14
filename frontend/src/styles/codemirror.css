@@ -1,0 +1,30 @@
+/* CodeMirror overrides — deliberately NOT wrapped in `@layer`.
+ *
+ * CodeMirror injects its own styles through StyleModule into <head> at runtime,
+ * unlayered. Unlayered CSS beats every layer regardless of order, so moving these
+ * rules into `@layer components` would silently stop them working, and reaching
+ * for `!important` again would be treating the symptom.
+ *
+ * The `!important` declarations below are still fighting the `oneDark` theme that
+ * `RequestEditor.tsx` imports. They go away with it, once the editor uses a theme
+ * built from the design tokens — at which point only `.cm-theme` needs to stay,
+ * because it sizes the React wrapper rather than anything CodeMirror owns.
+ */
+
+.cm-theme {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.cm-editor {
+  height: 100%;
+  background: #0d0d0f !important;
+  font-size: 11px;
+}
+
+.cm-gutters {
+  background: #0d0d0f !important;
+  border: 0 !important;
+  color: #404048 !important;
+}

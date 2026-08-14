@@ -1,0 +1,1600 @@
+/* Semantic component classes.
+ *
+ * These live in `@layer components`, which is declared before `@layer utilities`,
+ * so Tailwind utilities now win against them. That inversion is the point: while
+ * this file was unlayered it beat every utility, which is why `styles.css` used to
+ * hand-reimplement `.ml-auto`, `.truncate`, `.flex-1`, `.opacity-0`, `.w-[13px]`
+ * and the group-hover rule, and why several declarations needed `!important`.
+ * All of those are gone.
+ *
+ * Order matters twice over. Shared primitives come first so the components that
+ * extend them (`.panel-toggle` and `.save-btn` over `.icon-btn`) win on source
+ * order rather than on `!important`. After that the sections follow layout
+ * containment order, so reading top to bottom walks the DOM.
+ */
+
+@layer components {
+  /* ── Shared primitives ─────────────────────────────────────────────────── */
+  /* Declared first: .panel-toggle and .save-btn both override .icon-btn and rely
+   * on coming later in the source. */
+  .icon-btn {
+    width: var(--h-control-sm);
+    height: var(--h-control-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .icon-btn:hover {
+    color: var(--color-text);
+    background: var(--color-surface-4);
+  }
+
+  .icon-btn.xs {
+    width: var(--h-control-xs);
+    height: var(--h-control-xs);
+  }
+
+  /* ── Shell ─────────────────────────────────────────────────────────────── */
+  .app-shell {
+    height: 100%;
+    display: grid;
+    background: var(--color-surface-canvas);
+  }
+
+  .workspace {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace-top {
+    height: var(--h-tabbar);
+    display: flex;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+  }
+
+  .panel-toggle {
+    width: var(--h-tabbar);
+    border-right: 1px solid var(--color-border-subtle);
+    border-radius: 0;
+  }
+
+  .editor-split {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+  }
+
+  /* ── Split handles ─────────────────────────────────────────────────────── */
+  /* One component for both axes, replacing the separate .sidebar-resizer and
+   * .horizontal-resizer. Never given a transition: these are dragged at 60fps and
+   * any easing makes them trail the cursor. */
+  .split-handle {
+    position: relative;
+    background: var(--color-surface-2);
+    z-index: var(--z-resizer);
+  }
+
+  .split-handle[data-axis='x'] {
+    cursor: ew-resize;
+    border-right: 1px solid var(--color-border);
+  }
+
+  .split-handle[data-axis='y'] {
+    cursor: ns-resize;
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .split-handle:hover,
+  .split-handle:focus-visible {
+    background: var(--color-accent);
+  }
+
+  .split-handle:focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: calc(var(--focus-ring-offset) * -1);
+  }
+
+  /* The visible track stays a 4–5px hairline while the grabbable area widens to
+   * 24px, so the handle satisfies SC 2.5.8 without becoming a visible gutter. */
+  .split-handle::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    touch-action: none;
+  }
+
+  .split-handle[data-axis='x']::before {
+    inset-inline: calc(var(--resizer-slop) * -1);
+  }
+
+  .split-handle[data-axis='y']::before {
+    inset-block: calc(var(--resizer-slop) * -1);
+  }
+
+  .split-grip {
+    position: absolute;
+    background: var(--color-border-control);
+    border-radius: var(--radius-xs);
+  }
+
+  .split-handle[data-axis='y'] .split-grip {
+    width: 32px;
+    height: 2px;
+    left: 50%;
+    top: 1px;
+    transform: translateX(-50%);
+  }
+
+  .split-handle[data-axis='x'] .split-grip {
+    width: 2px;
+    height: 32px;
+    top: 50%;
+    left: 1px;
+    transform: translateY(-50%);
+  }
+
+  /* ── Sidebar ───────────────────────────────────────────────────────────── */
+  .sidebar {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--color-surface-2);
+    border-right: 0;
+    overflow: visible;
+  }
+
+  .sidebar.collapsed {
+    align-items: center;
+    padding-top: 8px;
+  }
+
+  .app-brand {
+    height: var(--h-brand);
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .app-brand strong {
+    display: block;
+    color: var(--color-text-strong);
+    font-size: var(--text-sm);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .app-brand small {
+    display: block;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    margin-top: 1px;
+  }
+
+  .brand-mark {
+    width: 29px;
+    height: 29px;
+    flex: 0 0 auto;
+    border: 1px solid var(--color-border-accent);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    font-weight: var(--font-weight-bold);
+    font-size: var(--text-2xs);
+    letter-spacing: -2px;
+  }
+
+  .brand-mark span {
+    color: var(--color-accent);
+  }
+
+  .brand-mark.large {
+    width: 48px;
+    height: 48px;
+    font-size: var(--text-lg);
+    border-radius: var(--radius-xl);
+    margin-bottom: 13px;
+  }
+
+  .sidebar-section-title {
+    height: var(--h-section-title);
+    padding: 0 8px 0 12px;
+    display: flex;
+    align-items: center;
+    color: var(--color-text-subtle);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-label);
+  }
+
+  .sidebar-section-title > div {
+    margin-left: auto;
+    display: flex;
+  }
+
+  .tree-scroll {
+    flex: 1;
+    overflow: auto;
+    padding: 1px 5px 8px;
+  }
+
+  .sidebar-footer {
+    height: var(--h-footer);
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-top: 1px solid var(--color-border-subtle);
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+    box-shadow: var(--shadow-dot);
+  }
+
+  /* ── Tree ──────────────────────────────────────────────────────────────── */
+  .tree-row {
+    height: var(--h-row-tree);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    position: relative;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    cursor: default;
+  }
+
+  .tree-row:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  /* A 3px rail, not the old 2px one. Selection used to be drawn as a 2px inset
+   * edge, which was indistinguishable from a focus indicator; focus is now a full
+   * 2px perimeter ring, so the two can legibly sit on the same row. */
+  .tree-row.selected {
+    background: var(--color-surface-accent);
+    color: var(--color-text-strong);
+    box-shadow: inset 3px 0 var(--color-accent);
+  }
+
+  .tree-menu {
+    position: absolute;
+    z-index: var(--z-dropdown);
+    right: 2px;
+    top: 24px;
+    width: 145px;
+    padding: 4px;
+    background: var(--color-surface-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-menu);
+  }
+
+  .tree-menu button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    height: var(--h-control-sm);
+    padding: 0 8px;
+    border: 0;
+    background: none;
+    border-radius: var(--radius-xs);
+    font-size: var(--text-2xs);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .tree-menu button:hover {
+    background: var(--color-surface-press);
+  }
+
+  .tree-menu .danger {
+    color: var(--color-danger);
+  }
+
+  .tree-rename {
+    flex: 1;
+    min-width: 0;
+    height: var(--h-control-xs);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-xs);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    font-size: var(--text-2xs);
+    padding: 0 4px;
+  }
+
+  /* ── HTTP methods ──────────────────────────────────────────────────────── */
+  /* Each class carries a single custom property, so the chip recipe below is
+   * written once and picks the hue up from the cascade. Seven tokens instead of
+   * twenty-one hand-written hexes. */
+  .method-get {
+    --method: var(--color-method-get);
+  }
+
+  .method-post {
+    --method: var(--color-method-post);
+  }
+
+  .method-put {
+    --method: var(--color-method-put);
+  }
+
+  .method-patch {
+    --method: var(--color-method-patch);
+  }
+
+  .method-delete {
+    --method: var(--color-method-delete);
+  }
+
+  .method-head {
+    --method: var(--color-method-head);
+  }
+
+  .method-options {
+    --method: var(--color-method-options);
+  }
+
+  .method-chip {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-xs);
+    color: var(--method, var(--color-text-muted));
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--tracking-tight);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .method-chip-chip,
+  .method-chip-compact {
+    height: 18px;
+    padding: 0 5px;
+    border: 1px solid color-mix(in oklab, var(--method) 30%, transparent);
+    background: color-mix(in oklab, var(--method) 16%, transparent);
+  }
+
+  .method-chip-chip {
+    min-width: 46px;
+  }
+
+  .method-chip-compact {
+    min-width: 34px;
+  }
+
+  /* DELETE and OPTIONS are 6–7 characters against GET's 3. Shrinking those two is
+   * cheaper than widening the column for every row and eating into the name. This
+   * is the one deliberate exception to the 11px floor: they are all-caps mono
+   * abbreviations, where cap-height at 10px is about x-height at 12px sans. */
+  .method-chip-chip.method-delete,
+  .method-chip-chip.method-options {
+    font-size: 10px;
+  }
+
+  .method-chip-ghost {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-weight: var(--font-weight-bold);
+  }
+
+  /* The native select is kept for keyboard and screen-reader behaviour but rendered
+   * transparently over the chip — the only way to fully style a select short of
+   * reimplementing the listbox. */
+  .method-field {
+    position: relative;
+    flex: 0 0 auto;
+    width: 96px;
+    height: var(--h-control-lg);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px 0 10px;
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+  }
+
+  .method-field svg {
+    margin-left: auto;
+    color: var(--color-text-subtle);
+    pointer-events: none;
+  }
+
+  .method-native {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .method-field:focus-within {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* ── Request tabs ──────────────────────────────────────────────────────── */
+  .request-tabs {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    scrollbar-width: none;
+  }
+
+  /* A container rather than a button: the close control is now a real sibling
+   * button instead of a <span role="button"> nested inside one. */
+  .request-tab {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 125px;
+    max-width: 190px;
+    height: var(--h-tab);
+    padding: 0 6px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-surface-3);
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+
+  .tab-main {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .request-tab.active {
+    background: var(--color-surface-1);
+    color: var(--color-text);
+    box-shadow: inset 0 2px var(--color-accent);
+  }
+
+  .request-tab:hover {
+    color: var(--color-text);
+    background: var(--color-surface-3);
+  }
+
+  .dirty-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-text-muted);
+  }
+
+  .tab-close {
+    flex: 0 0 auto;
+    width: var(--h-control-xs);
+    height: var(--h-control-xs);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  /* `display: none` took the close control out of the tab order entirely, so a
+   * keyboard user could never close a tab. Fading it keeps it focusable, and
+   * `:focus-within` brings it back into view when it is reached. */
+  .tab-close {
+    opacity: 0;
+  }
+
+  .request-tab:hover .tab-close,
+  .request-tab:focus-within .tab-close,
+  .tab-close:focus-visible {
+    opacity: 1;
+  }
+
+  .request-tab:hover .dirty-dot {
+    display: none;
+  }
+
+  .tab-close:hover {
+    background: var(--color-surface-press);
+  }
+
+  .tabs-spacer {
+    flex: 1;
+    min-width: 22px;
+    background: var(--color-surface-2);
+  }
+
+  /* ── Request bar ───────────────────────────────────────────────────────── */
+  .request-editor,
+  .response-viewer {
+    min-height: 0;
+    min-width: 0;
+    background: var(--color-surface-1);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .request-bar {
+    height: var(--h-request-bar);
+    padding: 9px 12px;
+    display: flex;
+    gap: 7px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .url-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0 11px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+  }
+
+  /* The URL field takes the shared ring from the base layer; it only needs its
+   * border lifted so the control still reads as focused at a glance. */
+  .url-input:focus-visible {
+    border-color: var(--color-border-control);
+  }
+
+  .save-btn {
+    width: var(--h-control-lg);
+    height: var(--h-control-lg);
+    border: 1px solid var(--color-border-control);
+  }
+
+  .send-btn {
+    min-width: 92px;
+    height: var(--h-control-lg);
+    padding: 0 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+    font-weight: var(--font-weight-bold);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    box-shadow: var(--shadow-accent);
+  }
+
+  .send-btn:hover {
+    background: var(--color-accent-hover);
+  }
+
+  .send-btn.cancel {
+    background: var(--color-surface-4);
+    border-color: var(--color-border-control);
+    color: var(--color-text);
+  }
+
+  /* ── Panel tabs ────────────────────────────────────────────────────────── */
+  .panel-tabs,
+  .response-tabs {
+    height: var(--h-panel-tabs);
+    display: flex;
+    align-items: stretch;
+    padding: 0 11px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .panel-tabs button,
+  .response-tabs button {
+    min-width: 65px;
+    padding: 0 9px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .panel-tabs button:hover,
+  .response-tabs button:hover {
+    color: var(--color-text);
+  }
+
+  .panel-tabs button.active,
+  .response-tabs button.active {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent);
+  }
+
+  .panel-tabs button span,
+  .response-tabs button span {
+    margin-left: 5px;
+    padding: 1px 4px;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-4);
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+
+  .request-panel {
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+  }
+
+  /* ── Key/value grid ────────────────────────────────────────────────────── */
+  /* Was a flat `min-width: 650px`, which forced a horizontal scrollbar at any
+   * usable sidebar width. The floor is now 380px and the optional DESCRIPTION
+   * column is dropped before the row is allowed to scroll. */
+  .kv-wrap {
+    container-type: inline-size;
+    min-width: 380px;
+  }
+
+  .kv-header,
+  .kv-row {
+    display: grid;
+    grid-template-columns: var(--h-control-xs) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 1fr) var(--h-control-xs);
+    align-items: center;
+  }
+
+  .kv-row input {
+    min-width: 0;
+  }
+
+  @container (max-width: 560px) {
+    .kv-header > :nth-child(4),
+    .kv-row > :nth-child(4) {
+      display: none;
+    }
+
+    .kv-header,
+    .kv-row {
+      grid-template-columns: var(--h-control-xs) minmax(0, 1fr) minmax(0, 1.3fr) var(--h-control-xs);
+    }
+  }
+
+  .kv-header {
+    height: var(--h-kv-header);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: var(--tracking-label);
+  }
+
+  .kv-header span:not(:last-child),
+  .kv-row > *:not(:last-child) {
+    border-right: 1px solid var(--color-border-subtle);
+  }
+
+  .kv-row {
+    height: var(--h-row-kv);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .kv-row:hover {
+    background: var(--color-surface-2);
+  }
+
+  .kv-row:hover .row-delete,
+  .kv-row:focus-within .row-delete,
+  .row-delete:focus-visible {
+    opacity: 1;
+  }
+
+  .technical-input,
+  .kv-row input {
+    width: 100%;
+    height: 100%;
+    padding: 0 9px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
+  /* These cells sit flush inside `.request-panel`, which is `overflow: auto`. A
+   * positive `outline-offset` would be clipped by that scroll container and the
+   * ring would vanish on the first and last column, so the focus indicator is
+   * drawn inside the cell with an inset shadow instead. */
+  .technical-input:focus-visible,
+  .kv-row input:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 var(--focus-ring-width) var(--color-focus);
+  }
+
+  .kv-row input::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  .row-delete {
+    opacity: 0;
+  }
+
+  /* The hit area is a full 24px square (SC 2.5.8) while the box itself stays a
+   * compact 16px, so the control is reachable without the checkbox growing to
+   * dominate a 32px row. The tick is layered over the box rather than laid out
+   * beside it. */
+  .row-check {
+    width: var(--h-control-xs);
+    height: var(--h-control-xs);
+    margin: auto;
+    padding: 0;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .row-check::before {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-xs);
+    background: var(--color-surface-3);
+  }
+
+  .row-check.on::before {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+  }
+
+  .row-check svg {
+    position: absolute;
+    color: var(--color-text-on-accent);
+  }
+
+  .add-row {
+    height: var(--h-control-md);
+    margin: 7px 9px;
+    padding: 0 9px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-3);
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+    cursor: pointer;
+  }
+
+  .add-row:hover {
+    color: var(--color-text);
+    border-color: var(--color-border-control);
+  }
+
+  /* ── Body editor ───────────────────────────────────────────────────────── */
+  .body-editor {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .editor-toolbar {
+    height: var(--h-panel-tabs);
+    padding: 0 9px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .segmented {
+    display: flex;
+    gap: 2px;
+  }
+
+  .segmented button {
+    height: var(--h-control-xs);
+    padding: 0 9px;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    cursor: pointer;
+  }
+
+  .segmented button.active {
+    background: var(--color-surface-4);
+    color: var(--color-text);
+  }
+
+  .text-action {
+    margin-left: auto;
+    border: 0;
+    background: none;
+    color: var(--color-accent-hover);
+    font-size: var(--text-2xs);
+    cursor: pointer;
+  }
+
+  /* ── Auth editor ───────────────────────────────────────────────────────── */
+  .auth-editor {
+    max-width: 610px;
+    padding: 18px;
+    display: grid;
+    gap: 15px;
+  }
+
+  .auth-editor label {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    align-items: center;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .auth-editor select,
+  .auth-editor input {
+    height: var(--h-control-md);
+    padding: 0 9px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    outline: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
+  .auth-editor p {
+    margin: 0 0 0 120px;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+  }
+
+  .auth-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  /* ── Response status strip ─────────────────────────────────────────────── */
+  /* Replaces .response-header, .response-meta, .status.ok/.bad and .failed-label —
+   * a 38px bar whose only content was the word "Response" plus 10px metrics tucked
+   * into a corner. This renders in all four states so the panel chrome never jumps
+   * height between them. */
+  .response-status {
+    flex: 0 0 auto;
+    min-height: var(--h-response-status);
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-surface-1);
+  }
+
+  /* Every pill pairs a distinct glyph with literal text, so the meaning never rests
+   * on hue alone. */
+  .status-pill {
+    margin: 0;
+    padding: 3px 9px 3px 7px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+
+  .status-code {
+    font-family: var(--font-mono);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .status-text {
+    color: var(--color-text-muted);
+  }
+
+  .status-pill[data-bucket='2xx'] {
+    border-color: color-mix(in oklab, var(--color-success) 32%, transparent);
+    background: color-mix(in oklab, var(--color-success) 14%, transparent);
+    color: var(--color-success);
+  }
+
+  .status-pill[data-bucket='3xx'] {
+    border-color: color-mix(in oklab, var(--color-method-put) 32%, transparent);
+    background: color-mix(in oklab, var(--color-method-put) 14%, transparent);
+    color: var(--color-method-put);
+  }
+
+  .status-pill[data-bucket='4xx'] {
+    border-color: color-mix(in oklab, var(--color-warning) 32%, transparent);
+    background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+    color: var(--color-warning);
+  }
+
+  .status-pill[data-bucket='5xx'],
+  .status-pill[data-bucket='failed'] {
+    border-color: color-mix(in oklab, var(--color-danger) 32%, transparent);
+    background: color-mix(in oklab, var(--color-danger) 14%, transparent);
+    color: var(--color-danger);
+  }
+
+  .status-pill[data-bucket='pending'] {
+    border-color: color-mix(in oklab, var(--color-accent) 32%, transparent);
+    background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+    color: var(--color-accent);
+  }
+
+  .status-pill[data-bucket='idle'] {
+    border-color: var(--color-border);
+    background: var(--color-surface-3);
+    color: var(--color-text-subtle);
+  }
+
+  .status-pill[data-bucket='pending'] .status-glyph {
+    animation: spin 1s linear infinite;
+  }
+
+  .status-metrics {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .metric {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .metric-label {
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .metric-value {
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
+  .status-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .response-format {
+    padding: 0 7px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  .response-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    user-select: text;
+  }
+
+  .response-code {
+    margin: 0;
+    padding: 12px 17px 30px;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-code);
+    line-height: var(--text-code--line-height);
+    tab-size: 2;
+  }
+
+  .json-key {
+    color: var(--color-syntax-key);
+  }
+
+  .json-string {
+    color: var(--color-syntax-string);
+  }
+
+  .json-literal {
+    color: var(--color-syntax-literal);
+  }
+
+  .json-number {
+    color: var(--color-syntax-number);
+  }
+
+  .response-headers {
+    min-width: 0;
+  }
+
+  .response-headers > div {
+    min-height: var(--h-row-kv);
+    display: grid;
+    grid-template-columns: minmax(140px, 0.5fr) minmax(0, 1fr);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  /* Long JWTs and CSP values wrap instead of pushing out a scrollbar. */
+  .response-headers code {
+    overflow-wrap: anywhere;
+  }
+
+  .response-headers b,
+  .response-headers code {
+    padding: 7px 11px;
+    border-right: 1px solid var(--color-border-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
+  .response-headers b {
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-label);
+  }
+
+  /* ── Placeholders: empty, loading and error states ─────────────────────── */
+  /* Replaces .response-empty, .empty-icon, .response-error, .error-symbol and
+   * .no-request, which were five near-identical centred stacks with no actions. */
+  .placeholder {
+    flex: 1;
+    min-height: 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--color-text-subtle);
+  }
+
+  .placeholder-icon {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    background: var(--color-surface-3);
+    color: var(--color-text-subtle);
+  }
+
+  .placeholder[data-tone='accent'] .placeholder-icon {
+    border-color: var(--color-border-accent);
+    background: var(--color-surface-accent);
+    color: var(--color-accent);
+  }
+
+  .placeholder[data-tone='danger'] .placeholder-icon {
+    border-color: var(--color-border-danger);
+    background: var(--color-surface-danger);
+    color: var(--color-danger);
+  }
+
+  .placeholder-title {
+    margin: 12px 0 4px;
+    color: var(--color-text-muted);
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .placeholder[data-tone='danger'] .placeholder-title {
+    color: var(--color-danger-strong);
+  }
+
+  .placeholder-body {
+    margin: 0;
+    max-width: 44ch;
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+
+  .placeholder[data-tone='danger'] .placeholder-body {
+    color: var(--color-danger-muted);
+  }
+
+  .placeholder-actions {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .placeholder-action {
+    height: var(--h-control-md);
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+
+  /* The label span can wrap an icon alongside the text, so it needs to be a flex
+   * row itself — otherwise the icon baseline-aligns and rides above the words. */
+  .placeholder-action > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .placeholder-action.action-primary {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-text-on-accent);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .placeholder-action.action-primary:hover {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+  }
+
+  .placeholder-action.action-secondary {
+    background: var(--color-surface-3);
+    border-color: var(--color-border-control);
+    color: var(--color-text-muted);
+  }
+
+  .placeholder-action.action-secondary:hover {
+    background: var(--color-surface-4);
+    color: var(--color-text);
+  }
+
+  /* ── Keyboard hints ────────────────────────────────────────────────────── */
+  .shortcut {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .shortcut kbd {
+    min-width: 16px;
+    padding: 1px 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-xs);
+    background: var(--color-surface-3);
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: 1.2;
+  }
+
+  .action-primary .shortcut kbd {
+    border-color: color-mix(in oklab, var(--color-text-on-accent) 30%, transparent);
+    background: color-mix(in oklab, var(--color-text-on-accent) 12%, transparent);
+    color: var(--color-text-on-accent);
+  }
+
+  /* ── Loading skeleton ──────────────────────────────────────────────────── */
+  /* Deliberately not a progress bar: the mock executor's fixed delay is a fixture,
+   * not a measured expectation, so a determinate bar built on it would become a
+   * lie the moment real networking lands. The elapsed counter is honest instead. */
+  .skeleton {
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .skeleton-line {
+    height: 9px;
+    border-radius: var(--radius-xs);
+    background: linear-gradient(90deg, var(--color-surface-3) 0%, var(--color-surface-4) 50%, var(--color-surface-3) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.4s var(--ease-in-out) infinite;
+  }
+
+  .response-loading {
+    flex: 1;
+    min-height: 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .loading-note {
+    margin: 0;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+  }
+
+  /* ── Screen-reader only ────────────────────────────────────────────────── */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ── Workspace actions ─────────────────────────────────────────────────── */
+  .workspace-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    border-left: 1px solid var(--color-border-subtle);
+  }
+
+  /* ── Sidebar search trigger ────────────────────────────────────────────── */
+  /* The in-tree filter this replaces only matched direct children, so searching for
+   * anything nested two levels deep emptied the whole tree. It now opens the
+   * command palette, which searches every request by name, method and URL. */
+  .search-trigger {
+    height: var(--h-control-md);
+    margin: 0 9px 7px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+
+  .search-trigger:hover {
+    border-color: var(--color-border-control);
+    color: var(--color-text-muted);
+  }
+
+  .search-trigger .shortcut {
+    margin-left: auto;
+  }
+
+  .tree-icon {
+    flex: 0 0 auto;
+    color: var(--color-text-subtle);
+  }
+
+  /* ── Command palette ───────────────────────────────────────────────────── */
+  /* Built on <dialog> + showModal(), which supplies the focus trap, top-layer
+   * rendering (so it never fights .tree-menu for z-index), ::backdrop, focus
+   * restoration on close and native Escape handling. */
+  .command-palette {
+    width: min(640px, 92vw);
+    max-height: min(60vh, 520px);
+    margin: 12vh auto auto;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-xl);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    box-shadow: var(--shadow-menu);
+    overflow: hidden;
+  }
+
+  .command-palette::backdrop {
+    background: rgb(0 0 0 / 0.55);
+  }
+
+  .palette-shell {
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
+  }
+
+  .palette-field {
+    flex: 0 0 auto;
+    height: 48px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-subtle);
+  }
+
+  .palette-input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: 0;
+    outline: 0;
+    color: var(--color-text);
+    font-size: var(--text-sm);
+  }
+
+  .palette-input::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  .palette-results {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px;
+  }
+
+  .palette-group-label {
+    margin: 6px 0 2px;
+    padding: 0 8px;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .palette-option {
+    min-height: var(--h-control-md);
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .palette-option[data-active='true'] {
+    background: var(--color-surface-4);
+    color: var(--color-text-strong);
+  }
+
+  .palette-title {
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .palette-title mark {
+    background: none;
+    color: var(--color-accent);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .palette-subtitle {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+  }
+
+  .palette-option .shortcut {
+    margin-left: auto;
+  }
+
+  .palette-void {
+    margin: 0;
+    padding: 24px 8px;
+    text-align: center;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+  }
+
+  .palette-footer {
+    flex: 0 0 auto;
+    height: var(--h-section-title);
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-top: 1px solid var(--color-border-subtle);
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+  }
+
+  .palette-footer span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* ── Text selection ────────────────────────────────────────────────────── */
+  /* `.app-shell` used to carry a blanket `user-select: none`, which made response
+   * headers, status codes and error messages impossible to copy. In an HTTP
+   * client, copying a header value is a primary task, so the default is inverted:
+   * content is selectable and only the chrome opts out. */
+  .app-brand,
+  .sidebar-section-title,
+  .sidebar-footer,
+  .tree-row,
+  .request-tab,
+  .panel-tabs,
+  .response-tabs,
+  .editor-toolbar,
+  .segmented,
+  .kv-header,
+  .icon-btn,
+  .send-btn,
+  .save-btn,
+  .add-row,
+  .split-handle,
+  .method-chip,
+  .placeholder,
+  .workspace-actions,
+  .search-trigger,
+  .shortcut {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .response-headers b,
+  .response-headers code,
+  .status-pill,
+  .metric-value,
+  .placeholder-title,
+  .placeholder-body {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* ── Motion ────────────────────────────────────────────────────────────── */
+  /* Dense rows get the shortest duration: hover feedback on a 28px row has to
+   * land in about a frame or the interface feels wet. Longer durations are
+   * reserved for things that genuinely move. The resizers and the grid template
+   * are deliberately never transitioned — they are dragged at 60fps and any
+   * transition makes them trail the cursor. */
+  .tree-row,
+  .kv-row,
+  .icon-btn,
+  .request-tab {
+    transition:
+      background-color var(--duration-instant) var(--ease-standard),
+      color var(--duration-instant) var(--ease-standard);
+  }
+
+  .send-btn,
+  .add-row,
+  .segmented button,
+  .row-check::before,
+  .tree-menu button {
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard);
+  }
+
+  .url-input,
+  .search-trigger,
+  .method-field,
+  .auth-editor select,
+  .auth-editor input {
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .panel-tabs button,
+  .response-tabs button {
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .row-delete,
+  .tab-close {
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .tree-menu {
+    animation: menu-in var(--duration-base) var(--ease-out);
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 1120px) {
+    .request-tab {
+      min-width: 112px;
+    }
+
+    .status-metrics {
+      gap: 10px;
+    }
+
+    .auth-editor {
+      max-width: 520px;
+    }
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

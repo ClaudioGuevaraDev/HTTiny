@@ -1,0 +1,210 @@
+/* HTTiny design tokens.
+ *
+ * `static` forces Tailwind to emit every variable below. Most of them are consumed as
+ * `var(--color-surface-2)` inside hand-written component CSS rather than as utility
+ * classes, and Tailwind's default lazy emission only keeps variables it believes are
+ * used — which would drop them silently. `static` applies per block, so Tailwind's own
+ * `@theme default {}` stays lazy and the 250-colour default palette costs nothing.
+ *
+ * Contrast ratios in the comments are measured against the surface each token is meant
+ * to sit on. Every text token clears 4.5:1 on all five surfaces; every non-text token
+ * that carries meaning clears 3:1 (WCAG 1.4.11).
+ */
+
+@theme static {
+  /* Close the system: the default palette is wiped, so `text-emerald-400` and
+   * `bg-zinc-800` no longer exist and every colour has to come from a token. This
+   * is the enforcement mechanism — a stray utility class fails visibly instead of
+   * quietly introducing a colour nobody chose. */
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+
+  /* ── Font families ──────────────────────────────────────────────────────── */
+  --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --default-font-family: var(--font-sans);
+  --default-mono-font-family: var(--font-mono);
+
+  /* ── Surfaces ───────────────────────────────────────────────────────────── */
+  /* The canvas keeps HTTiny's original near-black; the OLED identity is deliberate. */
+  --color-surface-canvas: #0a0a0b; /* app shell                                  */
+  --color-surface-1: #0e0e11; /* request + response panes                        */
+  --color-surface-2: #121215; /* sidebar, tab bar, chrome                        */
+  --color-surface-3: #17171b; /* inputs, inactive tabs, search                   */
+  --color-surface-4: #1e1e23; /* menus, popovers, badges                         */
+  --color-surface-hover: #1a1a1f;
+  --color-surface-press: #22222a;
+  --color-surface-accent: #12301f; /* selected tree row                          */
+  --color-surface-danger: #2a1418; /* error plate                                */
+  --color-surface-code-active: #14141a; /* CodeMirror active line                */
+
+  /* ── Borders ────────────────────────────────────────────────────────────── */
+  /* subtle/default/strong are decorative — no contrast minimum applies to them.
+   * border-control bounds form controls, so it must clear 3:1 (SC 1.4.11). */
+  --color-border-subtle: #1f1f23; /* hairline row separators within a surface    */
+  --color-border: #2a2a30; /* structural dividers between surfaces               */
+  --color-border-strong: #3a3a42; /* edges of elevated surfaces                  */
+  --color-border-control: #6a6a77; /* 3.71 canvas · 3.62 s1 · 3.35 s3 · 3.11 s4  */
+  --color-border-accent: #1e6b3c;
+  --color-border-danger: #7a3540;
+
+  /* ── Text ───────────────────────────────────────────────────────────────── */
+  /* Each ratio is the worst case, against surface-4, the lightest surface any
+   * text lands on. Nothing here drops below 4.5:1. */
+  --color-text-strong: #f4f4f7; /* 15.12 worst · 18.03 canvas                    */
+  --color-text: #d0d0d7; /*        10.82 worst · 12.90 canvas                    */
+  --color-text-muted: #aaaab4; /*   7.21 worst ·  8.59 canvas                    */
+  --color-text-subtle: #8d8d98; /*  5.06 worst ·  6.03 canvas                    */
+  --color-text-faint: #86868f; /*   4.60 worst ·  5.48 canvas — placeholders,
+                                    gutter numbers; the darkest legal text       */
+  --color-text-on-accent: #06120a; /* 8.39 on --color-accent                     */
+
+  /* ── Accent ─────────────────────────────────────────────────────────────── */
+  --color-accent: #22c55e; /*       8.69 canvas · 8.46 s1                        */
+  --color-accent-hover: #4ade80; /* 11.36 canvas                                 */
+  --color-accent-soft: #12301f;
+  --color-focus: #22c55e; /* 7.28–8.69 on every surface — 2.4× the 3:1 minimum   */
+
+  /* ── Status ─────────────────────────────────────────────────────────────── */
+  --color-success: #4ade80; /*      11.36 canvas                                 */
+  --color-danger: #fb7185; /*        7.30 canvas · 7.10 s1                       */
+  --color-danger-strong: #ffdbe0; /* headings on --color-surface-danger          */
+  --color-danger-muted: #b09298; /*  6.77 s1 — error detail copy                 */
+  --color-warning: #fbbf24; /*      11.86 canvas                                 */
+
+  /* ── HTTP methods ───────────────────────────────────────────────────────── */
+  /* One token per method. Chip background and border are derived at 16%/30% via
+   * color-mix, so these seven replace twenty-one hand-written hexes.
+   * Measured text-on-its-own-chip: GET 7.53, POST 8.46, PUT 6.92, PATCH 5.66,
+   * DELETE 5.75, HEAD 7.94, OPTIONS 5.89 — all clear 4.5:1.
+   * GET is deliberately pushed toward teal so it does not read as the accent
+   * green, which already means "send" and "ok". */
+  --color-method-get: #34d399;
+  --color-method-post: #fbbf24;
+  --color-method-put: #38bdf8;
+  --color-method-patch: #a78bfa;
+  --color-method-delete: #fb7185;
+  --color-method-head: #22d3ee;
+  --color-method-options: #a1a1aa;
+
+  /* ── Syntax ─────────────────────────────────────────────────────────────── */
+  /* One palette, consumed by both CodeMirror and the response viewer. Ratios are
+   * against surface-1, the editor background. */
+  --color-syntax-key: #7dd3fc; /*        11.55                                   */
+  --color-syntax-string: #86efac; /*     13.72                                   */
+  --color-syntax-literal: #c4b5fd; /*    10.23                                   */
+  --color-syntax-number: #fdba74; /*     11.42                                   */
+  --color-syntax-punctuation: #8d8d98; /* 5.86 — untagged in JSON, kept for
+                                          future languages                       */
+  --color-syntax-comment: #7f8fa6; /*     5.85                                   */
+  --color-selection: #1e3d2a; /* every syntax colour stays above 7.2:1 on it     */
+  --color-selection-match: #24402f;
+  --color-bracket-match: #26312a;
+
+  /* ── Type scale ─────────────────────────────────────────────────────────── */
+  /* Compact, with an 11px floor. The one documented exception is the DELETE and
+   * OPTIONS method chips at 10px: those are all-caps mono abbreviations, where
+   * cap-height at 10px roughly matches x-height at 12px sans. */
+  --text-2xs: 11px; /* table headers, method labels, meta, tree rows, badges      */
+  --text-2xs--line-height: 16px;
+  --text-2xs--letter-spacing: 0.005em;
+  --text-xs: 12px; /* key/value inputs, panel tabs, secondary copy                */
+  --text-xs--line-height: 16px;
+  --text-sm: 13px; /* URL input, brand, primary labels, section headings          */
+  --text-sm--line-height: 18px;
+  --text-base: 15px; /* empty-state headings                                     */
+  --text-base--line-height: 22px;
+  --text-lg: 19px; /* large brand mark, no-request headline                      */
+  --text-lg--line-height: 26px;
+  --text-code: 13px; /* response body and editor body                            */
+  --text-code--line-height: 1.6;
+
+  /* ── Weights ────────────────────────────────────────────────────────────── */
+  /* Capped at 700: IBM Plex Sans Variable tops out there, and `font-synthesis:
+   * none` means the old 750/800 declarations were already rendering as 700. */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --tracking-label: 0.04em;
+  --tracking-tight: -0.01em;
+
+  /* ── Radii ──────────────────────────────────────────────────────────────── */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* ── Spacing ────────────────────────────────────────────────────────────── */
+  /* Drives the whole dynamic scale: p-1 = 4px, gap-2 = 8px, size-6 = 24px. */
+  --spacing: 0.25rem;
+
+  /* ── Easing ─────────────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* entrances, menus                 */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* hover, colour, transform       */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --default-transition-timing-function: var(--ease-standard);
+  --default-transition-duration: 120ms;
+
+  /* ── Shadows ────────────────────────────────────────────────────────────── */
+  --shadow-menu: 0 16px 40px -12px rgb(0 0 0 / 0.72), 0 0 0 1px rgb(0 0 0 / 0.4);
+  --shadow-accent: 0 1px 12px -2px #22c55e33;
+  --shadow-dot: 0 0 8px #22c55e5c;
+}
+
+/* Tailwind 4.3 has no namespace for any of the following, so putting them in
+ * `@theme` would emit variables that generate no utilities and mislead the next
+ * reader. They live in plain `:root` and are referenced directly. */
+:root {
+  /* Motion. Hover feedback on 28px rows has to be ≤60ms or the UI feels wet;
+   * anything at 180ms and above should be something that actually moves. */
+  --duration-instant: 60ms; /* dense-row hover                                   */
+  --duration-fast: 120ms; /* buttons, tabs, chips, checkboxes                    */
+  --duration-base: 180ms; /* panels, menus, disclosure                           */
+  --duration-slow: 260ms; /* overlays                                            */
+
+  /* Layering */
+  --z-base: 0;
+  --z-resizer: 10;
+  --z-sticky: 20;
+  --z-dropdown: 30;
+  --z-overlay: 40;
+  --z-toast: 50;
+
+  /* Control heights. The 24px floor is WCAG 2.2 SC 2.5.8; the old values were
+   * 13, 20, 22 and 23px. */
+  --h-control-xs: 24px;
+  --h-control-sm: 28px;
+  --h-control-md: 32px;
+  --h-control-lg: 36px;
+
+  /* Bar and row heights */
+  --h-tabbar: 40px;
+  --h-tab: 40px;
+  --h-request-bar: 56px;
+  --h-panel-tabs: 36px;
+  --h-response-status: 40px;
+  --h-brand: 56px;
+  --h-section-title: 32px;
+  --h-footer: 32px;
+  --h-row-tree: 28px;
+  --h-row-kv: 32px;
+  --h-kv-header: 28px;
+
+  /* Geometry */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --resizer-track: 4px;
+  --resizer-slop: 10px; /* pseudo-element hit expansion, reaching 24px total     */
+  --scrollbar-size: 10px;
+  --sidebar-min: 220px;
+  --sidebar-max: 420px;
+  --sidebar-collapsed: 48px;
+  --size-icon-xs: 13px;
+  --size-icon-sm: 14px;
+  --size-icon-md: 16px;
+}

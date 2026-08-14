@@ -1,51 +1,64 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { CommandPalette } from './components/CommandPalette'
 import { RequestEditor } from './components/RequestEditor'
 import { RequestTabs } from './components/RequestTabs'
 import { ResponseViewer } from './components/ResponseViewer'
 import { Sidebar } from './components/Sidebar'
+import { SplitHandle } from './components/SplitHandle'
+import { WorkspaceActions } from './components/WorkspaceActions'
+import { useGlobalShortcuts } from './useGlobalShortcuts'
 import { useAppStore } from './store'
 
 export function App() {
-  const [sidebarWidth, setSidebarWidth] = useState(282)
-  const [collapsed, setCollapsed] = useState(false)
-  const [requestHeight, setRequestHeight] = useState(52)
-  const abortRef = useRef<AbortController | null>(null)
-  const { activeId, save, closeRequest, responses } = useAppStore()
-  const dragSidebar = useCallback((event: React.PointerEvent) => {
-    const startX = event.clientX; const start = sidebarWidth
-    const move = (e: PointerEvent) => setSidebarWidth(Math.min(420, Math.max(220, start + e.clientX - startX)))
-    const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop) }
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', stop)
-  }, [sidebarWidth])
-  const dragSplit = useCallback((event: React.PointerEvent) => {
-    const shell = (event.currentTarget.parentElement as HTMLElement).getBoundingClientRect(); const startY = event.clientY; const start = requestHeight
-    const move = (e: PointerEvent) => setRequestHeight(Math.min(72, Math.max(30, start + ((e.clientY - startY) / shell.height) * 100)))
-    const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop) }
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', stop)
-  }, [requestHeight])
+  const sidebarWidth = useAppStore(s => s.sidebarWidth)
+  const setSidebarWidth = useAppStore(s => s.setSidebarWidth)
+  const collapsed = useAppStore(s => s.sidebarCollapsed)
+  const toggleSidebar = useAppStore(s => s.toggleSidebar)
+  const splitOrientation = useAppStore(s => s.splitOrientation)
+  const splitRatio = useAppStore(s => s.splitRatio)
+  const setSplitRatio = useAppStore(s => s.setSplitRatio)
+  const splitRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const handle = (event: KeyboardEvent) => {
-      const modifier = event.ctrlKey || event.metaKey
-      if (modifier && event.key.toLowerCase() === 's' && activeId) { event.preventDefault(); save(activeId) }
-      if (modifier && event.key.toLowerCase() === 'w' && activeId) { event.preventDefault(); const doc = useAppStore.getState().documents[activeId]; if (!doc.dirty || window.confirm(`Close ${doc.name} without saving?`)) closeRequest(activeId) }
-      if (modifier && event.key === 'Enter' && activeId) { event.preventDefault(); document.querySelector<HTMLButtonElement>('.send-btn')?.click() }
-      if (event.key === 'Escape' && responses[activeId ?? '']?.state === 'loading') abortRef.current?.abort()
-    }
-    window.addEventListener('keydown', handle); return () => window.removeEventListener('keydown', handle)
-  }, [activeId, closeRequest, responses, save])
+  useGlobalShortcuts()
 
-  return <main className="app-shell" style={{ gridTemplateColumns: `${collapsed ? 48 : sidebarWidth}px 4px minmax(0, 1fr)` }}>
-    <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)}/>
-    <div className="sidebar-resizer" onPointerDown={collapsed ? undefined : dragSidebar}/>
-    <section className="workspace">
-      <div className="workspace-top"><button className="icon-btn panel-toggle" title={collapsed ? 'Show sidebar' : 'Hide sidebar'} onClick={() => setCollapsed(!collapsed)}>{collapsed ? <PanelLeftOpen size={15}/> : <PanelLeftClose size={15}/>}</button><RequestTabs/></div>
-      <div className="editor-split" style={{ gridTemplateRows: `minmax(210px, ${requestHeight}fr) 5px minmax(190px, ${100 - requestHeight}fr)` }}>
-        <RequestEditor onController={controller => { abortRef.current = controller }}/>
-        <div className="horizontal-resizer" onPointerDown={dragSplit}><span/></div>
-        <ResponseViewer/>
-      </div>
-    </section>
-  </main>
+  const columns = splitOrientation === 'columns'
+  // At 1440×900 the workspace is 1154px wide, so a 52/48 split gives 596/553px —
+  // both clear of the 360/320 minimums. Column mode is viable without a media query.
+  const splitStyle = columns
+    ? { gridTemplateColumns: `minmax(360px, ${splitRatio}fr) 5px minmax(320px, ${100 - splitRatio}fr)`, gridTemplateRows: 'minmax(0, 1fr)' }
+    : { gridTemplateRows: `minmax(210px, ${splitRatio}fr) 5px minmax(190px, ${100 - splitRatio}fr)`, gridTemplateColumns: 'minmax(0, 1fr)' }
+
+  return (
+    <main className="app-shell" style={{ gridTemplateColumns: `${collapsed ? 48 : sidebarWidth}px 4px minmax(0, 1fr)` }}>
+      <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
+      <SplitHandle label="Resize sidebar" axis="x" unit="px" value={sidebarWidth} min={220} max={420} step={16} defaultValue={282} onChange={setSidebarWidth} />
+      <section className="workspace">
+        <div className="workspace-top">
+          <button className="icon-btn panel-toggle" title={collapsed ? 'Show sidebar' : 'Hide sidebar'} onClick={toggleSidebar}>
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          </button>
+          <RequestTabs />
+          <WorkspaceActions />
+        </div>
+        <div className="editor-split" ref={splitRef} data-orientation={splitOrientation} style={splitStyle}>
+          <RequestEditor />
+          <SplitHandle
+            label={columns ? 'Resize request and response columns' : 'Resize request and response rows'}
+            axis={columns ? 'x' : 'y'}
+            unit="percent"
+            value={splitRatio}
+            min={30}
+            max={72}
+            step={4}
+            defaultValue={52}
+            onChange={setSplitRatio}
+            containerRef={splitRef}
+          />
+          <ResponseViewer />
+        </div>
+      </section>
+      <CommandPalette />
+    </main>
+  )
 }
