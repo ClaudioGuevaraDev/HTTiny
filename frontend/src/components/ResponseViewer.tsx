@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
-import { Braces, Copy, FileJson2, RotateCcw, Send, TriangleAlert, X } from 'lucide-react'
+import { Braces, Check, Copy, FileJson2, RotateCcw, Send, TriangleAlert, X } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import { formatDuration } from '../format'
 import { cancelRequest, runRequest } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
 import { useAppStore } from '../store'
+import { useCopy } from '../useCopy'
+import { useRovingFocus } from '../useRovingFocus'
 import { Placeholder, PlaceholderAction, SkeletonLines } from './Placeholder'
 import { ResponseStatus } from './ResponseStatus'
 
@@ -39,6 +41,8 @@ export function ResponseViewer() {
   const stored = useAppStore(s => (s.activeId ? s.responses[s.activeId] : undefined))
   const response = stored ?? { state: 'idle' as const }
   const elapsed = useElapsed(response.state === 'loading' ? response.startedAt : null)
+  const { status: copyStatus, copy } = useCopy()
+  const onTabsKeyDown = useRovingFocus('[role="tab"]')
 
   return (
     <section className="response-viewer" aria-label="Response">
@@ -47,19 +51,26 @@ export function ResponseViewer() {
           <button
             type="button"
             className="icon-btn xs"
-            aria-label="Copy response body"
-            title="Copy body"
-            onClick={() => void navigator.clipboard.writeText(response.body)}
+            aria-label={copyStatus === 'copied' ? 'Response body copied' : 'Copy response body'}
+            title={copyStatus === 'copied' ? 'Copied' : 'Copy body'}
+            onClick={() => copy(response.body)}
           >
-            <Copy size={13} />
+            {copyStatus === 'copied' ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
           </button>
         )}
         {(response.state === 'success' || response.state === 'error') && activeId && (
           <button type="button" className="icon-btn xs" aria-label="Clear response" title="Clear" onClick={() => setResponse(activeId, { state: 'idle' })}>
-            <X size={13} />
+            <X size={13} aria-hidden="true" />
           </button>
         )}
       </ResponseStatus>
+
+      {/* One region for both copy buttons. The clipboard write used to be a bare `void`
+          call: nothing moved on screen, nothing was announced, and a rejected promise —
+          a denied clipboard permission — was indistinguishable from success. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {copyStatus === 'copied' ? 'Copied to clipboard' : copyStatus === 'failed' ? 'Could not copy — clipboard access was denied' : ''}
+      </p>
 
       {response.state === 'idle' && (
         <Placeholder icon={<FileJson2 size={22} />} title="Nothing sent yet" description="Run this request to inspect its status, headers and body.">
@@ -70,9 +81,9 @@ export function ResponseViewer() {
       )}
 
       {response.state === 'loading' && (
-        <div className="response-loading">
+        <div className="response-loading" aria-busy="true">
           <SkeletonLines count={9} />
-          <p className="loading-note">Waiting for a response · {formatDuration(elapsed)}</p>
+          <p className="loading-note">Waiting for a response… · {formatDuration(elapsed)}</p>
           <PlaceholderAction variant="secondary" shortcut={shortcuts.cancel} onClick={() => activeId && cancelRequest(activeId)}>
             Cancel
           </PlaceholderAction>
@@ -89,27 +100,46 @@ export function ResponseViewer() {
               Fix the URL
             </PlaceholderAction>
           )}
-          <PlaceholderAction variant="secondary" onClick={() => void navigator.clipboard.writeText(`${response.code}: ${response.detail}`)}>
-            Copy details
+          <PlaceholderAction variant="secondary" onClick={() => copy(`${response.code}: ${response.detail}`)}>
+            {copyStatus === 'copied' ? 'Copied' : 'Copy Details'}
           </PlaceholderAction>
         </Placeholder>
       )}
 
       {response.state === 'success' && (
         <>
-          <div className="response-tabs">
-            <button type="button" className={responsePanel === 'body' ? 'active' : ''} onClick={() => setResponsePanel('body')}>
+          <div className="response-tabs" role="tablist" aria-label="Response sections" onKeyDown={onTabsKeyDown}>
+            <button
+              type="button"
+              role="tab"
+              id="response-tab-body"
+              aria-selected={responsePanel === 'body'}
+              aria-controls="response-content"
+              tabIndex={responsePanel === 'body' ? 0 : -1}
+              className={responsePanel === 'body' ? 'active' : ''}
+              onClick={() => setResponsePanel('body')}
+            >
               Body
             </button>
-            <button type="button" className={responsePanel === 'headers' ? 'active' : ''} onClick={() => setResponsePanel('headers')}>
-              Headers <span>{response.headers.length}</span>
+            <button
+              type="button"
+              role="tab"
+              id="response-tab-headers"
+              aria-selected={responsePanel === 'headers'}
+              aria-controls="response-content"
+              tabIndex={responsePanel === 'headers' ? 0 : -1}
+              className={responsePanel === 'headers' ? 'active' : ''}
+              onClick={() => setResponsePanel('headers')}
+            >
+              Headers <span aria-hidden="true">{response.headers.length}</span>
+              <span className="sr-only">, {response.headers.length} returned</span>
             </button>
-            <div className="ml-auto response-format">
-              <Braces size={13} />
+            <div className="ml-auto response-format" role="presentation">
+              <Braces size={13} aria-hidden="true" />
               JSON
             </div>
           </div>
-          <div className="response-content">
+          <div className="response-content" id="response-content" role="tabpanel" aria-labelledby={`response-tab-${responsePanel}`} tabIndex={-1}>
             {responsePanel === 'body' ? (
               response.body ? (
                 /*
@@ -132,18 +162,30 @@ export function ResponseViewer() {
                 <div className="subtle-empty">{response.status === 204 ? 'The response body is empty (204 No Content).' : 'The response had no body.'}</div>
               )
             ) : (
-              <div className="response-headers">
-                <div>
-                  <b>NAME</b>
-                  <b>VALUE</b>
-                </div>
-                {response.headers.map(h => (
-                  <div key={h.id}>
-                    <code>{h.key}</code>
-                    <code>{h.value}</code>
-                  </div>
-                ))}
-              </div>
+              /* A real table, not a grid of divs with <b> for column heads. Name/value
+                 pairs are tabular data, and a screen reader can only navigate them
+                 column-by-column if the markup says so. */
+              <table className="response-headers">
+                <caption className="sr-only">Response headers</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">NAME</th>
+                    <th scope="col">VALUE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {response.headers.map(h => (
+                    <tr key={h.id}>
+                      <td>
+                        <code>{h.key}</code>
+                      </td>
+                      <td>
+                        <code>{h.value}</code>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </>

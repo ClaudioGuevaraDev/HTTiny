@@ -1,149 +1,136 @@
 import { useState } from 'react'
-import { Boxes, ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react'
-import type { TreeNode } from '../types'
+import { Boxes, ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, Plus, Search } from 'lucide-react'
+import type { VisibleRow } from '../store'
 import { useAppStore } from '../store'
+import { useTreeNavigation } from '../useTreeNavigation'
 import { shortcuts } from '../shortcuts'
 import { MethodChip } from './MethodChip'
-import { Shortcut } from './Placeholder'
+import { Placeholder, PlaceholderAction, Shortcut } from './Placeholder'
+import { TreeRowMenu } from './TreeRowMenu'
 
-function TreeItem({ node, depth }: { node: TreeNode; depth: number }) {
+function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean; onFocusRow: (id: string) => void }) {
+  const { node, depth, position, siblings } = row
   const selectedNodeId = useAppStore(s => s.selectedNodeId)
   const openRequest = useAppStore(s => s.openRequest)
   const toggleNode = useAppStore(s => s.toggleNode)
-  const addNode = useAppStore(s => s.addNode)
   const renameNode = useAppStore(s => s.renameNode)
-  const deleteNode = useAppStore(s => s.deleteNode)
   // Read the method from the document rather than the node. `RequestNode.method`
   // used to be a denormalised copy that nothing kept in sync, so changing the method
   // in the editor left the tree showing the old one.
   const method = useAppStore(s => (node.type === 'request' ? s.documents[node.requestId]?.method : undefined))
   const [menu, setMenu] = useState(false)
   const [renaming, setRenaming] = useState(false)
-  const children = node.type === 'request' ? [] : node.children
+  const selected = selectedNodeId === node.id
 
   const select = () => (node.type === 'request' ? openRequest(node.requestId) : toggleNode(node.id))
 
   return (
-    <div className="tree-branch">
-      <div className={`tree-row group ${selectedNodeId === node.id ? 'selected' : ''}`} style={{ paddingLeft: 8 + depth * 14 }} onClick={select}>
-        {node.type !== 'request' ? node.expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : <span className="w-[13px]" />}
-        {node.type === 'collection' && <Boxes size={14} className="tree-icon" />}
-        {node.type === 'folder' && <Folder size={14} className="tree-icon" />}
-        {node.type === 'request' && method && <MethodChip method={method} variant="chip" />}
-        {renaming ? (
-          <input
-            autoFocus
-            className="tree-rename"
-            defaultValue={node.name}
-            onClick={e => e.stopPropagation()}
-            onBlur={e => {
-              renameNode(node.id, e.target.value.trim() || node.name)
-              setRenaming(false)
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Enter') e.currentTarget.blur()
-              if (e.key === 'Escape') setRenaming(false)
-            }}
-          />
+    <div
+      className={`tree-row group ${selected ? 'selected' : ''}`}
+      role="treeitem"
+      data-node-id={node.id}
+      tabIndex={active ? 0 : -1}
+      aria-level={depth + 1}
+      aria-posinset={position}
+      aria-setsize={siblings}
+      aria-selected={selected}
+      aria-expanded={node.type !== 'request' ? node.expanded : undefined}
+      style={{ paddingLeft: 8 + depth * 14 }}
+      onClick={() => {
+        onFocusRow(node.id)
+        select()
+      }}
+      // Shift+F10 and the ContextMenu key are the standard way to reach a row's actions
+      // from the keyboard, since the trigger itself is deliberately not a tab stop.
+      onKeyDown={event => {
+        if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+          event.preventDefault()
+          setMenu(true)
+        }
+      }}
+    >
+      {node.type !== 'request' ? (
+        node.expanded ? (
+          <ChevronDown size={13} aria-hidden="true" />
         ) : (
-          <span className="truncate flex-1">{node.name}</span>
-        )}
-        <button
-          className="icon-btn xs opacity-0 group-hover:opacity-100"
-          aria-label={`Actions for ${node.name}`}
-          onClick={e => {
-            e.stopPropagation()
-            setMenu(!menu)
+          <ChevronRight size={13} aria-hidden="true" />
+        )
+      ) : (
+        <span className="w-[13px]" />
+      )}
+      {node.type === 'collection' && <Boxes size={14} className="tree-icon" aria-hidden="true" />}
+      {node.type === 'folder' && <Folder size={14} className="tree-icon" aria-hidden="true" />}
+      {node.type === 'request' && method && <MethodChip method={method} variant="chip" />}
+      {renaming ? (
+        /* `autoFocus` is justified here — a single input that appears on demand, on
+           desktop, in direct response to choosing Rename. */
+        <input
+          autoFocus
+          className="tree-rename"
+          aria-label={`Rename ${node.name}`}
+          defaultValue={node.name}
+          autoComplete="off"
+          spellCheck={false}
+          onClick={e => e.stopPropagation()}
+          onBlur={e => {
+            renameNode(node.id, e.target.value.trim() || node.name)
+            setRenaming(false)
+            onFocusRow(node.id)
           }}
-        >
-          <MoreHorizontal size={14} />
-        </button>
-        {menu && (
-          <div className="tree-menu" onClick={e => e.stopPropagation()}>
-            {node.type !== 'request' && (
-              <>
-                <button
-                  onClick={() => {
-                    addNode('request', node.id)
-                    setMenu(false)
-                  }}
-                >
-                  <FilePlus2 size={13} />
-                  New request
-                </button>
-                <button
-                  onClick={() => {
-                    addNode('folder', node.id)
-                    setMenu(false)
-                  }}
-                >
-                  <FolderPlus size={13} />
-                  New folder
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => {
-                setRenaming(true)
-                setMenu(false)
-              }}
-            >
-              Rename
-            </button>
-            <button
-              className="danger"
-              onClick={() => {
-                deleteNode(node.id)
-                setMenu(false)
-              }}
-            >
-              <Trash2 size={13} />
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
-      {node.type !== 'request' && node.expanded && children.map(child => <TreeItem key={child.id} node={child} depth={depth + 1} />)}
+          onKeyDown={e => {
+            e.stopPropagation()
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') {
+              setRenaming(false)
+              onFocusRow(node.id)
+            }
+          }}
+        />
+      ) : (
+        <span className="truncate flex-1">{node.name}</span>
+      )}
+      <TreeRowMenu node={node} open={menu} onOpenChange={setMenu} onRename={() => setRenaming(true)} onReturnFocus={() => onFocusRow(node.id)} />
     </div>
   )
 }
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const tree = useAppStore(s => s.tree)
   const addNode = useAppStore(s => s.addNode)
   const openPalette = useAppStore(s => s.openPalette)
+  const { containerRef, rows, activeId, onKeyDown, focusRow } = useTreeNavigation()
 
   if (collapsed)
     return (
-      <aside className="sidebar collapsed">
-        <button className="brand-mark" onClick={onToggle} title="Open sidebar">
+      <nav className="sidebar collapsed" id="sidebar" aria-label="Collections">
+        <h1 className="sr-only">HTTiny</h1>
+        <button className="brand-mark" aria-label="Show sidebar" title="Show sidebar" onClick={onToggle}>
           H<span>T</span>
         </button>
-      </aside>
+      </nav>
     )
 
   return (
-    <aside className="sidebar">
+    <nav className="sidebar" id="sidebar" aria-label="Collections">
       <header className="app-brand">
-        <button className="brand-mark" onClick={onToggle} title="Collapse sidebar">
+        <button className="brand-mark" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={onToggle}>
           H<span>T</span>
         </button>
         <div>
-          <strong>HTTiny</strong>
+          <h1>HTTiny</h1>
           <small>HTTP workspace</small>
         </div>
-        <button className="icon-btn ml-auto" title="New collection" onClick={() => addNode('collection')}>
-          <Plus size={16} />
+        <button className="icon-btn ml-auto" aria-label="New collection" title="New collection" onClick={() => addNode('collection')}>
+          <Plus size={16} aria-hidden="true" />
         </button>
       </header>
       <div className="sidebar-section-title">
-        <span>COLLECTIONS</span>
+        <span id="collections-label">COLLECTIONS</span>
         <div>
-          <button className="icon-btn xs" title="New folder" onClick={() => addNode('folder', 'main')}>
-            <FolderPlus size={14} />
+          <button className="icon-btn xs" aria-label="New folder" title="New folder" onClick={() => addNode('folder', 'main')}>
+            <FolderPlus size={14} aria-hidden="true" />
           </button>
-          <button className="icon-btn xs" title="New request" onClick={() => addNode('request', 'main')}>
-            <FilePlus2 size={14} />
+          <button className="icon-btn xs" aria-label="New request" title="New request" onClick={() => addNode('request', 'main')}>
+            <FilePlus2 size={14} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -159,15 +146,25 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         <span>Search requests</span>
         <Shortcut keys={shortcuts.palette} />
       </button>
-      <div className="tree-scroll">
-        {tree.map(node => (
-          <TreeItem key={node.id} node={node} depth={0} />
-        ))}
-      </div>
+      {rows.length === 0 ? (
+        /* Deleting the last collection used to leave a blank panel with no way back
+           except the header's `+`. */
+        <div className="tree-scroll">
+          <Placeholder icon={<Boxes size={20} />} title="No Collections" description="Group your requests into a collection to get started.">
+            <PlaceholderAction onClick={() => addNode('collection')}>New Collection</PlaceholderAction>
+          </Placeholder>
+        </div>
+      ) : (
+        <div className="tree-scroll" ref={containerRef} role="tree" aria-labelledby="collections-label" onKeyDown={onKeyDown}>
+          {rows.map(row => (
+            <TreeRow key={row.node.id} row={row} active={row.node.id === activeId} onFocusRow={focusRow} />
+          ))}
+        </div>
+      )}
       <footer className="sidebar-footer">
-        <span className="status-dot" />
+        <span className="status-dot" aria-hidden="true" />
         Mock responses <span className="ml-auto">v{__APP_VERSION__}</span>
       </footer>
-    </aside>
+    </nav>
   )
 }

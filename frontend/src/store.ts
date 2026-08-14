@@ -87,7 +87,7 @@ const findRequestNodeId = (nodes: TreeNode[], requestId: string): string | null 
   return null
 }
 
-const findNode = (nodes: TreeNode[], id: string): TreeNode | null => {
+export const findNode = (nodes: TreeNode[], id: string): TreeNode | null => {
   for (const node of nodes) {
     if (node.id === id) return node
     if (node.type !== 'request') {
@@ -99,7 +99,32 @@ const findNode = (nodes: TreeNode[], id: string): TreeNode | null => {
 }
 
 /** Every document id in a subtree, so deleting a folder prunes its requests too. */
-const requestIdsIn = (node: TreeNode): string[] => (node.type === 'request' ? [node.requestId] : node.children.flatMap(requestIdsIn))
+export const requestIdsIn = (node: TreeNode): string[] => (node.type === 'request' ? [node.requestId] : node.children.flatMap(requestIdsIn))
+
+export interface VisibleRow {
+  node: TreeNode
+  depth: number
+  parentId: string | null
+  /** 1-based position among siblings, and the sibling count — `aria-posinset`/`aria-setsize`. */
+  position: number
+  siblings: number
+}
+
+/**
+ * The tree flattened to exactly the rows a user can see, in visual order. This is what
+ * makes keyboard navigation possible: `↑`/`↓` are a step through this array, and `←`/`→`
+ * need the parent id, which the nested structure does not carry.
+ *
+ * Collapsed branches contribute their own row and nothing beneath it, which is the whole
+ * point — arrow keys must not walk into rows that are not on screen. The flat shape is
+ * also what the sidebar renders: an ARIA tree may be authored flat as long as every row
+ * declares its level and position, and that avoids a wrapper element per branch.
+ */
+export const flattenVisible = (nodes: TreeNode[], depth = 0, parentId: string | null = null): VisibleRow[] =>
+  nodes.flatMap((node, index) => {
+    const row: VisibleRow = { node, depth, parentId, position: index + 1, siblings: nodes.length }
+    return node.type !== 'request' && node.expanded ? [row, ...flattenVisible(node.children, depth + 1, node.id)] : [row]
+  })
 
 /** Ids of every ancestor of `id`, outermost first — used to expand a revealed row. */
 const ancestorIds = (nodes: TreeNode[], id: string, trail: string[] = []): string[] | null => {

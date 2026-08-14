@@ -137,7 +137,7 @@ function CommandPaletteBody({ onDismiss }: { onDismiss: () => void }) {
           aria-autocomplete="list"
           aria-activedescendant={results.length ? optionId(active) : undefined}
           aria-label="Search requests and commands"
-          placeholder="Search requests, or type > for commands"
+          placeholder="Search requests, or type > for commands…"
           value={query}
           spellCheck={false}
           onChange={event => setQuery(event.target.value)}

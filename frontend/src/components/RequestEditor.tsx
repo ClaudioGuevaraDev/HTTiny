@@ -6,10 +6,22 @@ import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
 import { methodOptions, replaceQuery, useAppStore } from '../store'
 import { methodToken, type HttpMethod, type KeyValueRow, type RequestDocument } from '../types'
+import { requestTabId } from '../domIds'
+import { useRovingFocus } from '../useRovingFocus'
 import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction } from './Placeholder'
 
 const freshRow = (): KeyValueRow => ({ id: crypto.randomUUID(), enabled: true, key: '', value: '', description: '' })
+
+const FIELD_LABEL = { key: 'Key', value: 'Value', description: 'Description' } as const
+
+/**
+ * Deliberately generic rather than worked examples. The example-pattern rule is for
+ * single-purpose fields whose format is not obvious — the URL and the bearer token get
+ * one. In a repeating grid any example is arbitrary, and it repeats down every empty
+ * row, where two greyed "page…" cells read as duplicated data rather than as a hint.
+ */
+const PLACEHOLDER = { key: 'Key…', value: 'Value…', description: 'Optional description…' } as const
 
 function KeyValueEditor({ request, field }: { request: RequestDocument; field: 'params' | 'headers' }) {
   const setRows = useAppStore(s => s.setRows)
@@ -38,26 +50,31 @@ function KeyValueEditor({ request, field }: { request: RequestDocument; field: '
             aria-label={row.key ? `Enable ${row.key}` : 'Enable row'}
             onClick={() => commit(rows.map(r => (r.id === row.id ? { ...r, enabled: !r.enabled } : r)))}
           >
-            {row.enabled && <Check size={11} />}
+            {row.enabled && <Check size={11} aria-hidden="true" />}
           </button>
           {(['key', 'value', 'description'] as const).map(key => (
             <input
               key={key}
               className="technical-input"
               value={row[key]}
-              aria-label={key === 'key' ? 'Key' : key === 'value' ? 'Value' : 'Description'}
-              placeholder={key === 'key' ? 'Key' : key === 'value' ? 'Value' : 'Optional description'}
+              name={`${field}-${key}`}
+              aria-label={FIELD_LABEL[key]}
+              placeholder={PLACEHOLDER[key]}
+              // Header names and values are code tokens, not prose: a password manager
+              // offering to fill them, or a red squiggle under `X-Api-Key`, is noise.
+              autoComplete="off"
+              spellCheck={key === 'description'}
               onChange={e => commit(rows.map(r => (r.id === row.id ? { ...r, [key]: e.target.value } : r)))}
             />
           ))}
           <button type="button" className="icon-btn xs row-delete" aria-label="Delete row" onClick={() => commit(rows.filter(r => r.id !== row.id))}>
-            <Trash2 size={13} />
+            <Trash2 size={13} aria-hidden="true" />
           </button>
         </div>
       ))}
       <button type="button" className="add-row" onClick={() => commit([...rows, freshRow()])}>
-        <Plus size={13} />
-        Add {field === 'params' ? 'parameter' : 'header'}
+        <Plus size={13} aria-hidden="true" />
+        Add {field === 'params' ? 'Parameter' : 'Header'}
       </button>
     </div>
   )
@@ -65,13 +82,24 @@ function KeyValueEditor({ request, field }: { request: RequestDocument; field: '
 
 function BodyEditor({ request }: { request: RequestDocument }) {
   const updateDocument = useAppStore(s => s.updateDocument)
+  const onSegmentKeyDown = useRovingFocus('[role="radio"]')
   const setBody = (patch: Partial<RequestDocument['body']>) => updateDocument(request.id, { body: { ...request.body, ...patch } })
   return (
     <div className="body-editor">
       <div className="editor-toolbar">
-        <div className="segmented">
+        {/* A radiogroup rather than a tablist: these pick what the body *is*, they do not
+            switch between panels. Arrow keys move within it, per the ARIA radio pattern. */}
+        <div className="segmented" role="radiogroup" aria-label="Body type" onKeyDown={onSegmentKeyDown}>
           {(['none', 'json', 'text'] as const).map(type => (
-            <button type="button" key={type} className={request.body.type === type ? 'active' : ''} onClick={() => setBody({ type })}>
+            <button
+              type="button"
+              key={type}
+              role="radio"
+              aria-checked={request.body.type === type}
+              tabIndex={request.body.type === type ? 0 : -1}
+              className={request.body.type === type ? 'active' : ''}
+              onClick={() => setBody({ type })}
+            >
               {type === 'none' ? 'None' : type.toUpperCase()}
             </button>
           ))}
@@ -102,6 +130,7 @@ function BodyEditor({ request }: { request: RequestDocument }) {
           extensions={request.body.type === 'json' ? [json()] : []}
           onChange={content => setBody({ content })}
           basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: true }}
+          aria-label={`Request body (${request.body.type.toUpperCase()})`}
         />
       )}
     </div>
@@ -122,21 +151,51 @@ function AuthEditor({ request }: { request: RequestDocument }) {
         </select>
       </label>
       {request.auth.type === 'none' && <p>No auth. Requests are sent without credentials.</p>}
+      {/*
+        These are credentials for the *target API*, not for HTTiny, so every one of them
+        opts out of autofill: a password manager offering to save them would file another
+        site's secret under this app. `spellCheck` is off for the same reason it is off on
+        header names — none of this is prose.
+      */}
       {request.auth.type === 'bearer' && (
         <label>
           Token
-          <input className="technical-input" value={request.auth.token} onChange={e => setAuth({ token: e.target.value })} placeholder="Enter bearer token" />
+          <input
+            className="technical-input"
+            name="api-token"
+            value={request.auth.token}
+            onChange={e => setAuth({ token: e.target.value })}
+            placeholder="eyJhbGciOiJIUzI1NiJ9…"
+            autoComplete="off"
+            spellCheck={false}
+          />
         </label>
       )}
       {request.auth.type === 'basic' && (
         <div className="auth-grid">
           <label>
             Username
-            <input value={request.auth.username} onChange={e => setAuth({ username: e.target.value })} />
+            <input
+              className="technical-input"
+              name="api-username"
+              value={request.auth.username}
+              onChange={e => setAuth({ username: e.target.value })}
+              placeholder="api-user…"
+              autoComplete="off"
+              spellCheck={false}
+            />
           </label>
           <label>
             Password
-            <input type="password" value={request.auth.password} onChange={e => setAuth({ password: e.target.value })} />
+            <input
+              className="technical-input"
+              type="password"
+              name="api-password"
+              value={request.auth.password}
+              onChange={e => setAuth({ password: e.target.value })}
+              autoComplete="off"
+              spellCheck={false}
+            />
           </label>
         </div>
       )}
@@ -174,6 +233,7 @@ export function RequestEditor() {
   const addNode = useAppStore(s => s.addNode)
   const openPalette = useAppStore(s => s.openPalette)
   const sending = useAppStore(s => (s.activeId ? s.responses[s.activeId]?.state === 'loading' : false))
+  const onPanelKeyDown = useRovingFocus('[role="tab"]')
 
   if (!request || !activeId)
     return (
@@ -198,7 +258,9 @@ export function RequestEditor() {
     )
 
   return (
-    <section className="request-editor">
+    /* The editor is the panel the tab strip in `workspace-top` controls: switching tabs
+       swaps which request is shown here, which is exactly the tab/tabpanel relationship. */
+    <section className="request-editor" id="request-editor-panel" role="tabpanel" aria-labelledby={requestTabId(activeId)}>
       <div className="request-bar">
         {/*
           The native select is kept for keyboard and screen-reader behaviour and
@@ -222,18 +284,32 @@ export function RequestEditor() {
           </select>
         </div>
         {/* A stable id, so the INVALID_URL placeholder can focus this field without
-            reaching for a class selector the way Ctrl+Enter used to. */}
+            reaching for a class selector the way Ctrl+Enter used to.
+
+            `inputMode` but deliberately not `type="url"`: the mock executor keys off
+            `timeout`, `dns-error` and `refused` in the URL, and template variables such
+            as `{{baseUrl}}/users` are coming — both would trip native URL validation. */}
         <input
           id="request-url"
+          name="request-url"
           aria-label="Request URL"
           className="url-input"
           value={request.url}
           onChange={e => updateDocument(activeId, { url: e.target.value })}
           onBlur={() => useAppStore.getState().setRows(activeId, 'params', parseParams(request.url, request.params))}
+          placeholder="https://api.example.com/users…"
+          inputMode="url"
+          autoComplete="off"
           spellCheck={false}
         />
-        <button type="button" className="icon-btn save-btn" title={`Save request (${shortcutHint('save')})`} onClick={() => save(activeId)}>
-          <Save size={16} />
+        <button
+          type="button"
+          className="icon-btn save-btn"
+          aria-label={`Save request (${shortcutHint('save')})`}
+          title={`Save request (${shortcutHint('save')})`}
+          onClick={() => save(activeId)}
+        >
+          <Save size={16} aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -241,18 +317,36 @@ export function RequestEditor() {
           title={sending ? `Cancel request (${shortcutHint('cancel')})` : `Send request (${shortcutHint('send')})`}
           onClick={() => toggleRequest(activeId)}
         >
-          {sending ? <Square size={13} /> : <Send size={15} />} {sending ? 'Cancel' : 'Send'}
+          {sending ? <Square size={13} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} {sending ? 'Cancel' : 'Send'}
         </button>
       </div>
-      <div className="panel-tabs">
-        {(['params', 'headers', 'body', 'auth'] as const).map(panel => (
-          <button type="button" key={panel} className={requestPanel === panel ? 'active' : ''} onClick={() => setRequestPanel(panel)}>
-            {panel[0].toUpperCase() + panel.slice(1)}
-            {(panel === 'params' || panel === 'headers') && <span>{request[panel].filter(r => r.enabled && r.key).length}</span>}
-          </button>
-        ))}
+      <div className="panel-tabs" role="tablist" aria-label="Request sections" onKeyDown={onPanelKeyDown}>
+        {(['params', 'headers', 'body', 'auth'] as const).map(panel => {
+          const count = panel === 'params' || panel === 'headers' ? request[panel].filter(r => r.enabled && r.key).length : null
+          return (
+            <button
+              type="button"
+              key={panel}
+              role="tab"
+              id={`request-panel-tab-${panel}`}
+              aria-selected={requestPanel === panel}
+              aria-controls="request-panel"
+              tabIndex={requestPanel === panel ? 0 : -1}
+              className={requestPanel === panel ? 'active' : ''}
+              onClick={() => setRequestPanel(panel)}
+            >
+              {panel[0].toUpperCase() + panel.slice(1)}
+              {count !== null && (
+                <>
+                  <span aria-hidden="true">{count}</span>
+                  <span className="sr-only">, {count} enabled</span>
+                </>
+              )}
+            </button>
+          )
+        })}
       </div>
-      <div className="request-panel">
+      <div className="request-panel" id="request-panel" role="tabpanel" aria-labelledby={`request-panel-tab-${requestPanel}`} tabIndex={-1}>
         {requestPanel === 'params' && <KeyValueEditor request={request} field="params" />}
         {requestPanel === 'headers' && <KeyValueEditor request={request} field="headers" />}
         {requestPanel === 'body' && <BodyEditor request={request} />}

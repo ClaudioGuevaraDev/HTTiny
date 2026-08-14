@@ -17,6 +17,10 @@
      * almost none of. */
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
+    /* WebKitGTK and the macOS WKWebView both paint a tap flash on touch. The focus ring
+     * and the `:active` surface already carry that feedback, and the flash is a colour
+     * nobody chose. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   * {
@@ -40,6 +44,15 @@
 
   button {
     color: inherit;
+  }
+
+  /* Drops the ~300ms double-tap-to-zoom wait on touch input without disabling zoom. */
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='treeitem'] {
+    touch-action: manipulation;
   }
 
   /* `:where()` gives this zero specificity, so any component can override it

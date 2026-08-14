@@ -14,13 +14,11 @@ const BUCKET_ICON = {
  * The payoff moment of the app, which used to be 10px of grey text in the corner of
  * a bar whose main content was the word "Response".
  *
- * Rendered in all four states so the panel chrome keeps a constant height, and
- * announced through `role="status"` so a screen reader hears "201 Created" when a
- * response lands — something the old corner text never did.
+ * Rendered in all four states so the panel chrome keeps a constant height.
  */
 export function ResponseStatus({ response, elapsed, children }: { response: ResponseSnapshot; elapsed: number; children?: ReactNode }) {
   return (
-    <header className="response-status" data-state={response.state} role="status" aria-live="polite">
+    <header className="response-status" data-state={response.state}>
       <StatusPill response={response} />
       <dl className="status-metrics">
         {response.state === 'success' && (
@@ -34,7 +32,32 @@ export function ResponseStatus({ response, elapsed, children }: { response: Resp
         {response.state === 'error' && <Metric label="Code" value={response.code} />}
       </dl>
       {children && <div className="status-actions">{children}</div>}
+      <Announcement response={response} />
     </header>
+  )
+}
+
+/**
+ * The live region is a separate, invisible node carrying *settled* text only.
+ *
+ * `role="status"` used to sit on the header itself, which contains the Elapsed metric —
+ * and that re-renders every 100ms while a request is in flight, so a screen reader
+ * re-read the entire bar, buttons included, ten times a second. Announcing only what
+ * changed on a state boundary means one utterance per request instead of hundreds.
+ */
+function Announcement({ response }: { response: ResponseSnapshot }) {
+  const text =
+    response.state === 'loading'
+      ? 'Sending…'
+      : response.state === 'success'
+        ? `${response.status} ${response.statusText} · ${formatDuration(response.time)} · ${formatBytes(response.sizeBytes)}`
+        : response.state === 'error'
+          ? `Request failed: ${response.message}. ${response.detail}`
+          : ''
+  return (
+    <p className="sr-only" role="status" aria-live="polite">
+      {text}
+    </p>
   )
 }
 

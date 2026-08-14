@@ -30,13 +30,27 @@ export function App() {
     : { gridTemplateRows: `minmax(210px, ${splitRatio}fr) 5px minmax(190px, ${100 - splitRatio}fr)`, gridTemplateColumns: 'minmax(0, 1fr)' }
 
   return (
-    <main className="app-shell" style={{ gridTemplateColumns: `${collapsed ? 48 : sidebarWidth}px 4px minmax(0, 1fr)` }}>
+    /* The shell was `<main>` with the sidebar `<aside>` nested inside it, which put the
+       navigation *inside* the main landmark and left the app with no main region of its
+       own. The grid is now a plain div, the sidebar is `<nav>` and the workspace is
+       `<main>` — three sibling landmarks, which is what the skip link jumps between. */
+    <div className="app-shell" style={{ gridTemplateColumns: `${collapsed ? 48 : sidebarWidth}px 4px minmax(0, 1fr)` }}>
+      <a className="skip-link" href="#workspace">
+        Skip to Workspace
+      </a>
       <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
       <SplitHandle label="Resize sidebar" axis="x" unit="px" value={sidebarWidth} min={220} max={420} step={16} defaultValue={282} onChange={setSidebarWidth} />
-      <section className="workspace">
+      <main className="workspace" id="workspace">
         <div className="workspace-top">
-          <button className="icon-btn panel-toggle" title={collapsed ? 'Show sidebar' : 'Hide sidebar'} onClick={toggleSidebar}>
-            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          <button
+            className="icon-btn panel-toggle"
+            aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+            aria-expanded={!collapsed}
+            aria-controls="sidebar"
+            title={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+            onClick={toggleSidebar}
+          >
+            {collapsed ? <PanelLeftOpen size={15} aria-hidden="true" /> : <PanelLeftClose size={15} aria-hidden="true" />}
           </button>
           <RequestTabs />
           <WorkspaceActions />
@@ -57,8 +71,8 @@ export function App() {
           />
           <ResponseViewer />
         </div>
-      </section>
+      </main>
       <CommandPalette />
-    </main>
+    </div>
   )
 }

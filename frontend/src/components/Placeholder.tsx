@@ -26,7 +26,9 @@ export function Placeholder({
       <div className="placeholder-icon" aria-hidden="true">
         {icon}
       </div>
-      <h3 className="placeholder-title">{title}</h3>
+      {/* h2, not h3: the only h1 is the app name in the sidebar, and skipping a level
+          leaves a hole in the outline. */}
+      <h2 className="placeholder-title">{title}</h2>
       <p className="placeholder-body">{description}</p>
       {children && <div className="placeholder-actions">{children}</div>}
     </div>
