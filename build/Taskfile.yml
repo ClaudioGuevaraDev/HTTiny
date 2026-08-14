@@ -1,0 +1,31 @@
+version: '3'
+
+tasks:
+  install:frontend:deps:
+    summary: Installs frontend dependencies
+    dir: frontend
+    sources: [package.json, pnpm-lock.yaml]
+    generates: [node_modules/**/*]
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  build:frontend:
+    summary: Builds the React frontend
+    dir: frontend
+    deps: [install:frontend:deps]
+    sources:
+      - src/**/*
+      - index.html
+      - package.json
+      - vite.config.ts
+    generates: [dist/**/*]
+    cmds:
+      - pnpm run build
+
+  dev:frontend:
+    summary: Runs the Vite development server
+    dir: frontend
+    deps: [install:frontend:deps]
+    cmds:
+      - pnpm run dev -- --port {{.VITE_PORT}} --strictPort
+

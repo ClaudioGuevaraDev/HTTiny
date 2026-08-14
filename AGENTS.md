@@ -1,0 +1,55 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+HTTiny is a Wails v3 desktop application. Native application setup lives in `main.go`; Go dependencies are declared in `go.mod`. Build orchestration and desktop metadata live in `Taskfile.yml` and `build/`.
+
+The React/TypeScript frontend is under `frontend/`:
+
+- `src/components/` contains focused UI components such as the sidebar, request editor, tabs, and response viewer.
+- `src/store.ts` owns shared Zustand state and actions.
+- `src/types.ts` defines request, response, and collection contracts.
+- `src/data.ts` and `src/mockExecutor.ts` contain demo data and simulated HTTP behavior.
+- `public/` contains static visual assets.
+
+Generated directories such as `frontend/dist/`, `frontend/node_modules/`, and `bin/` must not be committed.
+
+## Build and Development Commands
+
+Run frontend commands from `frontend/`:
+
+- `pnpm install` installs locked dependencies.
+- `pnpm run dev` starts the browser-based Vite development server.
+- `pnpm run typecheck` validates TypeScript without emitting files.
+- `pnpm run build` type-checks and creates `frontend/dist/`.
+
+From the repository root, `wails3 task dev` launches the native application with hot reload. `wails3 task build` creates the desktop binary. Linux development requires GTK4 and WebKitGTK 6.0 development packages.
+
+## Coding Style & Naming Conventions
+
+Use tabs in Go and two spaces in TypeScript, TSX, JSON, and YAML. Format Go changes with `gofmt`. Prefer strict TypeScript types and avoid `any`.
+
+Use `PascalCase` for React components and exported types, `camelCase` for functions and state actions, and descriptive kebab-free filenames such as `RequestEditor.tsx`. Keep components focused; move shared state, fixtures, and request execution logic outside presentation components. Use Tailwind utilities or shared rules in `src/styles.css`, preserving the compact dark UI and green accent.
+
+## Testing Guidelines
+
+This stage intentionally has no automated test framework or test files. Do not introduce testing dependencies unless the project direction changes. Before submitting changes, run `pnpm run typecheck` and `pnpm run build`, then manually verify affected interactions in Vite or Wails.
+
+## Commits & Pull Requests
+
+The repository has no established commit history yet. Use concise imperative commits, for example `Add response error states`. Keep unrelated changes separate.
+
+Pull requests should explain the behavior changed, list manual verification steps, and include screenshots or recordings for visual changes. Reference related issues and call out new dependencies, Wails configuration changes, or platform-specific requirements.
+
+## Agent-Specific Versioning Rule
+
+Whenever the user explicitly requests the `.agents/skills/conventional-commit` skill, update the application version before staging and committing. Treat versions as `A.B.C` and never change `A`:
+
+- Increase `B` and reset `C` to `0` for a new user-facing feature or a meaningful capability change.
+- Increase only `C` for fixes, documentation, styling, refactors, dependency/build work, and other compatible maintenance.
+
+Keep every application version reference synchronized, including `frontend/package.json` and `build/config.yml`, plus any future manifests or packaging metadata that expose the app version. Do not change Taskfile schema versions such as `version: '3'`.
+
+## Dependency Version Policy
+
+Declare every direct dependency and development dependency with an exact version. Do not use semver ranges such as `^`, `~`, `>`, or `*`. When adding a package, use an exact version (for example, `pnpm add library@1.2.3`) and commit the updated lockfile. Keep Go modules pinned to explicit versions in `go.mod` and retain `go.sum` integrity data.
