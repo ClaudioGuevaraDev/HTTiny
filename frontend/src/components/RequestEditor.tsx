@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useRef } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -63,7 +63,7 @@ export function RequestEditor({ onController }: { onController: (controller: Abo
   const document = activeId ? documents[activeId] : null
   const response = activeId ? responses[activeId] : undefined
   const sending = response?.state === 'loading'
-  const controller = useMemo(() => ({ current: null as AbortController | null }), [])
+  const controller = useRef<AbortController | null>(null)
   useEffect(() => () => controller.current?.abort(), [controller])
   if (!document || !activeId) return <div className="no-request"><div className="brand-mark large">H<span>T</span></div><h2>No request open</h2><p>Select a request from the sidebar to start working.</p></div>
 
@@ -79,7 +79,7 @@ export function RequestEditor({ onController }: { onController: (controller: Abo
       <label className="method-select"><select className={methodColor[document.method]} value={document.method} onChange={e => updateDocument(activeId, { method: e.target.value as RequestDocument['method'] })}>{methodOptions.map(m => <option key={m}>{m}</option>)}</select><ChevronDown size={14}/></label>
       <input aria-label="Request URL" className="url-input" value={document.url} onChange={e => updateDocument(activeId, { url: e.target.value })} onBlur={() => useAppStore.getState().setRows(activeId, 'params', parseParams(document.url, document.params))} spellCheck={false}/>
       <button className="icon-btn save-btn" title="Save request (Ctrl+S)" onClick={() => save(activeId)}><Save size={16}/></button>
-      <button className={`send-btn ${sending ? 'cancel' : ''}`} onClick={sendRequest}>{sending ? <Square size={13}/> : <Send size={15}/>} {sending ? 'Cancel' : 'Send'}</button>
+      <button className={`send-btn ${sending ? 'cancel' : ''}`} onClick={() => void sendRequest()}>{sending ? <Square size={13}/> : <Send size={15}/>} {sending ? 'Cancel' : 'Send'}</button>
     </div>
     <div className="panel-tabs">{(['params', 'headers', 'body', 'auth'] as const).map(panel => <button key={panel} className={requestPanel === panel ? 'active' : ''} onClick={() => setRequestPanel(panel)}>{panel[0].toUpperCase() + panel.slice(1)}{(panel === 'params' || panel === 'headers') && <span>{document[panel].filter(r => r.enabled && r.key).length}</span>}</button>)}</div>
     <div className="request-panel">{requestPanel === 'params' && <KeyValueEditor document={document} field="params"/>}{requestPanel === 'headers' && <KeyValueEditor document={document} field="headers"/>}{requestPanel === 'body' && <BodyEditor document={document}/>} {requestPanel === 'auth' && <AuthEditor document={document}/>}</div>

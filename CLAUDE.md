@@ -10,10 +10,16 @@ Frontend (run from `frontend/`, pnpm is pinned via `packageManager`):
 
 ```bash
 pnpm install              # pnpm install --frozen-lockfile in CI/task runs
-pnpm run dev              # Vite dev server in a plain browser
+pnpm run dev              # Vite dev server in a plain browser (no lint)
 pnpm run typecheck        # tsc -b, no emit
-pnpm run build            # tsc -b && vite build -> frontend/dist/
+pnpm run lint             # typecheck + eslint . — compiler errors AND type-aware rules
+pnpm run lint:fix         # eslint . --fix
+pnpm run build            # lint && vite build -> frontend/dist/
+pnpm run format           # prettier --write over src/ and root configs
+pnpm run format:check     # same, report-only
 ```
+
+`lint` is the gate that matters: `typescript-eslint` does not emit `tsc` diagnostics, so the script chains `tsc -b` before `eslint`. `build` runs `lint` first and therefore no longer calls `tsc -b` itself — a lint failure aborts the build before Vite runs, on every path including `wails3 task build` and the blocking build step inside `wails3 dev`.
 
 Native app (from repo root, requires the `wails3` CLI):
 
@@ -23,7 +29,9 @@ wails3 task build         # builds frontend/dist/, then go build -o bin/HTTiny .
 wails3 task run           # build + launch bin/HTTiny
 ```
 
-Verification gate before submitting: `pnpm run typecheck` and `pnpm run build`, then manual checks in Vite or Wails. There is intentionally **no test framework** at this stage — do not add testing dependencies unless the project direction changes.
+Verification gate before submitting: `pnpm run lint` and `pnpm run build`, then manual checks in Vite or Wails. There is intentionally **no test framework** at this stage — do not add testing dependencies unless the project direction changes.
+
+Lint/format config lives in `frontend/eslint.config.js` (ESLint 10 flat config: `recommendedTypeChecked` via `projectService`, `react-hooks` flat recommended — which includes the React Compiler rules — plus `react-refresh`, with `eslint-config-prettier` last) and `frontend/.prettierrc.json`. Prettier is tuned to the existing compact style (`semi: false`, `singleQuote`, `arrowParens: "avoid"`, `printWidth: 160`) and is deliberately **not** part of the lint/build gate: the existing `src/` files predate it and `format:check` reports them as unformatted. Format a file only when you are already editing it.
 
 ## Architecture
 

@@ -21,7 +21,9 @@ Run frontend commands from `frontend/`:
 - `pnpm install` installs locked dependencies.
 - `pnpm run dev` starts the browser-based Vite development server.
 - `pnpm run typecheck` validates TypeScript without emitting files.
-- `pnpm run build` type-checks and creates `frontend/dist/`.
+- `pnpm run lint` runs the type check and then ESLint, so it reports both compiler errors and type-aware rule violations.
+- `pnpm run build` lints and creates `frontend/dist/`; a lint failure aborts the build.
+- `pnpm run format` and `pnpm run format:check` run Prettier over `src/` and the root configs.
 
 From the repository root, `wails3 task dev` launches the native application with hot reload. `wails3 task build` creates the desktop binary. Linux development requires GTK4 and WebKitGTK 6.0 development packages.
 
@@ -33,7 +35,9 @@ Use `PascalCase` for React components and exported types, `camelCase` for functi
 
 ## Testing Guidelines
 
-This stage intentionally has no automated test framework or test files. Do not introduce testing dependencies unless the project direction changes. Before submitting changes, run `pnpm run typecheck` and `pnpm run build`, then manually verify affected interactions in Vite or Wails.
+This stage intentionally has no automated test framework or test files. Do not introduce testing dependencies unless the project direction changes. Before submitting changes, run `pnpm run lint` and `pnpm run build`, then manually verify affected interactions in Vite or Wails.
+
+ESLint and Prettier are configured in `frontend/eslint.config.js` and `frontend/.prettierrc.json`. Prettier matches the existing compact style (no semicolons, single quotes, no parens on single-argument arrows, `printWidth` 160) and is intentionally excluded from the lint and build gate, because the files written before it was introduced do not satisfy `format:check` yet.
 
 ## Commits & Pull Requests
 

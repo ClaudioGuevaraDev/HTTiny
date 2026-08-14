@@ -18,6 +18,9 @@ tasks:
       - index.html
       - package.json
       - vite.config.ts
+      - eslint.config.js
+      - .prettierrc.json
+      - .prettierignore
     generates: [dist/**/*]
     cmds:
       - pnpm run build

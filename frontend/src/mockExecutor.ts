@@ -1,4 +1,4 @@
-import type { RequestDocument, RequestExecutor } from './types'
+import type { RequestExecutor } from './types'
 
 const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
   const timer = window.setTimeout(resolve, ms)
