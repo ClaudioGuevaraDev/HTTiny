@@ -283,6 +283,11 @@ export const en = {
   'settings.theme.desc.system': 'Following the system, currently {theme}.',
   'settings.theme.desc.always': 'Always {theme}, whatever the system is set to.',
   'settings.layout.heading': 'Layout',
+  // A switch is labelled by what turning it *on* does, not by the name of the setting:
+  // "Layout" beside a switch would not say which way is which. `rows` is the default, so
+  // off is the factory state.
+  'settings.layout.sideBySide.label': 'Side by side',
+  'settings.layout.sideBySide.desc': 'Put the response beside the request instead of below it.',
   'settings.layout.sidebar.label': 'Sidebar width',
   'settings.layout.sidebar.desc': 'How much room the collections tree gets.',
   // The width stays adjustable while the sidebar is hidden — the drag handle is not

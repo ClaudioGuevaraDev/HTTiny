@@ -151,6 +151,9 @@ function GeneralSection() {
       <h3 className="settings-heading">{t('settings.appearance')}</h3>
       <ThemeRow />
       <h3 className="settings-heading">{t('settings.layout.heading')}</h3>
+      {/* First in the group on purpose: the orientation decides *what* the split slider
+          divides, and that row's description reads "height" or "width" off it. */}
+      <SplitOrientationRow />
       <SidebarWidthRow />
       <SplitRatioRow />
       <h3 className="settings-heading">{t('settings.language.heading')}</h3>
@@ -199,6 +202,68 @@ function ThemeRow() {
         ))}
       </select>
     </div>
+  )
+}
+
+/**
+ * A `role="switch"` on a `<button>` carrying an `.on` class — the same construction the
+ * param rows already use for their enable toggle (`RequestEditor`'s `.row-check`), so
+ * this is not a new pattern, only a new skin over it.
+ *
+ * A `<button>` is a labelable element, which is what lets it keep the `<label htmlFor>`
+ * of the other rows and stay clickable by its text. `.row-check` needs an `aria-label`
+ * only because it has no visible label to point at.
+ */
+function SwitchRow({
+  id,
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  id: string
+  label: PlainMessageKey
+  description: string
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
+  const { t } = useT()
+
+  return (
+    <div className="settings-row">
+      <div className="settings-label">
+        <label htmlFor={id}>{t(label)}</label>
+        <p id={`${id}-desc`}>{description}</p>
+      </div>
+      <button
+        type="button"
+        id={id}
+        className={`settings-switch ${checked ? 'on' : ''}`}
+        role="switch"
+        aria-checked={checked}
+        aria-describedby={`${id}-desc`}
+        onClick={() => onChange(!checked)}
+      />
+    </div>
+  )
+}
+
+function SplitOrientationRow() {
+  const { t } = useT()
+  const orientation = useAppStore(s => s.splitOrientation)
+  const setSplitOrientation = useAppStore(s => s.setSplitOrientation)
+
+  return (
+    <SwitchRow
+      id="settings-split-orientation"
+      label="settings.layout.sideBySide.label"
+      description={t('settings.layout.sideBySide.desc')}
+      checked={orientation === 'columns'}
+      // `setSplitOrientation`, not `toggleSplitOrientation`: a switch states an absolute
+      // position. The toggle belongs to the workspace button and `Ctrl+\`, which are
+      // relative gestures.
+      onChange={next => setSplitOrientation(next ? 'columns' : 'rows')}
+    />
   )
 }
 

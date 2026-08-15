@@ -2024,6 +2024,54 @@
     text-align: right;
   }
 
+  /* Same construction as `.row-check`: a `role="switch"` button whose visual is drawn
+   * entirely in pseudo-elements, so the button itself is free to be a 24px hit area
+   * (SC 2.5.8) around a smaller control. The track would otherwise have to grow to 24px
+   * and dominate a row whose other controls are quieter than it. */
+  .settings-switch {
+    flex: 0 0 auto;
+    width: 36px;
+    height: var(--h-control-xs);
+    padding: 0;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .settings-switch::before {
+    content: '';
+    width: 34px;
+    height: 20px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+  }
+
+  .settings-switch::after {
+    content: '';
+    position: absolute;
+    /* 1px of centring slack + the track's own 1px border + 2px of air. */
+    left: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--radius-full);
+    background: var(--color-text-subtle);
+  }
+
+  .settings-switch.on::before {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+  }
+
+  .settings-switch.on::after {
+    /* 34 − two borders − 2px of air − the 14px thumb = 14px of travel. */
+    translate: 14px;
+    background: var(--color-text-on-accent);
+  }
+
   .settings-close {
     position: absolute;
     top: 10px;
@@ -2088,6 +2136,7 @@
   .add-row,
   .segmented button,
   .row-check::before,
+  .settings-switch::before,
   button.brand-mark,
   .collection-square,
   .rail-add {
@@ -2096,6 +2145,16 @@
       border-color var(--duration-fast) var(--ease-standard),
       color var(--duration-fast) var(--ease-standard),
       box-shadow var(--duration-fast) var(--ease-standard);
+  }
+
+  /* The one thing in the app that changes its own position, rather than its colour: a
+   * thumb that jumps does not read as a switch. `translate` rather than `left`, so it
+   * composites instead of laying out. The `prefers-reduced-motion` block in `base.css`
+   * already covers `::after`. */
+  .settings-switch::after {
+    transition:
+      translate var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
   }
 
   .url-input,

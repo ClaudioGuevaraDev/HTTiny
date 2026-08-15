@@ -267,6 +267,8 @@ export const es: Catalog = {
   'settings.theme.desc.system': 'Siguiendo el sistema; ahora en {theme}.',
   'settings.theme.desc.always': 'Siempre {theme}, independientemente del sistema.',
   'settings.layout.heading': 'Diseño',
+  'settings.layout.sideBySide.label': 'En paralelo',
+  'settings.layout.sideBySide.desc': 'Coloca la respuesta al lado de la petición en vez de debajo.',
   'settings.layout.sidebar.label': 'Ancho del panel lateral',
   'settings.layout.sidebar.desc': 'Cuánto espacio recibe el árbol de colecciones.',
   'settings.layout.sidebar.desc.collapsed': 'El panel lateral está oculto; esto se aplicará cuando lo muestres de nuevo.',
