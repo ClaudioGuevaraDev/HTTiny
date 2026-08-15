@@ -1937,7 +1937,7 @@
     padding: 10px 0;
   }
 
-  .settings-label > span {
+  .settings-label > label {
     display: block;
     color: var(--color-text);
     font-size: var(--text-xs);
@@ -1951,22 +1951,44 @@
     text-wrap: pretty;
   }
 
-  .settings-row .segmented {
+  /* Left native rather than reimplemented: the OS draws the popup, and it already
+   * follows the app's theme because `color-scheme` is declared per theme. That also
+   * buys keyboard support and type-ahead for nothing, and lets a long translated
+   * option open as wide as it needs instead of having to fit inside the row. */
+  .settings-select {
+    /* `.settings-row` is `justify-content: space-between`, so without this the control
+     * shrinks under the 20px gap — the same thing `.settings-row .segmented` supplied. */
     flex: 0 0 auto;
-    padding: 2px;
+    /* Both rows line their controls up even though "System" and "Español" differ. */
+    min-width: 132px;
+    height: var(--h-control-md);
+    padding: 0 9px;
+    border: 1px solid var(--color-border-control);
     border-radius: var(--radius-sm);
     background: var(--color-surface-3);
+    color: var(--color-text);
+    /* Explicit, because `base.css` gives every select `font: inherit`, which resolves to
+     * the 13px on `:root` rather than the 12px this row is set in. And no `--font-mono`:
+     * this is prose, not a header token like the auth editor's fields.
+     *
+     * Deliberately no `outline: 0` either. `.body-language` and `.auth-editor select`
+     * both carry one, and being class rules in this layer they beat the zero-specificity
+     * `:focus-visible` ring in `base.css` — so neither of those controls has a visible
+     * focus ring. Leaving it alone is all this needs. */
+    font-size: var(--text-xs);
+    cursor: pointer;
   }
 
-  .settings-row .segmented button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+  .settings-select:hover {
+    background: var(--color-surface-hover);
   }
 
-  .settings-row .segmented button.active {
-    background: var(--color-surface-1);
-    color: var(--color-text-strong);
+  /* The popup list is drawn by the OS and inherits nothing from the row — the same
+   * belt-and-braces as `.body-language option`, which matters on WebKitGTK where
+   * `color-scheme` alone under-themes it. */
+  .settings-select option {
+    background: var(--color-surface-3);
+    color: var(--color-text);
   }
 
   .settings-close {
@@ -2047,7 +2069,8 @@
   .search-trigger,
   .method-field,
   .auth-editor select,
-  .auth-editor input {
+  .auth-editor input,
+  .settings-select {
     transition:
       border-color var(--duration-fast) var(--ease-standard),
       background-color var(--duration-fast) var(--ease-standard);

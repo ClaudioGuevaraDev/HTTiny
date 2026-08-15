@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { HardDrive, Monitor, Moon, Settings2, Sun, X } from 'lucide-react'
+import { HardDrive, Settings2, X } from 'lucide-react'
 import type { MessageKey } from '../i18n'
 import { useT } from '../language'
 import { useSystemTheme } from '../theme'
@@ -15,11 +15,16 @@ const SECTIONS = [
   { id: 'storage', label: 'settings.section.storage', icon: HardDrive },
 ] as const satisfies readonly { id: Section; label: MessageKey; icon: typeof Settings2 }[]
 
+/**
+ * No icons: an `<option>` is drawn by the OS and cannot carry one. Nothing is lost that
+ * the words were not already carrying — "System" / "Light" / "Dark" name the choice
+ * without leaning on a glyph.
+ */
 const THEMES = [
-  { id: 'system', label: 'settings.theme.system', icon: Monitor },
-  { id: 'light', label: 'settings.theme.light', icon: Sun },
-  { id: 'dark', label: 'settings.theme.dark', icon: Moon },
-] as const satisfies readonly { id: ThemePreference; label: MessageKey; icon: typeof Sun }[]
+  { id: 'system', label: 'settings.theme.system' },
+  { id: 'light', label: 'settings.theme.light' },
+  { id: 'dark', label: 'settings.theme.dark' },
+] as const satisfies readonly { id: ThemePreference; label: MessageKey }[]
 
 /**
  * The in-sentence forms, which are not the button labels: Spanish lower-cases a theme
@@ -155,38 +160,40 @@ function ThemeRow() {
   const theme = useAppStore(s => s.theme)
   const setTheme = useAppStore(s => s.setTheme)
   const system = useSystemTheme()
-  // A radiogroup, not a tablist: these pick a value, they do not switch panels.
-  const onThemeKeyDown = useRovingFocus('[role="radio"]')
 
   return (
     <div className="settings-row">
       <div className="settings-label">
-        {/* A span rather than a label: there is no single control to point at, and
-            the radiogroup takes its name from here through `aria-labelledby`. */}
-        <span id="settings-theme-label">{t('settings.theme.label')}</span>
+        {/* A real label, now that there is a single control to point at — which also
+            makes the text clickable to focus the select. It used to be a span because
+            a radiogroup can only be named through `aria-labelledby`. */}
+        <label htmlFor="settings-theme">{t('settings.theme.label')}</label>
         {/* "System" on its own says nothing about what is on screen. */}
-        <p>
+        <p id="settings-theme-desc">
           {theme === 'system'
             ? t('settings.theme.desc.system', { theme: t(THEME_INLINE[system]) })
             : t('settings.theme.desc.always', { theme: t(THEME_INLINE[theme]) })}
         </p>
       </div>
-      <div className="segmented" role="radiogroup" aria-labelledby="settings-theme-label" onKeyDown={onThemeKeyDown}>
-        {THEMES.map(({ id, label, icon: Icon }) => (
-          <button
-            type="button"
-            key={id}
-            role="radio"
-            aria-checked={theme === id}
-            tabIndex={theme === id ? 0 : -1}
-            className={theme === id ? 'active' : ''}
-            onClick={() => setTheme(id)}
-          >
-            <Icon size={13} aria-hidden="true" />
+      <select
+        id="settings-theme"
+        className="settings-select"
+        aria-describedby="settings-theme-desc"
+        value={theme}
+        onChange={event => {
+          // `find` over the source of truth instead of asserting what came out of the
+          // DOM, the same way the response body's language picker does it: the option
+          // list and the union cannot drift apart, and nothing needs `as`.
+          const next = THEMES.find(option => option.id === event.target.value)
+          if (next) setTheme(next.id)
+        }}
+      >
+        {THEMES.map(({ id, label }) => (
+          <option key={id} value={id}>
             {t(label)}
-          </button>
+          </option>
         ))}
-      </div>
+      </select>
     </div>
   )
 }
@@ -203,29 +210,29 @@ function LanguageRow() {
   const { t } = useT()
   const language = useAppStore(s => s.language)
   const setLanguage = useAppStore(s => s.setLanguage)
-  const onLanguageKeyDown = useRovingFocus('[role="radio"]')
 
   return (
     <div className="settings-row">
       <div className="settings-label">
-        <span id="settings-language-label">{t('settings.language.label')}</span>
-        <p>{t('settings.language.desc')}</p>
+        <label htmlFor="settings-language">{t('settings.language.label')}</label>
+        <p id="settings-language-desc">{t('settings.language.desc')}</p>
       </div>
-      <div className="segmented" role="radiogroup" aria-labelledby="settings-language-label" onKeyDown={onLanguageKeyDown}>
+      <select
+        id="settings-language"
+        className="settings-select"
+        aria-describedby="settings-language-desc"
+        value={language}
+        onChange={event => {
+          const next = LANGUAGES.find(option => option.id === event.target.value)
+          if (next) setLanguage(next.id)
+        }}
+      >
         {LANGUAGES.map(({ id, label }) => (
-          <button
-            type="button"
-            key={id}
-            role="radio"
-            aria-checked={language === id}
-            tabIndex={language === id ? 0 : -1}
-            className={language === id ? 'active' : ''}
-            onClick={() => setLanguage(id)}
-          >
+          <option key={id} value={id}>
             {label}
-          </button>
+          </option>
         ))}
-      </div>
+      </select>
     </div>
   )
 }
