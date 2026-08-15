@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ClaudioGuevaraDev/HTTiny/internal/secrets"
+	"github.com/ClaudioGuevaraDev/httiny/internal/secrets"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 

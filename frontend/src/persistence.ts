@@ -1,4 +1,4 @@
-import { Service as WorkspaceService } from '../bindings/github.com/ClaudioGuevaraDev/HTTiny/internal/workspace'
+import { Service as WorkspaceService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/workspace'
 import { useAppStore } from './store'
 import type { RequestDocument } from './types'
 import { PREFS_VERSION, WORKSPACE_VERSION, readCollapsed, readPrefs, readWorkspace, toPrefsFile, toWorkspaceFile } from './workspaceFile'

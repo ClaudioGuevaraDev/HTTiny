@@ -13,11 +13,11 @@ import * as $models from "./models.js";
  * DataDir lets the UI tell the user where their collections actually live.
  */
 export function DataDir(): $CancellablePromise<string> {
-    return $Call.ByID(685828284);
+    return $Call.ByID(875064860);
 }
 
 export function LoadPrefs(): $CancellablePromise<$models.LoadResult> {
-    return $Call.ByID(3659111629);
+    return $Call.ByID(4024617645);
 }
 
 /**
@@ -25,15 +25,15 @@ export function LoadPrefs(): $CancellablePromise<$models.LoadResult> {
  * one round trip each, which matters because this sits on the startup path.
  */
 export function LoadSecrets(ids: string[] | null): $CancellablePromise<$models.SecretsResult> {
-    return $Call.ByID(3603143122, ids);
+    return $Call.ByID(1489042866, ids);
 }
 
 export function LoadWorkspace(): $CancellablePromise<$models.LoadResult> {
-    return $Call.ByID(3873956306);
+    return $Call.ByID(939686834);
 }
 
 export function SavePrefs(payload: string, version: number): $CancellablePromise<void> {
-    return $Call.ByID(1057156010, payload, version);
+    return $Call.ByID(2125053962, payload, version);
 }
 
 /**
@@ -42,9 +42,9 @@ export function SavePrefs(payload: string, version: number): $CancellablePromise
  * keychain. `keep` is the full set of live request ids.
  */
 export function SaveSecrets(entries: $models.Secret[] | null, keep: string[] | null): $CancellablePromise<$models.SecretsResult> {
-    return $Call.ByID(67004157, entries, keep);
+    return $Call.ByID(1517057117, entries, keep);
 }
 
 export function SaveWorkspace(payload: string, version: number): $CancellablePromise<void> {
-    return $Call.ByID(832011597, payload, version);
+    return $Call.ByID(337654957, payload, version);
 }

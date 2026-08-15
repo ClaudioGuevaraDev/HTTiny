@@ -25,8 +25,8 @@ Native app (from repo root, requires the `wails3` CLI):
 
 ```bash
 wails3 task dev           # wails3 dev with frontend hot reload, driven by build/config.yml
-wails3 task build         # builds frontend/dist/, then go build -o bin/HTTiny .
-wails3 task run           # build + launch bin/HTTiny
+wails3 task build         # builds frontend/dist/, then go build -o bin/httiny .
+wails3 task run           # build + launch bin/httiny
 ```
 
 Verification gate before submitting: `pnpm run lint` and `pnpm run build`, then manual checks in Vite or Wails. There is intentionally **no test framework** at this stage — do not add testing dependencies unless the project direction changes.

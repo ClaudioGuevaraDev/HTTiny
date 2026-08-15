@@ -4,8 +4,8 @@ import (
 	"embed"
 	"log"
 
-	"github.com/ClaudioGuevaraDev/HTTiny/internal/httpexec"
-	"github.com/ClaudioGuevaraDev/HTTiny/internal/workspace"
+	"github.com/ClaudioGuevaraDev/httiny/internal/httpexec"
+	"github.com/ClaudioGuevaraDev/httiny/internal/workspace"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 

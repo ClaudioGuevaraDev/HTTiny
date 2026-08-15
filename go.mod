@@ -1,4 +1,4 @@
-module github.com/ClaudioGuevaraDev/HTTiny
+module github.com/ClaudioGuevaraDev/httiny
 
 go 1.26
 

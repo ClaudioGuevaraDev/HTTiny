@@ -1,6 +1,6 @@
 import { Call, CancelError } from '@wailsio/runtime'
-import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/HTTiny/internal/httpexec'
-import type { KeyValue } from '../bindings/github.com/ClaudioGuevaraDev/HTTiny/internal/httpexec'
+import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
+import type { KeyValue } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import { RequestFailure } from './errors'
 import type { KeyValueRow, RequestExecutor, ResponseFormat } from './types'
 
