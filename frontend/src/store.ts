@@ -172,6 +172,39 @@ const ancestorIds = (nodes: TreeNode[], id: string, trail: string[] = []): strin
 const remember = (recentIds: string[], id: string): string[] => [id, ...recentIds.filter(recent => recent !== id)].slice(0, 12)
 
 /**
+ * What it takes to make a request visible in the sidebar: switch to its collection,
+ * expand every ancestor, select its row.
+ *
+ * The tree only renders one collection's children, so activating a tab without this
+ * left the selection on a row that was not on screen — and `containerFor` would then
+ * place a new request beside it, inside a collection you were not looking at.
+ *
+ * Takes `tree` rather than the whole state because `deleteNode` applies it to the
+ * tree it has just pruned, not to the one still in the store. Returns its inputs
+ * unchanged when the request is not in the tree — the same fallback `setActive`
+ * spelled out as `?? s.selectedNodeId`.
+ */
+const revealPatch = (tree: TreeNode[], requestId: string | null, selectedNodeId: string | null, activeCollectionId: string | null) => {
+  const nodeId = requestId ? findRequestNodeId(tree, requestId) : null
+  if (!nodeId) return { tree, selectedNodeId, activeCollectionId }
+  const ancestors = ancestorIds(tree, nodeId) ?? []
+  // Only rebuild the tree when something is actually collapsed. `mapTree` gives every
+  // node a new identity, and the autosave subscriber serialises the whole workspace
+  // the moment `tree` changes reference (persistence.ts:116) — too much for a click
+  // on a tab that reveals nothing.
+  const collapsed = ancestors.some(id => {
+    const node = findNode(tree, id)
+    return node !== null && node.type !== 'request' && !node.expanded
+  })
+  return {
+    tree: collapsed ? mapTree(tree, n => (n.type !== 'request' && ancestors.includes(n.id) ? { ...n, expanded: true } : n)) : tree,
+    selectedNodeId: nodeId,
+    // `ancestors[0]` is the collection: collections are always root nodes.
+    activeCollectionId: ancestors[0] ?? activeCollectionId,
+  }
+}
+
+/**
  * Where a new node goes when the caller does not name a parent: into the selected
  * container, or alongside the selected request, else at the root.
  *
@@ -226,13 +259,14 @@ export const useAppStore = create<AppState>(set => ({
 
   // `selectedNodeId` used to be derived as `node-${activeId}`, a convention that only
   // held for the seeded fixtures in data.ts. Requests created through `addNode` got
-  // ids like `request-1699…`, so they never highlighted in the tree. Looking the node
-  // up keeps selection correct for every request, however it was created.
+  // ids like `request-1699…`, so they never highlighted in the tree. `revealPatch`
+  // looks the node up, so selection is correct for every request however it was
+  // created — and the sidebar follows it into its own collection.
   openRequest: id =>
     set(s => ({
+      ...revealPatch(s.tree, id, s.selectedNodeId, s.activeCollectionId),
       tabs: s.tabs.includes(id) ? s.tabs : [...s.tabs, id],
       activeId: id,
-      selectedNodeId: findRequestNodeId(s.tree, id) ?? s.selectedNodeId,
       recentIds: remember(s.recentIds, id),
     })),
 
@@ -244,13 +278,23 @@ export const useAppStore = create<AppState>(set => ({
       const index = s.tabs.indexOf(id)
       const tabs = s.tabs.filter(tab => tab !== id)
       const activeId = s.activeId === id ? (tabs[Math.min(index, tabs.length - 1)] ?? null) : s.activeId
-      return { tabs, activeId, recentIds: s.recentIds.filter(recent => recent !== id) }
+      return {
+        tabs,
+        activeId,
+        recentIds: s.recentIds.filter(recent => recent !== id),
+        // Only when the neighbour tab took over. Closing a background tab must not
+        // move the sidebar out from under you.
+        ...(activeId === s.activeId ? {} : revealPatch(s.tree, activeId, s.selectedNodeId, s.activeCollectionId)),
+      }
     }),
 
+  // The sidebar follows the tab strip: the rail switches to the request's collection
+  // and its row is revealed, so what the tree shows always matches what the editor
+  // holds. The command palette has done this since it existed; tabs did not.
   setActive: id =>
     set(s => ({
+      ...revealPatch(s.tree, id, s.selectedNodeId, s.activeCollectionId),
       activeId: id,
-      selectedNodeId: findRequestNodeId(s.tree, id) ?? s.selectedNodeId,
       recentIds: remember(s.recentIds, id),
     })),
 
@@ -371,6 +415,11 @@ export const useAppStore = create<AppState>(set => ({
       const activeCollectionId =
         s.activeCollectionId && collections.some(c => c.id === s.activeCollectionId) ? s.activeCollectionId : (collections[0]?.id ?? null)
 
+      // Was only cleared when the selection *was* the deleted node, so deleting a
+      // folder left `selectedNodeId` pointing inside the subtree that just went
+      // away — a dangling id that `containerFor` would then resolve against.
+      const selectedNodeId = s.selectedNodeId && findNode(tree, s.selectedNodeId) ? s.selectedNodeId : null
+
       return {
         tree,
         documents,
@@ -378,33 +427,22 @@ export const useAppStore = create<AppState>(set => ({
         tabs,
         activeId,
         activeCollectionId,
+        selectedNodeId,
         recentIds: s.recentIds.filter(recent => !removed.includes(recent)),
-        // Was only cleared when the selection *was* the deleted node, so deleting a
-        // folder left `selectedNodeId` pointing inside the subtree that just went
-        // away — a dangling id that `containerFor` would then resolve against.
-        selectedNodeId: s.selectedNodeId && findNode(tree, s.selectedNodeId) ? s.selectedNodeId : null,
+        // Same rule as closing a tab, against the pruned tree and the already
+        // validated ids: follow the request that took over, and only then — deleting
+        // an unrelated folder must not yank the selection across the panel.
+        ...(activeId === s.activeId ? {} : revealPatch(tree, activeId, selectedNodeId, activeCollectionId)),
       }
     }),
 
   /**
-   * Switch to the request's collection, expand every ancestor, and select it — so a
-   * jump from the command palette lands somewhere visible rather than selecting a
-   * row inside a collection the sidebar is not showing.
+   * Reveal a request without activating it — the palette's "Reveal in sidebar".
    *
-   * All three palette paths (open tab, open request, "Reveal in sidebar") funnel
-   * through here, so the collection switch only has to exist in this one place.
+   * The palette's other two paths used to call this straight after `setActive` /
+   * `openRequest`; they no longer need to, because those actions reveal on their own.
    */
-  revealNode: requestId =>
-    set(s => {
-      const nodeId = findRequestNodeId(s.tree, requestId)
-      if (!nodeId) return {}
-      const ancestors = ancestorIds(s.tree, nodeId) ?? []
-      return {
-        tree: mapTree(s.tree, n => (n.type !== 'request' && ancestors.includes(n.id) ? { ...n, expanded: true } : n)),
-        selectedNodeId: nodeId,
-        activeCollectionId: ancestors[0] ?? s.activeCollectionId,
-      }
-    }),
+  revealNode: requestId => set(s => revealPatch(s.tree, requestId, s.selectedNodeId, s.activeCollectionId)),
 
   setRequestPanel: requestPanel => set({ requestPanel }),
   setResponsePanel: responsePanel => set({ responsePanel }),

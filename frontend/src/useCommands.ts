@@ -42,10 +42,8 @@ export function useCommands(enabled: boolean): Command[] {
         subtitle: entry?.breadcrumb || doc.url,
         keywords: documentKeywords(doc, entry?.breadcrumb ?? ''),
         method: doc.method,
-        run: () => {
-          useAppStore.getState().setActive(id)
-          useAppStore.getState().revealNode(id)
-        },
+        // `setActive` reveals on its own now, the same as clicking the tab does.
+        run: () => useAppStore.getState().setActive(id),
       })
     }
 
@@ -111,10 +109,7 @@ export function useCommands(enabled: boolean): Command[] {
         subtitle: entry.breadcrumb || doc.url,
         keywords: documentKeywords(doc, entry.breadcrumb),
         method: doc.method,
-        run: () => {
-          useAppStore.getState().openRequest(entry.requestId)
-          useAppStore.getState().revealNode(entry.requestId)
-        },
+        run: () => useAppStore.getState().openRequest(entry.requestId),
       })
     }
 
