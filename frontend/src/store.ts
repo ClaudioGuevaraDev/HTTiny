@@ -473,11 +473,23 @@ export const useAppStore = create<AppState>(set => ({
   closePalette: () => set({ paletteOpen: false, paletteSeed: '' }),
 }))
 
-export const replaceQuery = (url: string, rows: KeyValueRow[]) => {
+/**
+ * `base?query#hash`, split once so the two directions of the URL/params sync cannot
+ * disagree about where the query starts. `replaceQuery` writes rows into a URL and
+ * `parseParams` reads them back out; both go through here.
+ *
+ * The fragment wins: `?a=1` after a `#` is part of the fragment, not the query.
+ */
+export const splitUrl = (url: string): { base: string; query: string; hash: string } => {
   const hashAt = url.indexOf('#')
   const hash = hashAt >= 0 ? url.slice(hashAt) : ''
   const clean = hashAt >= 0 ? url.slice(0, hashAt) : url
-  const base = clean.split('?')[0]
+  const queryAt = clean.indexOf('?')
+  return queryAt >= 0 ? { base: clean.slice(0, queryAt), query: clean.slice(queryAt + 1), hash } : { base: clean, query: '', hash }
+}
+
+export const replaceQuery = (url: string, rows: KeyValueRow[]) => {
+  const { base, hash } = splitUrl(url)
   const query = rows
     .filter(r => r.enabled && r.key.trim())
     .map(r => `${encodeURIComponent(r.key)}=${encodeURIComponent(r.value)}`)

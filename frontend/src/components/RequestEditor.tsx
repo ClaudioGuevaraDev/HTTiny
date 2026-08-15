@@ -5,7 +5,7 @@ import { httinyTheme } from '../editorTheme'
 import { flushNow } from '../persistence'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
-import { methodOptions, replaceQuery, useAppStore } from '../store'
+import { methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
 import { methodToken, type HttpMethod, type KeyValueRow, type RequestDocument } from '../types'
 import { requestTabId } from '../domIds'
 import { useRovingFocus } from '../useRovingFocus'
@@ -205,42 +205,54 @@ function AuthEditor({ request }: { request: RequestDocument }) {
 }
 
 /**
- * Re-derives the param rows from the URL's query string.
+ * Re-derives the param rows from the URL's query string, on every keystroke.
  *
- * Rows are matched to the previous ones **by key** so a row keeps its id and its
+ * There is one row per query entry, in the URL's own order. Emptying the query used
+ * to keep the rows and blank their contents instead, which left four empty rows
+ * behind after deleting four parameters.
+ *
+ * Parsed with `URLSearchParams` over `splitUrl`, not with `new URL`: the latter
+ * throws on anything without a scheme, so `api.example.com/users?a=1` — or a URL
+ * halfway through being typed — never synced at all.
+ *
+ * Disabled rows are kept and appended. `replaceQuery` leaves them out of the URL by
+ * design, so deriving purely from the URL would delete a row the moment it was
+ * unticked. They land after the derived rows rather than back in place: their old
+ * position and the URL's order can contradict each other.
+ *
+ * Keyless rows are not kept — one parameter is one row, and a blank row alongside
+ * four real ones is the same complaint as four blank ones. The grid keeps a blank row
+ * only when the query is empty, so there is always somewhere to start typing.
+ *
+ * Derived rows are matched to previous ones **by key**, so a row keeps its id and
  * description when the query is edited around it. Matching by position — which is
- * what this used to do — meant deleting `a=1` from `?a=1&b=2` left `b` wearing
- * `a`'s description. That was survivable when this only ran on blur; it is not
- * now that it runs on every keystroke.
- *
- * Each previous row is consumed at most once, because a repeated key (`?a=1&a=2`
- * is legal) would otherwise hand the same id to two rows and collide as a React
- * key. Unmatched entries fall back to the first row left over, which preserves
- * the old behaviour while a key is being typed one character at a time.
+ * what this used to do — meant deleting `a=1` from `?a=1&b=2` left `b` wearing `a`'s
+ * description. Each previous row is claimed at most once, because a repeated key
+ * (`?a=1&a=2` is legal) would otherwise hand the same id to two rows and collide as a
+ * React key. Unmatched entries fall back to the first row left over, which is what
+ * keeps a row still when its key is being typed one character at a time.
  */
 const parseParams = (url: string, existing: KeyValueRow[]): KeyValueRow[] => {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    // Not a URL yet — typing one from scratch passes through here on every
-    // keystroke, and blanking the rows each time would be destructive.
-    return existing
-  }
+  const entries = [...new URLSearchParams(splitUrl(url).query).entries()]
+  const keyed = existing.filter(row => row.key.trim())
+  const pool = keyed.filter(row => row.enabled)
+  const kept = keyed.filter(row => !row.enabled)
 
-  const entries = [...parsed.searchParams.entries()]
-  if (!entries.length) return existing.length ? existing.map(r => ({ ...r, key: '', value: '' })) : [freshRow()]
-
-  const pool = [...existing]
   const claim = (key: string): KeyValueRow | undefined => {
     const byKey = pool.findIndex(row => row.key === key)
     return pool.splice(byKey >= 0 ? byKey : 0, 1)[0]
   }
 
-  return entries.map(([key, value]) => {
+  const derived = entries.map(([key, value]) => {
     const prior = claim(key)
     return { id: prior?.id ?? crypto.randomUUID(), enabled: true, key, value, description: prior?.description ?? '' }
   })
+
+  // Never a bare header. The previous blank row is reused rather than replaced, so its
+  // id — and anything already typed into it — survives every keystroke that leaves the
+  // query empty, instead of remounting three inputs each time.
+  const next = [...derived, ...kept]
+  return next.length ? next : [existing.find(row => !row.key.trim()) ?? freshRow()]
 }
 
 export function RequestEditor() {
