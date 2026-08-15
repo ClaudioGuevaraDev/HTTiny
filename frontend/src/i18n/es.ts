@@ -298,7 +298,8 @@ export const es: Catalog = {
   'settings.layout.split.desc.columns': 'Cómo se reparte el ancho entre la petición y la respuesta.',
   'settings.layout.split.value': '{request} / {response}',
   'settings.response.format.label': 'Interpretar los cuerpos como',
-  'settings.response.format.desc': 'Con qué formato abre el visor un cuerpo. Automático sigue el tipo de contenido, y el formato que elijas en el visor manda para esa petición.',
+  'settings.response.format.desc':
+    'Con qué formato abre el visor un cuerpo. Automático lee como JSON un cuerpo JSON aunque el tipo de contenido diga otra cosa, y el formato que elijas en el visor manda para esa petición.',
   'settings.response.format.auto': 'Automático',
   'settings.language.label': 'Idioma',
   'settings.language.desc': 'Elige el idioma de la interfaz.',

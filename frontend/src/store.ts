@@ -136,8 +136,8 @@ interface AppState {
   language: Locale
   /**
    * What the response viewer opens a body as when the request has no pick of its own.
-   * `null` is "automatic", which defers to Go's classification — see `resolveLanguage`,
-   * which owns the precedence.
+   * `null` is "automatic", which defers to the body and then to Go's classification —
+   * see `resolveLanguage`, which owns the precedence.
    */
   defaultBodyLanguage: BodyLanguage | null
 

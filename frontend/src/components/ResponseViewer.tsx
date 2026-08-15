@@ -165,8 +165,8 @@ export function ResponseViewer() {
   // Hooks cannot sit inside the success branch, so the inputs are read defensively and
   // the memo runs against an empty body the rest of the time — which costs nothing.
   const view = storedView ?? DEFAULT_BODY_VIEW
-  const language = resolveLanguage(view, response.state === 'success' ? response.format : 'text', defaultBodyLanguage)
   const rawBody = response.state === 'success' ? response.body : ''
+  const language = resolveLanguage(view, response.state === 'success' ? response.format : 'text', defaultBodyLanguage, rawBody)
   // Reparsing several MB of JSON on every render — and this component re-renders ten
   // times a second while a *later* request is in flight — is not affordable.
   const { text: bodyText, failed: formatFailed } = useMemo(() => formatBody(rawBody, language, view.mode), [rawBody, language, view.mode])

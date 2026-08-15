@@ -3,7 +3,7 @@ import type { BodyLanguage, BodyView, ResponseFormat } from './types'
 
 /**
  * How a body is presented when nothing has been chosen for a request: indented, and
- * interpreted as whatever Go said the Content-Type was.
+ * interpreted as whatever the body itself looks like — see `resolveLanguage`.
  */
 export const DEFAULT_BODY_VIEW: BodyView = { mode: 'pretty', language: null }
 
@@ -29,29 +29,50 @@ export const bodyLanguageLabel = (t: Translate, language: BodyLanguage): string 
 }
 
 /**
- * What "automatic" resolves to. A table rather than a chain of ternaries, because two of
- * the five entries are substitutions and both are worth being able to read at a glance.
+ * Does this body open the way JSON opens? A heuristic on the first token, not a
+ * validation — and deliberately so. `resolveLanguage` runs on every render of the
+ * viewer, which re-renders ten times a second while a *later* request is in flight, and
+ * it runs outside its `useMemo`; a `JSON.parse` of several MB there is not affordable.
+ * The regex is anchored and `trimStart()` is avoided for the same reason, since that
+ * would copy the whole body just to look at one character.
+ *
+ * Being wrong is cheap and already handled: a body that opens with `{` and does not
+ * parse reaches `formatBody`, which hands it back untouched, and the viewer says the
+ * JSON did not parse. What this does miss is a JSON scalar — `42`, `"hola"` — served
+ * under a Content-Type that does not say JSON. Nothing shows for it either way:
+ * indenting a scalar is a no-op.
+ */
+const JSON_START = /^\s*[[{]/
+
+/**
+ * The reading of last resort, once the body itself has had nothing to say. A table
+ * rather than a chain of ternaries, because the one entry that is a substitution is
+ * worth being able to read at a glance.
  *
  * `binary` degrades to `text` defensively: those bodies never cross the binding and the
  * viewer renders them from metadata alone, so this branch exists only so `BodyLanguage`
  * does not have to widen.
  *
- * `text` resolving to `json` is the deliberate one. Go's `classifyFormat` returns `text`
- * for every `text/*` it could not place more precisely — and the most common thing
- * hiding behind that is JSON served as `text/plain`. Guessing JSON there costs little
- * when it is wrong: `formatBody` hands the body back untouched and the viewer says the
- * JSON did not parse. It does mean a genuine `text/csv` now opens with that notice.
+ * Everything else is Go's `classifyFormat` taken at its word, which is right *here* —
+ * a body that does not look like JSON has no reason to be read as anything other than
+ * what the `Content-Type` claimed.
  */
-const AUTOMATIC = { json: 'json', html: 'html', xml: 'xml', text: 'json', binary: 'text' } as const satisfies Record<ResponseFormat, BodyLanguage>
+const AUTOMATIC = { json: 'json', html: 'html', xml: 'xml', text: 'text', binary: 'text' } as const satisfies Record<ResponseFormat, BodyLanguage>
 
 /**
- * The language actually in effect, resolved down three steps: the one chosen for this
- * request, then the global default from Settings, then the automatic reading above. The
- * chained `??` is the whole precedence rule — a choice made in the viewer outranks the
- * preference, and the preference outranks the `Content-Type`.
+ * The language actually in effect, resolved down four steps: the one chosen for this
+ * request, then the global default from Settings, then the shape of the body, and only
+ * then the `Content-Type` reading above. The chained `??` is the whole precedence rule —
+ * a choice made in the viewer outranks the preference, and the preference outranks both
+ * of the guesses.
+ *
+ * The body is consulted before the `Content-Type` because it is the better witness of
+ * the two: `classifyFormat` is a whitelist over the header alone, so an API behind a
+ * proxy that says `text/html`, or one that ignores `Accept`, lands on `html` with a
+ * JSON payload inside. Reading the body first is what makes those open indented.
  */
-export const resolveLanguage = (view: BodyView, format: ResponseFormat, fallback: BodyLanguage | null): BodyLanguage =>
-  view.language ?? fallback ?? AUTOMATIC[format]
+export const resolveLanguage = (view: BodyView, format: ResponseFormat, fallback: BodyLanguage | null, body: string): BodyLanguage =>
+  view.language ?? fallback ?? (JSON_START.test(body) ? 'json' : AUTOMATIC[format])
 
 /**
  * `failed` is only ever true for JSON that would not parse, and the caller decides

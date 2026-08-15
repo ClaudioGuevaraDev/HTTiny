@@ -76,7 +76,7 @@ export interface PrefsFile {
   zoom: number
   /** Pixels, for the two editors only. */
   codeFontSize: number
-  /** `null` is "automatic" — the viewer follows whatever Go classified the body as. */
+  /** `null` is "automatic" — the viewer reads the body, then falls back to Go's classification. */
   defaultBodyLanguage: BodyLanguage | null
 }
 
