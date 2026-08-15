@@ -186,10 +186,18 @@
     margin-top: 1px;
   }
 
+  /* Centres its own text. The mark is a <button> in the sidebar and a <div> in the
+   * "no request open" placeholder; without these the button looked right only
+   * because of the user-agent stylesheet, while the div had no vertical centring
+   * at all and sat the glyphs against the top of the box. */
   .brand-mark {
     width: 29px;
     height: 29px;
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
     border: 1px solid var(--color-border-accent);
     border-radius: var(--radius-lg);
     background: var(--color-surface-3);
@@ -203,12 +211,15 @@
     color: var(--color-accent);
   }
 
+  /* No margin-bottom: the placeholder centres this with `place-items`, which
+   * centres the *margin* box, so a bottom margin shifted the plate upwards by
+   * half its value instead of adding space below it. The gap to the title comes
+   * from `.placeholder-title`'s own top margin. */
   .brand-mark.large {
     width: 48px;
     height: 48px;
     font-size: var(--text-lg);
     border-radius: var(--radius-xl);
-    margin-bottom: 13px;
   }
 
   .sidebar-section-title {
@@ -1162,6 +1173,18 @@
     border-radius: var(--radius-xl);
     background: var(--color-surface-3);
     color: var(--color-text-subtle);
+  }
+
+  /* The brand mark brings its own plate — border, radius and surface — so nesting
+   * it in this one produced two concentric plates with the inner 48px one
+   * overhanging the outer 44px one by 2px a side. Matched on the child rather
+   * than through a new `Placeholder` prop: the component is shared by four
+   * states and only this caller is a plate itself. */
+  .placeholder-icon:has(.brand-mark) {
+    width: auto;
+    height: auto;
+    border: 0;
+    background: none;
   }
 
   .placeholder[data-tone='accent'] .placeholder-icon {

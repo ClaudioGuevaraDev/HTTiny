@@ -252,7 +252,10 @@ export const useAppStore = create<AppState>(set => ({
           kind: 'http',
           name: name?.trim() || 'New Request',
           method: 'GET',
-          url: 'https://',
+          // Empty rather than a `https://` stub: the input's placeholder already
+          // shows the expected shape, and a prefilled scheme has to be deleted
+          // before a pasted URL will go in.
+          url: '',
           params: [{ id: `${requestId}-p`, enabled: true, key: '', value: '', description: '' }],
           headers: [{ id: `${requestId}-h`, enabled: true, key: '', value: '', description: '' }],
           body: { type: 'none', content: '' },

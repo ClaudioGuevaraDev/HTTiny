@@ -204,24 +204,43 @@ function AuthEditor({ request }: { request: RequestDocument }) {
   )
 }
 
-const parseParams = (url: string, existing: KeyValueRow[]) => {
+/**
+ * Re-derives the param rows from the URL's query string.
+ *
+ * Rows are matched to the previous ones **by key** so a row keeps its id and its
+ * description when the query is edited around it. Matching by position — which is
+ * what this used to do — meant deleting `a=1` from `?a=1&b=2` left `b` wearing
+ * `a`'s description. That was survivable when this only ran on blur; it is not
+ * now that it runs on every keystroke.
+ *
+ * Each previous row is consumed at most once, because a repeated key (`?a=1&a=2`
+ * is legal) would otherwise hand the same id to two rows and collide as a React
+ * key. Unmatched entries fall back to the first row left over, which preserves
+ * the old behaviour while a key is being typed one character at a time.
+ */
+const parseParams = (url: string, existing: KeyValueRow[]): KeyValueRow[] => {
+  let parsed: URL
   try {
-    const parsed = new URL(url)
-    const entries = [...parsed.searchParams.entries()]
-    return entries.length
-      ? entries.map(([key, value], i) => ({
-          id: existing[i]?.id ?? crypto.randomUUID(),
-          enabled: true,
-          key,
-          value,
-          description: existing[i]?.description ?? '',
-        }))
-      : existing.length
-        ? existing.map(r => ({ ...r, key: '', value: '' }))
-        : [freshRow()]
+    parsed = new URL(url)
   } catch {
+    // Not a URL yet — typing one from scratch passes through here on every
+    // keystroke, and blanking the rows each time would be destructive.
     return existing
   }
+
+  const entries = [...parsed.searchParams.entries()]
+  if (!entries.length) return existing.length ? existing.map(r => ({ ...r, key: '', value: '' })) : [freshRow()]
+
+  const pool = [...existing]
+  const claim = (key: string): KeyValueRow | undefined => {
+    const byKey = pool.findIndex(row => row.key === key)
+    return pool.splice(byKey >= 0 ? byKey : 0, 1)[0]
+  }
+
+  return entries.map(([key, value]) => {
+    const prior = claim(key)
+    return { id: prior?.id ?? crypto.randomUUID(), enabled: true, key, value, description: prior?.description ?? '' }
+  })
 }
 
 export function RequestEditor() {
@@ -296,8 +315,16 @@ export function RequestEditor() {
           aria-label="Request URL"
           className="url-input"
           value={request.url}
-          onChange={e => updateDocument(activeId, { url: e.target.value })}
-          onBlur={() => useAppStore.getState().setRows(activeId, 'params', parseParams(request.url, request.params))}
+          // Re-derives the rows as you type rather than on blur, which is what
+          // made a pasted query string only show up in the Params tab once
+          // something else stole the focus. There is no feedback loop: the other
+          // direction (editing a row rewrites the URL through `replaceQuery`)
+          // updates the store programmatically and never fires this handler.
+          onChange={e => {
+            const url = e.target.value
+            updateDocument(activeId, { url })
+            useAppStore.getState().setRows(activeId, 'params', parseParams(url, request.params))
+          }}
           placeholder="https://api.example.com/users…"
           inputMode="url"
           autoComplete="off"
