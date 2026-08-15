@@ -598,8 +598,15 @@
     background: color-mix(in oklab, var(--method) 16%, transparent);
   }
 
+  /* The tree variant is a column, not a lone pill, so its label is left-aligned:
+   * centring inside a 46px minimum put GET at ~39px and DELETE at ~34px, leaving the
+   * method column visibly ragged from one row to the next.
+   *
+   * No optical nudge: the chip is the first thing in a leaf row now, so it should sit
+   * flush on the row's padding edge. */
   .method-chip-chip {
     min-width: 46px;
+    justify-content: flex-start;
   }
 
   .method-chip-compact {
@@ -1597,6 +1604,18 @@
   .tree-icon {
     flex: 0 0 auto;
     color: var(--color-text-subtle);
+  }
+
+  /* The expand/collapse chevron. Only branches have one — leaves render nothing here
+   * rather than an empty spacer, so a request starts at the same x as a folder's
+   * chevron instead of 18px inside it.
+   *
+   * Pinned because a flex child with only a width is collapsible: the old leaf spacer
+   * was `w-[13px]`, which held its size only until the row ran out of room. */
+  .tree-twisty {
+    width: 13px;
+    height: 13px;
+    flex: 0 0 auto;
   }
 
   /* ── Command palette ───────────────────────────────────────────────────── */

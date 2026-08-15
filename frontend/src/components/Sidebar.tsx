@@ -86,15 +86,18 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
         }
       }}
     >
-      {node.type !== 'request' ? (
-        node.expanded ? (
-          <ChevronDown size={13} aria-hidden="true" />
+      {/* Requests get no twisty slot at all. Reserving one lined their labels up with
+          branch labels, but it also left 18px of nothing down the left of every leaf
+          row, so a request sitting beside a folder read as indented under it — most
+          obviously for requests directly in a collection, with no folder to belong
+          to. Indentation now comes only from depth, which is the thing that actually
+          means nesting. */}
+      {node.type !== 'request' &&
+        (node.expanded ? (
+          <ChevronDown size={13} className="tree-twisty" aria-hidden="true" />
         ) : (
-          <ChevronRight size={13} aria-hidden="true" />
-        )
-      ) : (
-        <span className="w-[13px]" />
-      )}
+          <ChevronRight size={13} className="tree-twisty" aria-hidden="true" />
+        ))}
       {node.type === 'collection' && <Boxes size={14} className="tree-icon" aria-hidden="true" />}
       {node.type === 'folder' && <Folder size={14} className="tree-icon" aria-hidden="true" />}
       {node.type === 'request' && method && <MethodChip method={method} variant="chip" />}
