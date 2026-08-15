@@ -278,6 +278,10 @@ export const en = {
   'settings.section.layout': 'Layout',
   'settings.section.storage': 'Storage',
   'settings.close': 'Close settings',
+  // Short, because the navigation column is 176px wide. The sentence that has to carry the
+  // whole meaning lives in the confirmation, where there is room for it.
+  'settings.reset.label': 'Restore defaults',
+  'settings.reset.confirm': 'Restore every setting to its default? This includes the interface language.',
   'settings.storage.title': 'Nothing here yet',
   'settings.storage.desc': 'Storage settings will live in this panel.',
   'settings.theme.label': 'Theme',

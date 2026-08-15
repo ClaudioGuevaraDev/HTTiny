@@ -263,6 +263,8 @@ export const es: Catalog = {
   'settings.section.layout': 'Diseño',
   'settings.section.storage': 'Almacenamiento',
   'settings.close': 'Cerrar los ajustes',
+  'settings.reset.label': 'Restablecer todo',
+  'settings.reset.confirm': '¿Restablecer todos los ajustes a sus valores por defecto? Esto incluye el idioma de la interfaz.',
   'settings.storage.title': 'Aquí todavía no hay nada',
   'settings.storage.desc': 'Los ajustes de almacenamiento estarán en este panel.',
   'settings.theme.label': 'Tema',

@@ -1898,7 +1898,10 @@
     font-weight: var(--font-weight-semibold);
   }
 
-  .settings-nav button {
+  /* Scoped to the tablist rather than to the whole column. As `.settings-nav button` these
+   * three also matched the restore button below, and being one element more specific they
+   * beat it — its colour and its hover would never have been the ones written for it. */
+  .settings-sections button {
     height: var(--h-control-md);
     padding: 0 9px;
     display: flex;
@@ -1913,12 +1916,41 @@
     cursor: pointer;
   }
 
-  .settings-nav button:hover {
+  /* `.settings-nav` is already a flex column, so `margin-top: auto` alone parks this at
+   * its foot. Geometry copied from the tabs above so it belongs to the column, and dimmer
+   * than them at rest so it does not read as a fifth one.
+   *
+   * Deliberately *not* `--color-danger` on hover. In this app red means the delete
+   * actions, where something is destroyed and cannot come back; restoring a setting
+   * destroys nothing and every value it touches can be set again from the same panel.
+   * Spending the danger colour here would blunt it where it actually has to land. */
+  .settings-reset {
+    margin-top: auto;
+    height: var(--h-control-md);
+    padding: 0 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .settings-reset:hover {
     background: var(--color-surface-hover);
     color: var(--color-text);
   }
 
-  .settings-nav button.active {
+  .settings-sections button:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  .settings-sections button.active {
     background: var(--color-surface-accent);
     color: var(--color-text-strong);
     box-shadow: inset 2px 0 var(--color-accent);

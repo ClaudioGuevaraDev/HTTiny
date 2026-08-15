@@ -43,6 +43,32 @@ export const ZOOM_STEPS = [80, 90, 100, 110, 125, 150] as const
 export const CODE_FONT_SIZE = { min: 10, max: 22, default: 13 } as const
 
 /**
+ * What a fresh install gets, and what "Restore defaults" restores. One object so those two
+ * cannot drift apart: the initial state spreads it and the action assigns it, instead of a
+ * reset written out by hand becoming a third copy and the first to fall behind.
+ *
+ * `satisfies` ties every field to the type the store declares, so renaming one breaks here
+ * rather than silently resetting nothing.
+ *
+ * `sidebarCollapsed` is deliberately absent: it is not a settings-modal preference but a
+ * workspace state, toggled from `Ctrl+B` and its own button, and restoring settings has no
+ * business unfolding a sidebar somebody hid.
+ */
+export const SETTINGS_DEFAULTS = {
+  theme: 'system',
+  language: 'en',
+  zoom: ZOOM.default,
+  codeFontSize: CODE_FONT_SIZE.default,
+  defaultBodyLanguage: null,
+  splitOrientation: 'rows',
+  sidebarWidth: SIDEBAR_WIDTH.default,
+  splitRatio: SPLIT_RATIO.default,
+} as const satisfies Pick<
+  AppState,
+  'theme' | 'language' | 'zoom' | 'codeFontSize' | 'defaultBodyLanguage' | 'splitOrientation' | 'sidebarWidth' | 'splitRatio'
+>
+
+/**
  * The next stop in a direction. `findIndex` rather than `indexOf` so a value that is not
  * a stop at all — a hand-edited `ui.json` — still moves instead of sticking: the first
  * stop past it in that direction wins.
@@ -152,6 +178,7 @@ interface AppState {
   setCodeFontSize: (size: number) => void
   setTheme: (theme: ThemePreference) => void
   setLanguage: (language: Locale) => void
+  resetSettings: () => void
   setDefaultBodyLanguage: (language: BodyLanguage | null) => void
   openPalette: (seed?: string) => void
   closePalette: () => void
@@ -320,15 +347,9 @@ export const useAppStore = create<AppState>(set => ({
   responses: {},
   bodyViews: {},
   recentIds: [],
-  sidebarWidth: SIDEBAR_WIDTH.default,
+  ...SETTINGS_DEFAULTS,
+  // Not one of them: hiding the sidebar is a workspace gesture, not a setting.
   sidebarCollapsed: false,
-  splitOrientation: 'rows',
-  splitRatio: SPLIT_RATIO.default,
-  zoom: ZOOM.default,
-  codeFontSize: CODE_FONT_SIZE.default,
-  theme: 'system',
-  language: 'en',
-  defaultBodyLanguage: null,
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
@@ -556,6 +577,11 @@ export const useAppStore = create<AppState>(set => ({
   setTheme: theme => set({ theme }),
   setLanguage: language => set({ language }),
   setDefaultBodyLanguage: defaultBodyLanguage => set({ defaultBodyLanguage }),
+  // One `set` is the whole feature: `initTheme`, `initLanguage`, `initZoom` and
+  // `initCodeFontSize` are all subscribed and push their own field onto the document,
+  // `App.tsx` reads the layout fields at render, and the autosave subscriber rewrites
+  // `ui.json`. Nothing here has to know about any of that.
+  resetSettings: () => set(SETTINGS_DEFAULTS),
   openPalette: (seed = '') => set({ paletteOpen: true, paletteSeed: seed }),
   closePalette: () => set({ paletteOpen: false, paletteSeed: '' }),
   openSettings: () => set({ settingsOpen: true }),

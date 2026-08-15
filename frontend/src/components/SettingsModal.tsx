@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { HardDrive, Minus, Palette, PanelsTopLeft, Plus, Settings2, X } from 'lucide-react'
+import { HardDrive, Minus, Palette, PanelsTopLeft, Plus, RotateCcw, Settings2, X } from 'lucide-react'
 import type { MessageKey, PlainMessageKey } from '../i18n'
 import { useT } from '../language'
 import { BODY_LANGUAGES, bodyLanguageLabel } from '../responseBody'
@@ -112,6 +112,13 @@ function SettingsBody({ onDismiss }: { onDismiss: () => void }) {
   // `?? SECTIONS[0]` rather than a `!`: it is a tuple, index 0 exists, and nothing has to
   // be asserted to say so.
   const { Panel: ActivePanel } = SECTIONS.find(entry => entry.id === section) ?? SECTIONS[0]
+  const resetSettings = useAppStore(s => s.resetSettings)
+
+  const confirmReset = () => {
+    // The OK/Cancel labels come from the OS, so the question carries the whole meaning and
+    // never names a button — the same contract the tree's delete confirmation follows.
+    if (window.confirm(t('settings.reset.confirm'))) resetSettings()
+  }
 
   return (
     <div className="settings-shell">
@@ -139,6 +146,13 @@ function SettingsBody({ onDismiss }: { onDismiss: () => void }) {
             </button>
           ))}
         </div>
+        {/* Outside `.settings-sections` on purpose: a tablist's children are tabs, and this
+            is not a section — it acts on all of them, which is also why it belongs to the
+            navigation column rather than to any one panel. */}
+        <button type="button" className="settings-reset" onClick={confirmReset}>
+          <RotateCcw size={14} aria-hidden="true" />
+          {t('settings.reset.label')}
+        </button>
       </div>
 
       <div className="settings-panel" role="tabpanel" id={panelId(section)} aria-labelledby={tabId(section)} tabIndex={-1}>
