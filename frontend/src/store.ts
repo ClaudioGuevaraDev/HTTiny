@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { initialDocuments, initialTree } from './data'
 import type { HttpMethod, KeyValueRow, RequestDocument, ResponseSnapshot, SplitOrientation, TreeNode } from './types'
 
 type Panel = 'params' | 'headers' | 'body' | 'auth'
@@ -16,6 +15,18 @@ interface AppState {
 
   /** Most-recently-activated request ids, newest first, capped at 12. */
   recentIds: string[]
+
+  // Persistence status, owned by persistence.ts and rendered in the sidebar footer.
+  // `unavailable` is the browser dev server, which has no Wails runtime behind it;
+  // `newer-version` is a workspace file written by a later build, which is read-only
+  // by design rather than being silently truncated.
+  persistenceState: 'loading' | 'ready' | 'unavailable' | 'newer-version'
+  saveState: 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+  /** False when no OS credential store could be reached — tokens are session-only. */
+  secretsAvailable: boolean
+  /** Set when an unreadable workspace file was moved aside on load. */
+  quarantinedPath: string | null
+  dataDir: string
 
   // Layout preferences live here rather than in App's local state because two
   // independent surfaces mutate them — the workspace buttons and palette commands —
@@ -34,7 +45,8 @@ interface AppState {
   openRequest: (id: string) => void
   closeRequest: (id: string) => void
   setActive: (id: string) => void
-  save: (id: string) => void
+  setSaveState: (state: AppState['saveState']) => void
+  setSecretsAvailable: (available: boolean) => void
   updateDocument: (id: string, patch: Partial<RequestDocument>) => void
   setRows: (id: string, key: 'params' | 'headers', rows: KeyValueRow[]) => void
   toggleNode: (nodeId: string) => void
@@ -140,22 +152,48 @@ const ancestorIds = (nodes: TreeNode[], id: string, trail: string[] = []): strin
 
 const remember = (recentIds: string[], id: string): string[] => [id, ...recentIds.filter(recent => recent !== id)].slice(0, 12)
 
+/**
+ * Where a new node goes when the caller does not name a parent: into the selected
+ * container, or alongside the selected request, else at the root.
+ *
+ * Three call sites used to hardcode `'main'` — the id of a collection that existed
+ * only in the deleted fixtures. `insertNode` returns the tree unchanged when no
+ * node matches, so with an empty tree the sidebar's New folder and New request
+ * buttons silently did nothing, and `addNode('request', 'main')` was worse than a
+ * no-op: it still created the document and opened a tab, leaving a request that
+ * belonged to no tree and could never be found again once the tab was closed.
+ */
+const containerFor = (nodes: TreeNode[], selectedNodeId: string | null): string | undefined => {
+  if (!selectedNodeId) return undefined
+  const node = findNode(nodes, selectedNodeId)
+  if (node && node.type !== 'request') return node.id
+  return ancestorIds(nodes, selectedNodeId)?.at(-1)
+}
+
 export const useAppStore = create<AppState>(set => ({
-  tree: initialTree,
-  documents: initialDocuments,
-  tabs: ['users', 'createUser', 'login'],
-  activeId: 'users',
-  selectedNodeId: 'node-users',
+  // The app starts genuinely empty. There are no fixtures to seed from any more:
+  // demo data against a domain that does not exist made every surface look
+  // populated while nothing worked, and it hid the first-run experience.
+  tree: [],
+  documents: {},
+  tabs: [],
+  activeId: null,
+  selectedNodeId: null,
   requestPanel: 'params',
   responsePanel: 'body',
   responses: {},
-  recentIds: ['users'],
+  recentIds: [],
   sidebarWidth: 282,
   sidebarCollapsed: false,
   splitOrientation: 'rows',
   splitRatio: 52,
   paletteOpen: false,
   paletteSeed: '',
+  persistenceState: 'loading',
+  saveState: 'idle',
+  secretsAvailable: true,
+  quarantinedPath: null,
+  dataDir: '',
 
   // `selectedNodeId` used to be derived as `node-${activeId}`, a convention that only
   // held for the seeded fixtures in data.ts. Requests created through `addNode` got
@@ -187,17 +225,22 @@ export const useAppStore = create<AppState>(set => ({
       recentIds: remember(s.recentIds, id),
     })),
 
-  save: id => set(s => ({ documents: { ...s.documents, [id]: { ...s.documents[id], dirty: false } } })),
+  setSaveState: saveState => set({ saveState }),
+  setSecretsAvailable: secretsAvailable => set({ secretsAvailable }),
 
-  updateDocument: (id, patch) => set(s => ({ documents: { ...s.documents, [id]: { ...s.documents[id], ...patch, dirty: true } } })),
+  // There is no `dirty` flag any more. Everything autosaves, so "unsaved" was a
+  // state the app could no longer be in — and a confirmation dialog guarding
+  // against losing changes that were already on disk was simply lying.
+  updateDocument: (id, patch) => set(s => ({ documents: { ...s.documents, [id]: { ...s.documents[id], ...patch } } })),
 
-  setRows: (id, key, rows) => set(s => ({ documents: { ...s.documents, [id]: { ...s.documents[id], [key]: rows, dirty: true } } })),
+  setRows: (id, key, rows) => set(s => ({ documents: { ...s.documents, [id]: { ...s.documents[id], [key]: rows } } })),
 
   toggleNode: nodeId => set(s => ({ tree: mapTree(s.tree, n => (n.id === nodeId && n.type !== 'request' ? { ...n, expanded: !n.expanded } : n)) })),
 
   addNode: (type, parentId, name) =>
     set(s => {
       const stamp = Date.now()
+      const parent = parentId ?? containerFor(s.tree, s.selectedNodeId)
       if (type === 'request') {
         // The node id and the document id were both `request-${Date.now()}` in the
         // same tick, so they came out identical — a latent collision between tree
@@ -210,14 +253,13 @@ export const useAppStore = create<AppState>(set => ({
           name: name?.trim() || 'New Request',
           method: 'GET',
           url: 'https://',
-          dirty: true,
           params: [{ id: `${requestId}-p`, enabled: true, key: '', value: '', description: '' }],
           headers: [{ id: `${requestId}-h`, enabled: true, key: '', value: '', description: '' }],
           body: { type: 'none', content: '' },
           auth: { type: 'none', token: '', username: '', password: '' },
         }
         return {
-          tree: insertNode(s.tree, parentId, { id: nodeId, type, requestId, name: doc.name }),
+          tree: insertNode(s.tree, parent, { id: nodeId, type, requestId, name: doc.name }),
           documents: { ...s.documents, [requestId]: doc },
           tabs: [...s.tabs, requestId],
           activeId: requestId,
@@ -233,7 +275,7 @@ export const useAppStore = create<AppState>(set => ({
         expanded: true,
         children: [],
       }
-      return { tree: insertNode(s.tree, parentId, child), selectedNodeId: id }
+      return { tree: insertNode(s.tree, parent, child), selectedNodeId: id }
     }),
 
   renameNode: (nodeId, name) =>
@@ -244,7 +286,7 @@ export const useAppStore = create<AppState>(set => ({
         if (n.type === 'request') requestId = n.requestId
         return { ...n, name }
       })
-      return { tree, documents: requestId ? { ...s.documents, [requestId]: { ...s.documents[requestId], name, dirty: true } } : s.documents }
+      return { tree, documents: requestId ? { ...s.documents, [requestId]: { ...s.documents[requestId], name } } : s.documents }
     }),
 
   // Used to touch only `tree` and `selectedNodeId`, which left the deleted request's

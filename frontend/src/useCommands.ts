@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { documentKeywords, flattenRequests, type Command } from './commands'
+import { flushNow } from './persistence'
 import { cancelRequest, runRequest, toggleRequest } from './requestRunner'
 import { shortcuts } from './shortcuts'
 import { methodOptions, useAppStore } from './store'
@@ -53,7 +54,7 @@ export function useCommands(enabled: boolean): Command[] {
       commands.push({ id: `action:${id}`, group: 'action', title, keywords: keywords.toLowerCase(), shortcut, run })
 
     action('new-request', 'New request', 'create add request', () => useAppStore.getState().addNode('request'), shortcuts.newRequest)
-    action('new-folder', 'New folder', 'create add folder group', () => useAppStore.getState().addNode('folder', 'main'))
+    action('new-folder', 'New folder', 'create add folder group', () => useAppStore.getState().addNode('folder'))
     action('new-collection', 'New collection', 'create add collection', () => useAppStore.getState().addNode('collection'))
 
     if (activeId) {
@@ -63,7 +64,7 @@ export function useCommands(enabled: boolean): Command[] {
       } else {
         action('send', 'Send request', 'run execute fire', () => toggleRequest(activeId), shortcuts.send)
       }
-      action('save', 'Save request', 'persist store', () => useAppStore.getState().save(activeId), shortcuts.save)
+      action('save', 'Save now', 'persist store write flush disk', () => flushNow(), shortcuts.save)
       action('close', 'Close tab', 'dismiss hide', () => useAppStore.getState().closeRequest(activeId), shortcuts.close)
       action('reveal', 'Reveal in sidebar', 'find locate show tree', () => useAppStore.getState().revealNode(activeId))
       action('copy-url', 'Copy request URL', 'clipboard link', () => void navigator.clipboard.writeText(doc?.url ?? ''))

@@ -9,12 +9,27 @@ tasks:
     cmds:
       - pnpm install --frozen-lockfile
 
+  generate:bindings:
+    summary: Generates TypeScript bindings for the bound Go services
+    sources:
+      - '*.go'
+      - internal/**/*.go
+      - go.mod
+      - go.sum
+    generates:
+      - frontend/bindings/**/*.ts
+    cmds:
+      # -i emits plain interfaces instead of classes: these DTOs are pure JSON, so
+      # the class variant only adds runtime construction helpers nothing calls.
+      - wails3 generate bindings -ts -i -d frontend/bindings ./...
+
   build:frontend:
     summary: Builds the React frontend
     dir: frontend
     deps: [install:frontend:deps]
     sources:
       - src/**/*
+      - bindings/**/*
       - index.html
       - package.json
       - vite.config.ts

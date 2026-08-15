@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { flushNow } from './persistence'
 import { cancelRequest, toggleRequest } from './requestRunner'
 import { matchesCombo } from './shortcuts'
 import { useAppStore } from './store'
@@ -28,9 +29,12 @@ export function useGlobalShortcuts(): void {
 
       const id = state.activeId
 
-      if (matchesCombo(event, 'mod+s') && id) {
+      // Kept even though everything autosaves: it is universal muscle memory, and
+      // it is a real escape hatch — it writes immediately instead of waiting out
+      // the debounce. It is simply no longer the thing that makes saving happen.
+      if (matchesCombo(event, 'mod+s')) {
         event.preventDefault()
-        state.save(id)
+        flushNow()
       } else if (matchesCombo(event, 'mod+enter') && id) {
         event.preventDefault()
         // Was `document.querySelector('.send-btn')?.click()`, which meant renaming a
@@ -38,11 +42,8 @@ export function useGlobalShortcuts(): void {
         toggleRequest(id)
       } else if (matchesCombo(event, 'mod+w') && id) {
         event.preventDefault()
-        const doc = state.documents[id]
-        if (!doc || !doc.dirty || window.confirm(`Discard unsaved changes to “${doc.name}”?`)) {
-          cancelRequest(id)
-          state.closeRequest(id)
-        }
+        cancelRequest(id)
+        state.closeRequest(id)
       } else if (matchesCombo(event, 'mod+b')) {
         event.preventDefault()
         state.toggleSidebar()

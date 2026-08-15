@@ -7,7 +7,7 @@ info:
   description: "A tiny, focused HTTP client for developers."
   copyright: "Copyright 2026 HTTiny"
   comments: "Dark, fast and frictionless HTTP tooling."
-  version: "0.4.0"
+  version: "0.5.0"
 
 dev_mode:
   root_path: .
@@ -20,6 +20,10 @@ dev_mode:
     git_ignore: true
   executes:
     - cmd: wails3 task common:install:frontend:deps
+      type: once
+    # Before Vite starts: the frontend imports the generated bindings, so they have
+    # to be on disk for the very first dev build.
+    - cmd: wails3 task common:generate:bindings
       type: once
     - cmd: wails3 task common:dev:frontend
       type: background

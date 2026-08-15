@@ -261,6 +261,31 @@
     box-shadow: var(--shadow-dot);
   }
 
+  /* The dot is never the only signal — the footer always carries the state in words
+   * beside it — so colour here is reinforcement, not information. */
+  .sidebar-footer[data-tone='pending'] .status-dot {
+    background: var(--color-text-muted);
+    box-shadow: none;
+  }
+
+  .sidebar-footer[data-tone='warn'] {
+    color: var(--color-warning);
+  }
+
+  .sidebar-footer[data-tone='warn'] .status-dot {
+    background: var(--color-warning);
+    box-shadow: none;
+  }
+
+  .sidebar-footer[data-tone='error'] {
+    color: var(--color-danger);
+  }
+
+  .sidebar-footer[data-tone='error'] .status-dot {
+    background: var(--color-danger);
+    box-shadow: none;
+  }
+
   /* ── Tree ──────────────────────────────────────────────────────────────── */
   .tree-row {
     height: var(--h-row-tree);
@@ -523,14 +548,6 @@
     background: var(--color-surface-3);
   }
 
-  .dirty-dot {
-    flex: 0 0 auto;
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-full);
-    background: var(--color-text-muted);
-  }
-
   .tab-close {
     flex: 0 0 auto;
     width: var(--h-control-xs);
@@ -556,10 +573,6 @@
   .request-tab:focus-within .tab-close,
   .tab-close:focus-visible {
     opacity: 1;
-  }
-
-  .request-tab:hover .dirty-dot {
-    display: none;
   }
 
   .tab-close:hover {
@@ -1307,6 +1320,18 @@
 
   .loading-note {
     margin: 0;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+  }
+
+  /* Sits above a truncated body. A banner rather than a subtle footnote: silently
+   * showing the first 5 MB of a larger response would make the viewer lie. */
+  .response-notice {
+    flex: none;
+    margin: 0;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-surface-3);
     color: var(--color-text-subtle);
     font-size: var(--text-xs);
   }

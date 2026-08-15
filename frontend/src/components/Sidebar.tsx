@@ -8,6 +8,40 @@ import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction, Shortcut } from './Placeholder'
 import { TreeRowMenu } from './TreeRowMenu'
 
+/**
+ * The footer used to read "Mock responses", which was true and is not any more.
+ * It now carries the one fact the user cannot otherwise check: whether their work
+ * is actually on disk. The failure states are the point — a silent autosave that
+ * has stopped working is worse than no autosave at all.
+ */
+function SaveStatus() {
+  const persistenceState = useAppStore(s => s.persistenceState)
+  const saveState = useAppStore(s => s.saveState)
+  const secretsAvailable = useAppStore(s => s.secretsAvailable)
+  const dataDir = useAppStore(s => s.dataDir)
+
+  const [tone, label] =
+    persistenceState === 'unavailable'
+      ? (['warn', 'Not saved — browser preview'] as const)
+      : persistenceState === 'newer-version'
+        ? (['error', 'Newer workspace — not saving'] as const)
+        : saveState === 'error'
+          ? (['error', 'Save failed'] as const)
+          : saveState === 'saving' || saveState === 'pending'
+            ? (['pending', 'Saving…'] as const)
+            : !secretsAvailable
+              ? (['warn', 'Saved · no keychain'] as const)
+              : (['ok', 'Saved'] as const)
+
+  return (
+    <footer className="sidebar-footer" data-tone={tone} title={dataDir || undefined}>
+      <span className="status-dot" aria-hidden="true" />
+      {label}
+      <span className="ml-auto">v{__APP_VERSION__}</span>
+    </footer>
+  )
+}
+
 function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean; onFocusRow: (id: string) => void }) {
   const { node, depth, position, siblings } = row
   const selectedNodeId = useAppStore(s => s.selectedNodeId)
@@ -126,10 +160,10 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       <div className="sidebar-section-title">
         <span id="collections-label">COLLECTIONS</span>
         <div>
-          <button className="icon-btn xs" aria-label="New folder" title="New folder" onClick={() => addNode('folder', 'main')}>
+          <button className="icon-btn xs" aria-label="New folder" title="New folder" onClick={() => addNode('folder')}>
             <FolderPlus size={14} aria-hidden="true" />
           </button>
-          <button className="icon-btn xs" aria-label="New request" title="New request" onClick={() => addNode('request', 'main')}>
+          <button className="icon-btn xs" aria-label="New request" title="New request" onClick={() => addNode('request')}>
             <FilePlus2 size={14} aria-hidden="true" />
           </button>
         </div>
@@ -150,8 +184,16 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         /* Deleting the last collection used to leave a blank panel with no way back
            except the header's `+`. */
         <div className="tree-scroll">
-          <Placeholder icon={<Boxes size={20} />} title="No Collections" description="Group your requests into a collection to get started.">
-            <PlaceholderAction onClick={() => addNode('collection')}>New Collection</PlaceholderAction>
+          {/* This is both the "you deleted everything" state and the very first thing
+              a new user sees, so it leads with the request — the thing the app is for —
+              and offers the collection as the way to organise them afterwards. */}
+          <Placeholder icon={<Boxes size={20} />} title="No requests yet" description="Create a request to send your first call, or start with a collection.">
+            <PlaceholderAction shortcut={shortcuts.newRequest} onClick={() => addNode('request')}>
+              New request
+            </PlaceholderAction>
+            <PlaceholderAction variant="secondary" onClick={() => addNode('collection')}>
+              New collection
+            </PlaceholderAction>
           </Placeholder>
         </div>
       ) : (
@@ -161,10 +203,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           ))}
         </div>
       )}
-      <footer className="sidebar-footer">
-        <span className="status-dot" aria-hidden="true" />
-        Mock responses <span className="ml-auto">v{__APP_VERSION__}</span>
-      </footer>
+      <SaveStatus />
     </nav>
   )
 }

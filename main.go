@@ -4,16 +4,25 @@ import (
 	"embed"
 	"log"
 
+	"github.com/ClaudioGuevaraDev/HTTiny/internal/httpexec"
+	"github.com/ClaudioGuevaraDev/HTTiny/internal/workspace"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
-func main() {	
+func main() {
 	app := application.New(application.Options{
 		Name:        "HTTiny",
 		Description: "A tiny, focused HTTP client for developers.",
+		// Bound services. The bindings generator detects the type argument of
+		// application.NewService statically, so services must be registered
+		// through that call for `wails3 generate bindings` to see them.
+		Services: []application.Service{
+			application.NewService(httpexec.New()),
+			application.NewService(workspace.New()),
+		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
@@ -38,4 +47,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

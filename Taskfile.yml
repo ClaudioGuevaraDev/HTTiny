@@ -11,17 +11,20 @@ vars:
 tasks:
   build:
     summary: Builds HTTiny
-    deps:
-      - task: common:build:frontend
+    # Sequenced in cmds rather than deps: `deps` run concurrently, and the frontend
+    # build type-checks the generated bindings, so they have to exist first.
     cmds:
-      - mkdir -p {{.BIN_DIR}}
-      - go build -o {{.BIN_DIR}}/{{.APP_NAME}} .
+      - task: common:generate:bindings
+      - task: common:build:frontend
+      # go build creates {{.BIN_DIR}} itself; `mkdir -p` is not available in
+      # Task's built-in shell on Windows.
+      - go build -o {{.BIN_DIR}}/{{.APP_NAME}}{{exeExt}} .
 
   run:
     summary: Builds and runs HTTiny
     deps: [build]
     cmds:
-      - ./{{.BIN_DIR}}/{{.APP_NAME}}
+      - ./{{.BIN_DIR}}/{{.APP_NAME}}{{exeExt}}
 
   dev:
     summary: Runs HTTiny with frontend hot reload

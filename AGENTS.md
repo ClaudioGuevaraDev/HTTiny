@@ -2,17 +2,19 @@
 
 ## Project Structure & Module Organization
 
-HTTiny is a Wails v3 desktop application. Native application setup lives in `main.go`; Go dependencies are declared in `go.mod`. Build orchestration and desktop metadata live in `Taskfile.yml` and `build/`.
+HTTiny is a Wails v3 desktop application. Native application setup lives in `main.go`, and the bound Go services live under `internal/` (`httpexec` for outbound HTTP, `workspace` for persistence, `secrets` for the OS credential store). Go dependencies are declared in `go.mod`. Build orchestration and desktop metadata live in `Taskfile.yml` and `build/`.
 
 The React/TypeScript frontend is under `frontend/`:
 
 - `src/components/` contains focused UI components such as the sidebar, request editor, tabs, and response viewer.
 - `src/store.ts` owns shared Zustand state and actions.
 - `src/types.ts` defines request, response, and collection contracts.
-- `src/data.ts` and `src/mockExecutor.ts` contain demo data and simulated HTTP behavior.
+- `src/goExecutor.ts` bridges the `RequestExecutor` contract to the Go `HTTPExec` service; `src/persistence.ts` and `src/workspaceFile.ts` own disk persistence. There is no demo data and nothing is simulated.
 - `public/` contains static visual assets.
 
 Generated directories such as `frontend/dist/`, `frontend/node_modules/`, and `bin/` must not be committed.
+
+`frontend/bindings/` is generated but **is** committed, because it is an input to the TypeScript build and producing it requires the Go toolchain and the `wails3` CLI. Regenerate it with `wails3 task common:generate:bindings` after changing a bound Go signature; never edit it by hand.
 
 ## Build and Development Commands
 

@@ -44,20 +44,48 @@ export interface RequestDocument {
   params: KeyValueRow[]
   headers: KeyValueRow[]
   body: { type: 'none' | 'json' | 'text'; content: string }
+  /**
+   * `token` and `password` are the only fields that never reach the workspace file:
+   * they are written to the OS credential store and merged back in on load, so a
+   * workspace can be copied, diffed or attached to a bug report without leaking a
+   * credential for someone else's API.
+   */
   auth: { type: 'none' | 'bearer' | 'basic'; token: string; username: string; password: string }
-  dirty: boolean
 }
+/**
+ * How the response body should be labelled and rendered. Decided in Go from the
+ * Content-Type — and overridden to `binary` when a payload that claims to be text
+ * turns out not to be valid UTF-8 — so the viewer never has to re-sniff it.
+ */
+export type ResponseFormat = 'json' | 'html' | 'xml' | 'text' | 'binary'
+
 /**
  * `sizeBytes` is a number rather than a pre-baked `'1.2 KB'` string: formatting is
  * the view's job, and a real network executor hands back a byte count. `startedAt`
  * lets the loading state render a live elapsed counter without a second source of
  * truth, and `code` keeps the raw failure code so the UI can special-case it.
+ *
+ * On success, `body` is empty when `format` is `binary`: the bytes are deliberately
+ * never shipped across the binding, so the viewer renders from the metadata alone.
+ * `truncated` says the body was capped, in which case `sizeBytes` is the full size
+ * reported by the server rather than the length of what is on screen.
  */
 export type ResponseSnapshot =
   | { state: 'idle' }
   | { state: 'loading'; startedAt: number }
   | { state: 'error'; code: string; message: string; detail: string }
-  | { state: 'success'; status: number; statusText: string; time: number; sizeBytes: number; body: string; headers: KeyValueRow[] }
+  | {
+      state: 'success'
+      status: number
+      statusText: string
+      time: number
+      sizeBytes: number
+      body: string
+      headers: KeyValueRow[]
+      contentType: string
+      format: ResponseFormat
+      truncated: boolean
+    }
 
 export interface RequestExecutor {
   execute(request: RequestDocument, signal: AbortSignal): Promise<Extract<ResponseSnapshot, { state: 'success' }>>

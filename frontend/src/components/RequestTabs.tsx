@@ -18,8 +18,10 @@ export function RequestTabs() {
       {tabs.map(id => {
         const doc = documents[id]
         if (!doc) return null
+        // No confirmation: edits are already on disk, and closing a tab has never
+        // deleted anything — the request stays in the tree and reopens with its
+        // content intact.
         const close = () => {
-          if (doc.dirty && !window.confirm(`Discard unsaved changes to “${doc.name}”?`)) return
           cancelRequest(id)
           closeRequest(id)
         }
@@ -48,9 +50,7 @@ export function RequestTabs() {
             >
               <MethodChip method={doc.method} variant="compact" decorative />
               <span className="truncate">{doc.name}</span>
-              {doc.dirty && <span className="sr-only">, unsaved changes</span>}
             </button>
-            {doc.dirty && <span className="dirty-dot" aria-hidden="true" />}
             <button type="button" className="tab-close" aria-label={`Close ${doc.name}`} onClick={close}>
               <X size={13} aria-hidden="true" />
             </button>

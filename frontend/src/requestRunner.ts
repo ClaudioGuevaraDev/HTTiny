@@ -1,5 +1,5 @@
-import { resolveError } from './errors'
-import { mockExecutor } from './mockExecutor'
+import { RequestFailure, resolveError } from './errors'
+import { goExecutor } from './goExecutor'
 import { useAppStore } from './store'
 import type { RequestExecutor } from './types'
 
@@ -8,22 +8,22 @@ import type { RequestExecutor } from './types'
  *
  * This exists so that the four surfaces that can start or stop a request — the Send
  * button, Ctrl+Enter, the command palette and the response placeholders — all go
- * through one code path and cannot diverge. It also finally honours the seam
- * CLAUDE.md describes: `RequestEditor` no longer imports `mockExecutor` directly, so
- * moving to real Go-bound networking is a single `setRequestExecutor` call.
+ * through one code path and cannot diverge.
+ *
+ * The executor is a variable rather than a direct import so that a second
+ * implementation can be swapped in without touching any call site. Today there is
+ * one: `goExecutor`, which runs the request in the Go process.
  *
  * Module-level state is reset by HMR, which orphans controllers during a hot reload
  * in dev. That is an accepted dev-only edge rather than something worth engineering
  * around.
  */
-let executor: RequestExecutor = mockExecutor
+let executor: RequestExecutor = goExecutor
 const controllers = new Map<string, AbortController>()
 
 export const setRequestExecutor = (next: RequestExecutor): void => {
   executor = next
 }
-
-export const isSending = (id: string): boolean => controllers.has(id)
 
 export async function runRequest(id: string): Promise<void> {
   const state = useAppStore.getState()
@@ -42,8 +42,12 @@ export async function runRequest(id: string): Promise<void> {
     if (!controller.signal.aborted) useAppStore.getState().setResponse(id, result)
   } catch (error) {
     if (controller.signal.aborted) return
-    const code = error instanceof Error ? error.message : 'UNKNOWN'
-    const [message, detail] = resolveError(code)
+    const code = error instanceof RequestFailure ? error.code : error instanceof Error ? error.message : 'UNKNOWN'
+    const [message, fallback] = resolveError(code)
+    // The executor's own diagnostic wins over the curated copy when there is one:
+    // "connectex: no connection could be made" locates the problem in a way that
+    // "nothing is listening on that host and port" cannot.
+    const detail = (error instanceof RequestFailure && error.detail) || fallback
     useAppStore.getState().setResponse(id, { state: 'error', code, message, detail })
   } finally {
     controllers.delete(id)
@@ -61,8 +65,4 @@ export function cancelRequest(id: string): void {
 export function toggleRequest(id: string): void {
   if (controllers.has(id)) cancelRequest(id)
   else void runRequest(id)
-}
-
-export function cancelAll(ids: readonly string[]): void {
-  ids.forEach(cancelRequest)
 }

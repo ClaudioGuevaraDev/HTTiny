@@ -2,6 +2,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { Check, ChevronDown, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
+import { flushNow } from '../persistence'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
 import { methodOptions, replaceQuery, useAppStore } from '../store'
@@ -229,7 +230,6 @@ export function RequestEditor() {
   const requestPanel = useAppStore(s => s.requestPanel)
   const setRequestPanel = useAppStore(s => s.setRequestPanel)
   const updateDocument = useAppStore(s => s.updateDocument)
-  const save = useAppStore(s => s.save)
   const addNode = useAppStore(s => s.addNode)
   const openPalette = useAppStore(s => s.openPalette)
   const sending = useAppStore(s => (s.activeId ? s.responses[s.activeId]?.state === 'loading' : false))
@@ -286,9 +286,10 @@ export function RequestEditor() {
         {/* A stable id, so the INVALID_URL placeholder can focus this field without
             reaching for a class selector the way Ctrl+Enter used to.
 
-            `inputMode` but deliberately not `type="url"`: the mock executor keys off
-            `timeout`, `dns-error` and `refused` in the URL, and template variables such
-            as `{{baseUrl}}/users` are coming — both would trip native URL validation. */}
+            `inputMode` but deliberately not `type="url"`: the URL is validated once, in
+            Go, and template variables such as `{{baseUrl}}/users` are coming — native
+            URL validation would reject those and would be a second, disagreeing
+            validator besides. */}
         <input
           id="request-url"
           name="request-url"
@@ -302,12 +303,15 @@ export function RequestEditor() {
           autoComplete="off"
           spellCheck={false}
         />
+        {/* Everything autosaves, so this writes immediately rather than waiting out
+            the debounce. Kept because "did that save?" is a real question and a
+            button that answers it is worth one icon. */}
         <button
           type="button"
           className="icon-btn save-btn"
-          aria-label={`Save request (${shortcutHint('save')})`}
-          title={`Save request (${shortcutHint('save')})`}
-          onClick={() => save(activeId)}
+          aria-label={`Save now (${shortcutHint('save')})`}
+          title={`Save now (${shortcutHint('save')})`}
+          onClick={flushNow}
         >
           <Save size={16} aria-hidden="true" />
         </button>
