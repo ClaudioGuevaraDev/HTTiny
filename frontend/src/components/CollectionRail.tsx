@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Plus } from 'lucide-react'
 import { COLLECTION_PANEL_ID, collectionTabId, hueOf, initialsOf } from '../collections'
 import { collectionsIn, useAppStore } from '../store'
@@ -26,6 +27,21 @@ export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; on
   // rail would drop out of the tab order entirely.
   const shown = collections.some(c => c.id === activeCollectionId) ? activeCollectionId : collections[0]?.id
 
+  // Activating a tab switches the collection, and once the strip scrolls that square
+  // can be out of view — so the switch would look like nothing happened. Arrow keys
+  // get this from the browser's scroll-on-focus; a click on a tab has nothing.
+  // `nearest` is a no-op while the square is already visible, so this never steals
+  // the scroll position from the user.
+  //
+  // The braces are load-bearing. As a concise body this returned `scrollIntoView`'s
+  // result, which React takes as the cleanup function — and `TypeError: destroy is
+  // not a function` during unmount tears down the whole root, leaving a black
+  // window. `() => void` accepts any return type, so tsc cannot catch it.
+  const activeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [shown])
+
   return (
     <div className="collection-rail">
       <button
@@ -49,6 +65,7 @@ export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; on
             <button
               type="button"
               key={collection.id}
+              ref={active ? activeRef : null}
               id={collectionTabId(collection.id)}
               role="tab"
               // The square shows initials, so the accessible name has to carry the

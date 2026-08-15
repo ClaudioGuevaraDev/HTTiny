@@ -44,6 +44,14 @@
   .app-shell {
     height: 100%;
     display: grid;
+    /* Without this the single row is implicit and `auto`: it stretches to the
+     * container while the content fits, but nothing caps it once the content is
+     * taller — and then `body { overflow: hidden }` clips the sidebar instead of
+     * letting it scroll. `.sidebar`'s `height: 100%` is a percentage against that
+     * track, so it resolved as `auto` too and the rail's content height fed back
+     * into the row. Same shape the editor split already uses (App.tsx:34-35);
+     * the columns still come in inline from App.tsx. */
+    grid-template-rows: minmax(0, 1fr);
     background: var(--color-surface-canvas);
   }
 
@@ -177,8 +185,13 @@
     background: var(--color-surface-canvas);
   }
 
+  /* `flex: 1` pushed the add button to the floor of the rail even with two
+   * collections in it. At `0 1 auto` the strip is as tall as its collections, so
+   * the button sits directly under the last one, and it only shrinks when they
+   * stop fitting — which is exactly when the button should pin to the bottom and
+   * this should start scrolling. */
   .rail-tabs {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
     width: 100%;
     display: flex;
@@ -189,9 +202,19 @@
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
+    /* A 9px scrollbar (base.css) inside a 48px rail shifts the 34px squares off
+     * centre and clips the active pill, and it would only be there some of the
+     * time. Hidden, the same way `.request-tabs` hides its own. */
+    scrollbar-width: none;
     /* Separates the collections from the brand mark above and the add button below
      * without a border, which at 48px wide would read as a boxed-in column. */
     border-block: 1px solid var(--color-border-subtle);
+  }
+
+  /* With no collections there is nothing to separate, and the strip would be two
+   * hairlines 12px apart floating under the brand mark. */
+  .rail-tabs:empty {
+    display: none;
   }
 
   .collection-square {
@@ -225,11 +248,16 @@
 
   /* The active marker is a shape, not a colour: the pill reads as "this one" even
    * where the hue difference does not, which is the same reason the selected tree
-   * row carries an inset rail rather than only a tint. */
+   * row carries an inset rail rather than only a tint.
+   *
+   * `-7px`, not `-9px`. The square is 34px centred in the strip's 48px content box,
+   * so its left edge is at 7px and `-9px` put the pill at -2px — `overflow-x:
+   * hidden` clips at the padding box, which left 1px of a 3px marker on screen.
+   * At -7px it sits flush against the rail's left edge, whole. */
   .collection-square[aria-selected='true']::before {
     content: '';
     position: absolute;
-    left: -9px;
+    left: -7px;
     width: 3px;
     height: 20px;
     border-radius: var(--radius-full);
