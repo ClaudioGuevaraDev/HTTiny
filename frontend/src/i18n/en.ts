@@ -296,6 +296,12 @@ export const en = {
   'settings.zoom.in': 'Zoom in',
   'settings.zoom.out': 'Zoom out',
   'settings.zoom.reset': 'Reset zoom',
+  'settings.codeFont.label': 'Code text size',
+  'settings.codeFont.desc': 'The request and response bodies. The zoom applies on top of it.',
+  'settings.codeFont.value': '{size}px',
+  'settings.codeFont.in': 'Larger code text',
+  'settings.codeFont.out': 'Smaller code text',
+  'settings.codeFont.reset': 'Reset code text size',
   'settings.layout.heading': 'Layout',
   // A switch is labelled by what turning it *on* does, not by the name of the setting:
   // "Layout" beside a switch would not say which way is which. `rows` is the default, so

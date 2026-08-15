@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { initCodeFontSize } from './codeFont'
 import { initLanguage } from './language'
 import { hydrate } from './persistence'
 import { initTheme } from './theme'
@@ -27,13 +28,14 @@ import './styles.css'
  * is invisible rather than a white flash.
  */
 void hydrate().then(() => {
-  // All three between the two for the same reason the render is after the hydration: the
-  // theme, the language and the zoom have to be on the document before anything paints,
-  // and none can be known until the stored preferences have been read. The catalogues
-  // are static imports, so there is nothing to await for the language.
+  // All four between the two for the same reason the render is after the hydration: the
+  // theme, the language, the zoom and the code size have to be on the document before
+  // anything paints, and none can be known until the stored preferences have been read.
+  // The catalogues are static imports, so there is nothing to await for the language.
   initTheme()
   initLanguage()
   initZoom()
+  initCodeFontSize()
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

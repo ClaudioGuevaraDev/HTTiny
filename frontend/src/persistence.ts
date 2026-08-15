@@ -214,6 +214,7 @@ export async function hydrate(): Promise<void> {
       // nothing, resetting to English on every launch.
       language: layout.language,
       zoom: layout.zoom,
+      codeFontSize: layout.codeFontSize,
       defaultBodyLanguage: layout.defaultBodyLanguage,
       persistenceState: 'ready',
       secretsAvailable,

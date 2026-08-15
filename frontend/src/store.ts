@@ -36,6 +36,13 @@ export const ZOOM = { min: 80, max: 150, default: 100 } as const
 export const ZOOM_STEPS = [80, 90, 100, 110, 125, 150] as const
 
 /**
+ * Pixels, and no list of stops: every integer is a legitimate type size. Governs
+ * `--text-code`, which feeds nothing but the two editors — so this is the knob the zoom
+ * cannot be, the one that leaves the chrome alone.
+ */
+export const CODE_FONT_SIZE = { min: 10, max: 22, default: 13 } as const
+
+/**
  * The next stop in a direction. `findIndex` rather than `indexOf` so a value that is not
  * a stop at all — a hand-edited `ui.json` — still moves instead of sticking: the first
  * stop past it in that direction wins.
@@ -95,6 +102,8 @@ interface AppState {
 
   /** Applied by `zoom.ts` as a CSS `zoom` on the root, in percent. */
   zoom: number
+  /** Applied by `codeFont.ts` as `--text-code`, in pixels. */
+  codeFontSize: number
   /** Applied by `theme.ts`, which resolves `system` before CSS ever sees it. */
   theme: ThemePreference
   /** Applied by `language.ts`, which pushes it into the message runtime and onto `<html lang>`. */
@@ -140,6 +149,7 @@ interface AppState {
   zoomIn: () => void
   zoomOut: () => void
   resetZoom: () => void
+  setCodeFontSize: (size: number) => void
   setTheme: (theme: ThemePreference) => void
   setLanguage: (language: Locale) => void
   setDefaultBodyLanguage: (language: BodyLanguage | null) => void
@@ -315,6 +325,7 @@ export const useAppStore = create<AppState>(set => ({
   splitOrientation: 'rows',
   splitRatio: SPLIT_RATIO.default,
   zoom: ZOOM.default,
+  codeFontSize: CODE_FONT_SIZE.default,
   theme: 'system',
   language: 'en',
   defaultBodyLanguage: null,
@@ -538,6 +549,10 @@ export const useAppStore = create<AppState>(set => ({
   zoomIn: () => set(s => ({ zoom: stepZoom(s.zoom, 1) })),
   zoomOut: () => set(s => ({ zoom: stepZoom(s.zoom, -1) })),
   resetZoom: () => set({ zoom: ZOOM.default }),
+  // No `increase`/`decrease`/`reset` beside it, unlike the zoom: those exist because three
+  // surfaces step the zoom, while this has one. The stepper does the arithmetic and lets
+  // the clamp here be the only thing that decides what is in range.
+  setCodeFontSize: size => set({ codeFontSize: Math.min(CODE_FONT_SIZE.max, Math.max(CODE_FONT_SIZE.min, size)) }),
   setTheme: theme => set({ theme }),
   setLanguage: language => set({ language }),
   setDefaultBodyLanguage: defaultBodyLanguage => set({ defaultBodyLanguage }),

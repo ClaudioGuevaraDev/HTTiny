@@ -6,7 +6,7 @@ import { BODY_LANGUAGES, bodyLanguageLabel } from '../responseBody'
 import { useSystemTheme } from '../theme'
 import type { Locale, ThemePreference } from '../types'
 import { shortcuts } from '../shortcuts'
-import { SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, useAppStore } from '../store'
+import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, useAppStore } from '../store'
 import { useRovingFocus } from '../useRovingFocus'
 import { Placeholder, Shortcut } from './Placeholder'
 
@@ -153,6 +153,7 @@ function GeneralSection() {
       <h3 className="settings-heading">{t('settings.appearance')}</h3>
       <ThemeRow />
       <ZoomRow />
+      <CodeFontRow />
       <h3 className="settings-heading">{t('settings.layout.heading')}</h3>
       {/* First in the group on purpose: the orientation decides *what* the split slider
           divides, and that row's description reads "height" or "width" off it. */}
@@ -248,6 +249,58 @@ function ZoomRow() {
           {t('settings.zoom.value', { zoom })}
         </button>
         <button type="button" className="icon-btn" aria-label={t('settings.zoom.in')} disabled={zoom >= ZOOM.max} onClick={zoomIn}>
+          <Plus size={14} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The knob the zoom cannot be. Zoom scales everything at once, which is right when the
+ * whole window is too small; this leaves the chrome compact and moves only the two
+ * editors, for when the payload is what needs to be readable. They multiply rather than
+ * fight — 16px of code at 125% paints at 20.
+ *
+ * Same stepper as the zoom row, minus the keys: this has no shortcut, so there is nothing
+ * to print.
+ */
+function CodeFontRow() {
+  const { t } = useT()
+  const size = useAppStore(s => s.codeFontSize)
+  const setCodeFontSize = useAppStore(s => s.setCodeFontSize)
+
+  return (
+    <div className="settings-row">
+      <div className="settings-label">
+        <span id="settings-code-font-label">{t('settings.codeFont.label')}</span>
+        <p id="settings-code-font-desc">{t('settings.codeFont.desc')}</p>
+      </div>
+      <div className="settings-stepper" role="group" aria-labelledby="settings-code-font-label" aria-describedby="settings-code-font-desc">
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={t('settings.codeFont.out')}
+          disabled={size <= CODE_FONT_SIZE.min}
+          onClick={() => setCodeFontSize(size - 1)}
+        >
+          <Minus size={14} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="settings-stepper-value"
+          aria-label={t('settings.codeFont.reset')}
+          onClick={() => setCodeFontSize(CODE_FONT_SIZE.default)}
+        >
+          {t('settings.codeFont.value', { size })}
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={t('settings.codeFont.in')}
+          disabled={size >= CODE_FONT_SIZE.max}
+          onClick={() => setCodeFontSize(size + 1)}
+        >
           <Plus size={14} aria-hidden="true" />
         </button>
       </div>
