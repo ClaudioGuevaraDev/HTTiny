@@ -5,9 +5,8 @@ import { Binary, Braces, Check, Code, Copy, FileJson2, FileText, FileX2, RotateC
 import { httinyTheme } from '../editorTheme'
 import { errorCopy } from '../errors'
 import { formatBytes, formatDuration } from '../format'
-import type { MessageKey } from '../i18n'
 import { useLocale, useT } from '../language'
-import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW, formatBody, resolveLanguage } from '../responseBody'
+import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW, bodyLanguageLabel, formatBody, resolveLanguage } from '../responseBody'
 import type { BodyLanguage, BodyView, ResponseFormat } from '../types'
 import { cancelRequest, runRequest } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
@@ -69,13 +68,6 @@ function FormatChip({ format, contentType }: { format: ResponseFormat; contentTy
 }
 
 /**
- * Three of these are format names and stay as they are; only `text` is a word rather
- * than a token, and it sits inside a control labelled "Interpret body as", where it
- * reads as a choice in a sentence.
- */
-const LANGUAGE_LABEL = { json: null, html: null, xml: null, text: 'response.language.text' } as const satisfies Record<BodyLanguage, MessageKey | null>
-
-/**
  * Takes the chip's place while the body panel is showing something an editor can
  * render. Both say what the body is; only one of them can also change it, and the
  * tabs row is too narrow in the columns layout to carry the pair.
@@ -129,7 +121,9 @@ function BodyControls({
         ))}
       </div>
       {/* Shows the resolved language, so a request nobody has configured still names
-          what its body actually is — and picking one pins it from then on. */}
+          what its body actually is — and picking one pins it from then on. There is no
+          entry for "nothing chosen": the default lives in Settings, and this control is
+          only for overriding it. */}
       <select
         className="body-language"
         aria-label={t('response.interpretAs')}
@@ -142,14 +136,11 @@ function BodyControls({
           if (next) onChange({ language: next })
         }}
       >
-        {BODY_LANGUAGES.map(option => {
-          const label = LANGUAGE_LABEL[option]
-          return (
-            <option key={option} value={option}>
-              {label ? t(label) : option.toUpperCase()}
-            </option>
-          )
-        })}
+        {BODY_LANGUAGES.map(option => (
+          <option key={option} value={option}>
+            {bodyLanguageLabel(t, option)}
+          </option>
+        ))}
       </select>
     </div>
   )
@@ -165,6 +156,7 @@ export function ResponseViewer() {
   const stored = useAppStore(s => (s.activeId ? s.responses[s.activeId] : undefined))
   const storedView = useAppStore(s => (s.activeId ? s.bodyViews[s.activeId] : undefined))
   const setBodyView = useAppStore(s => s.setBodyView)
+  const defaultBodyLanguage = useAppStore(s => s.defaultBodyLanguage)
   const response = stored ?? { state: 'idle' as const }
   const elapsed = useElapsed(response.state === 'loading' ? response.startedAt : null)
   const { status: copyStatus, copy } = useCopy()
@@ -173,7 +165,7 @@ export function ResponseViewer() {
   // Hooks cannot sit inside the success branch, so the inputs are read defensively and
   // the memo runs against an empty body the rest of the time — which costs nothing.
   const view = storedView ?? DEFAULT_BODY_VIEW
-  const language = resolveLanguage(view, response.state === 'success' ? response.format : 'text')
+  const language = resolveLanguage(view, response.state === 'success' ? response.format : 'text', defaultBodyLanguage)
   const rawBody = response.state === 'success' ? response.body : ''
   // Reparsing several MB of JSON on every render — and this component re-renders ten
   // times a second while a *later* request is in flight — is not affordable.

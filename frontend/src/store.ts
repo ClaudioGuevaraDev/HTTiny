@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { translate } from './i18n'
 import { DEFAULT_BODY_VIEW } from './responseBody'
 import type {
+  BodyLanguage,
   BodyView,
   CollectionNode,
   HttpMethod,
@@ -78,6 +79,12 @@ interface AppState {
   theme: ThemePreference
   /** Applied by `language.ts`, which pushes it into the message runtime and onto `<html lang>`. */
   language: Locale
+  /**
+   * What the response viewer opens a body as when the request has no pick of its own.
+   * `null` is "automatic", which defers to Go's classification — see `resolveLanguage`,
+   * which owns the precedence.
+   */
+  defaultBodyLanguage: BodyLanguage | null
 
   // Only open/closed lives here; the palette's query and highlighted index stay
   // local to the dialog, since they change on every keystroke and nothing outside
@@ -111,6 +118,7 @@ interface AppState {
   setSplitRatio: (ratio: number) => void
   setTheme: (theme: ThemePreference) => void
   setLanguage: (language: Locale) => void
+  setDefaultBodyLanguage: (language: BodyLanguage | null) => void
   openPalette: (seed?: string) => void
   closePalette: () => void
   openSettings: () => void
@@ -284,6 +292,7 @@ export const useAppStore = create<AppState>(set => ({
   splitRatio: SPLIT_RATIO.default,
   theme: 'system',
   language: 'en',
+  defaultBodyLanguage: null,
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
@@ -500,6 +509,7 @@ export const useAppStore = create<AppState>(set => ({
   setSplitRatio: ratio => set({ splitRatio: Math.min(SPLIT_RATIO.max, Math.max(SPLIT_RATIO.min, ratio)) }),
   setTheme: theme => set({ theme }),
   setLanguage: language => set({ language }),
+  setDefaultBodyLanguage: defaultBodyLanguage => set({ defaultBodyLanguage }),
   openPalette: (seed = '') => set({ paletteOpen: true, paletteSeed: seed }),
   closePalette: () => set({ paletteOpen: false, paletteSeed: '' }),
   openSettings: () => set({ settingsOpen: true }),

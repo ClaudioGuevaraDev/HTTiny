@@ -63,13 +63,16 @@ export type ResponseFormat = 'json' | 'html' | 'xml' | 'text' | 'binary'
  * How the viewer is showing a response body, remembered per request.
  *
  * `language` overrides what Go decided, because a `Content-Type` is a claim and not
- * a fact — JSON served as `text/plain` is common enough that "interpret this as
- * JSON" has to be reachable. `binary` is not offered: those bytes never cross the
- * binding, so there is nothing to interpret.
+ * a fact — a JSON endpoint answering with an HTML error page, or a body labelled
+ * `text/plain` that the automatic reading guessed wrong, both have to be correctable.
+ * `binary` is not offered: those bytes never cross the binding, so there is nothing to
+ * interpret.
  *
  * `null` is "nothing chosen yet", not a menu entry: the picker offers four real
- * languages and starts on whatever the response turned out to be. Once a request has
- * been given one it keeps it, which is the point of choosing.
+ * languages and falls through to the default in Settings, which itself falls through to
+ * whatever the response turned out to be. Once a request has been given one it keeps it
+ * — that is the point of choosing, and it is why a per-request pick outranks the
+ * preference rather than the other way round.
  *
  * `mode` is what the request editor's "Format JSON" button does, minus the writing
  * back: `pretty` re-indents, `raw` is exactly what the server sent.

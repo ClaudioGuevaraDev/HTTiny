@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { HardDrive, Settings2, X } from 'lucide-react'
 import type { MessageKey, PlainMessageKey } from '../i18n'
 import { useT } from '../language'
+import { BODY_LANGUAGES, bodyLanguageLabel } from '../responseBody'
 import { useSystemTheme } from '../theme'
 import type { Locale, ThemePreference } from '../types'
 import { SIDEBAR_WIDTH, SPLIT_RATIO, useAppStore } from '../store'
@@ -156,6 +157,8 @@ function GeneralSection() {
       <SplitOrientationRow />
       <SidebarWidthRow />
       <SplitRatioRow />
+      <h3 className="settings-heading">{t('settings.response.heading')}</h3>
+      <BodyLanguageRow />
       <h3 className="settings-heading">{t('settings.language.heading')}</h3>
       <LanguageRow />
     </>
@@ -379,6 +382,46 @@ function SplitRatioRow() {
       max={SPLIT_RATIO.max}
       onChange={setSplitRatio}
     />
+  )
+}
+
+/**
+ * The default the response viewer falls back to. Only a default: a format picked in the
+ * viewer is stored against that request and outranks this, which is why the row promises
+ * as much rather than letting someone discover it.
+ *
+ * The options are walked out of `BODY_LANGUAGES` and named from `BODY_LANGUAGE_LABEL`
+ * rather than listed here, so this menu and the viewer's cannot come to offer different
+ * formats — including the day a fifth one is added.
+ */
+function BodyLanguageRow() {
+  const { t } = useT()
+  const defaultBodyLanguage = useAppStore(s => s.defaultBodyLanguage)
+  const setDefaultBodyLanguage = useAppStore(s => s.setDefaultBodyLanguage)
+
+  return (
+    <div className="settings-row">
+      <div className="settings-label">
+        <label htmlFor="settings-body-language">{t('settings.response.format.label')}</label>
+        <p id="settings-body-language-desc">{t('settings.response.format.desc')}</p>
+      </div>
+      <select
+        id="settings-body-language"
+        className="settings-select"
+        aria-describedby="settings-body-language-desc"
+        // The empty string stands in for "automatic": no format can be named that, so the
+        // `find` on the way back misses and lands on `null` with no case of its own.
+        value={defaultBodyLanguage ?? ''}
+        onChange={event => setDefaultBodyLanguage(BODY_LANGUAGES.find(candidate => candidate === event.target.value) ?? null)}
+      >
+        <option value="">{t('settings.response.format.auto')}</option>
+        {BODY_LANGUAGES.map(option => (
+          <option key={option} value={option}>
+            {bodyLanguageLabel(t, option)}
+          </option>
+        ))}
+      </select>
+    </div>
   )
 }
 

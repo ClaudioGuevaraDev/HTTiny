@@ -301,6 +301,12 @@ export const en = {
   'settings.layout.split.desc.rows': 'How the height is split between the request and the response.',
   'settings.layout.split.desc.columns': 'How the width is split between the request and the response.',
   'settings.layout.split.value': '{request} / {response}',
+  'settings.response.heading': 'Response',
+  // Echoes the viewer's own control (`response.interpretAs`) on purpose: it is the same
+  // setting in two places, and reading it as two would be worse than the repetition.
+  'settings.response.format.label': 'Interpret bodies as',
+  'settings.response.format.desc': 'What the viewer opens a body as. Automatic follows the content type, and a format picked in the viewer wins for that request.',
+  'settings.response.format.auto': 'Automatic',
   'settings.language.heading': 'Language',
   'settings.language.label': 'Language',
   'settings.language.desc': 'Choose the interface language.',
