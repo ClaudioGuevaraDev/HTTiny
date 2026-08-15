@@ -1,5 +1,6 @@
+import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW } from './responseBody'
 import { SIDEBAR_WIDTH, SPLIT_RATIO, methodOptions } from './store'
-import type { HttpMethod, KeyValueRow, RequestDocument, SplitOrientation, TreeNode } from './types'
+import type { BodyView, HttpMethod, KeyValueRow, RequestDocument, SplitOrientation, TreeNode } from './types'
 
 /**
  * The on-disk schema.
@@ -59,6 +60,12 @@ export interface PrefsFile {
   collapsedNodeIds: string[]
   requestPanel: 'params' | 'headers' | 'body' | 'auth'
   responsePanel: 'body' | 'headers'
+  /**
+   * Only the requests whose view differs from the default appear here. Writing an
+   * entry per request would grow this file in lockstep with the workspace to record
+   * that nothing was chosen.
+   */
+  bodyViews: Record<string, BodyView>
   sidebarWidth: number
   sidebarCollapsed: boolean
   splitOrientation: SplitOrientation
@@ -97,6 +104,10 @@ export const toWorkspaceFile = (state: { tree: TreeNode[]; documents: Record<str
   documents: Object.fromEntries(Object.entries(state.documents).map(([id, doc]) => [id, toStoredDocument(doc)])),
 })
 
+/** A request showing its body the default way records nothing — see `PrefsFile`. */
+const nonDefaultViews = (views: Record<string, BodyView>): Record<string, BodyView> =>
+  Object.fromEntries(Object.entries(views).filter(([, view]) => view.mode !== DEFAULT_BODY_VIEW.mode || view.language !== DEFAULT_BODY_VIEW.language))
+
 export const toPrefsFile = (state: {
   tree: TreeNode[]
   tabs: string[]
@@ -106,6 +117,7 @@ export const toPrefsFile = (state: {
   recentIds: string[]
   requestPanel: PrefsFile['requestPanel']
   responsePanel: PrefsFile['responsePanel']
+  bodyViews: Record<string, BodyView>
   sidebarWidth: number
   sidebarCollapsed: boolean
   splitOrientation: SplitOrientation
@@ -119,6 +131,7 @@ export const toPrefsFile = (state: {
   collapsedNodeIds: collapsedIn(state.tree),
   requestPanel: state.requestPanel,
   responsePanel: state.responsePanel,
+  bodyViews: nonDefaultViews(state.bodyViews),
   sidebarWidth: state.sidebarWidth,
   sidebarCollapsed: state.sidebarCollapsed,
   splitOrientation: state.splitOrientation,
@@ -143,6 +156,26 @@ const BODY_TYPES = ['none', 'json', 'text'] as const
 const AUTH_TYPES = ['none', 'bearer', 'basic'] as const
 const PANELS = ['params', 'headers', 'body', 'auth'] as const
 const RESPONSE_PANELS = ['body', 'headers'] as const
+
+/**
+ * Dropped for requests that no longer exist, the same way `tabs` and `recentIds`
+ * are: a view kept for a deleted request can never be reached or cleared, so it
+ * would only accumulate.
+ */
+const readBodyViews = (value: unknown, documents: Record<string, RequestDocument>): Record<string, BodyView> => {
+  if (!isRecord(value)) return {}
+  const out: Record<string, BodyView> = {}
+  for (const [id, view] of Object.entries(value)) {
+    if (!documents[id] || !isRecord(view)) continue
+    out[id] = {
+      mode: oneOf(view.mode, BODY_MODES, DEFAULT_BODY_VIEW.mode),
+      // Not `oneOf`: the fallback here is `null` — no language chosen — which is not
+      // one of the allowed values.
+      language: BODY_LANGUAGES.find(candidate => candidate === view.language) ?? null,
+    }
+  }
+  return out
+}
 const ORIENTATIONS = ['rows', 'columns'] as const
 
 const readRows = (value: unknown, prefix: string): KeyValueRow[] => {
@@ -305,6 +338,7 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     collapsedNodeIds: ids(raw.collapsedNodeIds),
     requestPanel: oneOf(raw.requestPanel, PANELS, 'params'),
     responsePanel: oneOf(raw.responsePanel, RESPONSE_PANELS, 'body'),
+    bodyViews: readBodyViews(raw.bodyViews, documents),
     sidebarWidth: clamped(raw.sidebarWidth, SIDEBAR_WIDTH),
     sidebarCollapsed: bool(raw.sidebarCollapsed, false),
     splitOrientation: oneOf(raw.splitOrientation, ORIENTATIONS, 'rows'),

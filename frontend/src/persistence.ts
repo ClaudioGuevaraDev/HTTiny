@@ -203,6 +203,7 @@ export async function hydrate(): Promise<void> {
       recentIds: layout.recentIds,
       requestPanel: layout.requestPanel,
       responsePanel: layout.responsePanel,
+      bodyViews: layout.bodyViews,
       sidebarWidth: layout.sidebarWidth,
       sidebarCollapsed: layout.sidebarCollapsed,
       splitOrientation: layout.splitOrientation,

@@ -60,6 +60,27 @@ export interface RequestDocument {
 export type ResponseFormat = 'json' | 'html' | 'xml' | 'text' | 'binary'
 
 /**
+ * How the viewer is showing a response body, remembered per request.
+ *
+ * `language` overrides what Go decided, because a `Content-Type` is a claim and not
+ * a fact — JSON served as `text/plain` is common enough that "interpret this as
+ * JSON" has to be reachable. `binary` is not offered: those bytes never cross the
+ * binding, so there is nothing to interpret.
+ *
+ * `null` is "nothing chosen yet", not a menu entry: the picker offers four real
+ * languages and starts on whatever the response turned out to be. Once a request has
+ * been given one it keeps it, which is the point of choosing.
+ *
+ * `mode` is what the request editor's "Format JSON" button does, minus the writing
+ * back: `pretty` re-indents, `raw` is exactly what the server sent.
+ */
+export type BodyLanguage = 'json' | 'html' | 'xml' | 'text'
+export interface BodyView {
+  mode: 'pretty' | 'raw'
+  language: BodyLanguage | null
+}
+
+/**
  * `sizeBytes` is a number rather than a pre-baked `'1.2 KB'` string: formatting is
  * the view's job, and a real network executor hands back a byte count. `startedAt`
  * lets the loading state render a live elapsed counter without a second source of

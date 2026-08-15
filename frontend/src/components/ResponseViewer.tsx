@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { Binary, Braces, Check, Code, Copy, FileJson2, FileText, RotateCcw, Send, TriangleAlert, X } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import { formatBytes, formatDuration } from '../format'
-import type { ResponseFormat } from '../types'
+import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW, formatBody, resolveLanguage } from '../responseBody'
+import type { BodyLanguage, BodyView, ResponseFormat } from '../types'
 import { cancelRequest, runRequest } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
 import { useAppStore } from '../store'
@@ -64,16 +65,105 @@ function FormatChip({ format, contentType }: { format: ResponseFormat; contentTy
   )
 }
 
+const LANGUAGE_LABEL: Record<BodyLanguage, string> = { json: 'JSON', html: 'HTML', xml: 'XML', text: 'Text' }
+
+/**
+ * Takes the chip's place while the body panel is showing something an editor can
+ * render. Both say what the body is; only one of them can also change it, and the
+ * tabs row is too narrow in the columns layout to carry the pair.
+ *
+ * The picker sits on the resolved language, so the format stays readable at a glance —
+ * that was the chip's whole job — and the media type the server actually sent survives
+ * as the title, where the chip kept it too.
+ */
+function BodyControls({
+  view,
+  language,
+  contentType,
+  onChange,
+}: {
+  view: BodyView
+  language: BodyLanguage
+  contentType: string
+  onChange: (patch: Partial<BodyView>) => void
+}) {
+  const onSegmentKeyDown = useRovingFocus('[role="radio"]')
+  // Nothing else can be re-indented without pulling in a formatter per language. The
+  // control stays visible and disabled rather than disappearing: a control that comes
+  // and goes with the Content-Type reads as a bug.
+  const canFormat = language === 'json'
+
+  return (
+    <div className="ml-auto body-controls">
+      {/* A radiogroup rather than a tablist, like the request body's type picker: these
+          pick how one panel renders, they do not switch between panels. */}
+      <div
+        className="segmented"
+        role="radiogroup"
+        aria-label="Body formatting"
+        title={canFormat ? undefined : 'Only JSON can be reformatted'}
+        onKeyDown={onSegmentKeyDown}
+      >
+        {BODY_MODES.map(mode => (
+          <button
+            type="button"
+            key={mode}
+            role="radio"
+            aria-checked={view.mode === mode}
+            disabled={!canFormat}
+            tabIndex={view.mode === mode ? 0 : -1}
+            className={view.mode === mode ? 'active' : ''}
+            onClick={() => onChange({ mode })}
+          >
+            {mode === 'pretty' ? 'Pretty' : 'Raw'}
+          </button>
+        ))}
+      </div>
+      {/* Shows the resolved language, so a request nobody has configured still names
+          what its body actually is — and picking one pins it from then on. */}
+      <select
+        className="body-language"
+        aria-label="Interpret body as"
+        title={contentType || undefined}
+        value={language}
+        onChange={event => {
+          // `find` over the source of truth instead of asserting the value: the option
+          // list and the union cannot drift apart, and nothing needs `as`.
+          const next = BODY_LANGUAGES.find(candidate => candidate === event.target.value)
+          if (next) onChange({ language: next })
+        }}
+      >
+        {BODY_LANGUAGES.map(option => (
+          <option key={option} value={option}>
+            {LANGUAGE_LABEL[option]}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 export function ResponseViewer() {
   const activeId = useAppStore(s => s.activeId)
   const responsePanel = useAppStore(s => s.responsePanel)
   const setResponsePanel = useAppStore(s => s.setResponsePanel)
   const setResponse = useAppStore(s => s.setResponse)
   const stored = useAppStore(s => (s.activeId ? s.responses[s.activeId] : undefined))
+  const storedView = useAppStore(s => (s.activeId ? s.bodyViews[s.activeId] : undefined))
+  const setBodyView = useAppStore(s => s.setBodyView)
   const response = stored ?? { state: 'idle' as const }
   const elapsed = useElapsed(response.state === 'loading' ? response.startedAt : null)
   const { status: copyStatus, copy } = useCopy()
   const onTabsKeyDown = useRovingFocus('[role="tab"]')
+
+  // Hooks cannot sit inside the success branch, so the inputs are read defensively and
+  // the memo runs against an empty body the rest of the time — which costs nothing.
+  const view = storedView ?? DEFAULT_BODY_VIEW
+  const language = resolveLanguage(view, response.state === 'success' ? response.format : 'text')
+  const rawBody = response.state === 'success' ? response.body : ''
+  // Reparsing several MB of JSON on every render — and this component re-renders ten
+  // times a second while a *later* request is in flight — is not affordable.
+  const { text: bodyText, failed: formatFailed } = useMemo(() => formatBody(rawBody, language, view.mode), [rawBody, language, view.mode])
 
   return (
     <section className="response-viewer" aria-label="Response">
@@ -84,7 +174,9 @@ export function ResponseViewer() {
             className="icon-btn xs"
             aria-label={copyStatus === 'copied' ? 'Response body copied' : 'Copy response body'}
             title={copyStatus === 'copied' ? 'Copied' : 'Copy body'}
-            onClick={() => copy(response.body)}
+            /* What is on screen, not what arrived: pasting the indented body is the
+               point of having indented it. */
+            onClick={() => copy(bodyText)}
           >
             {copyStatus === 'copied' ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
           </button>
@@ -139,33 +231,43 @@ export function ResponseViewer() {
 
       {response.state === 'success' && (
         <>
-          <div className="response-tabs" role="tablist" aria-label="Response sections" onKeyDown={onTabsKeyDown}>
-            <button
-              type="button"
-              role="tab"
-              id="response-tab-body"
-              aria-selected={responsePanel === 'body'}
-              aria-controls="response-content"
-              tabIndex={responsePanel === 'body' ? 0 : -1}
-              className={responsePanel === 'body' ? 'active' : ''}
-              onClick={() => setResponsePanel('body')}
-            >
-              Body
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="response-tab-headers"
-              aria-selected={responsePanel === 'headers'}
-              aria-controls="response-content"
-              tabIndex={responsePanel === 'headers' ? 0 : -1}
-              className={responsePanel === 'headers' ? 'active' : ''}
-              onClick={() => setResponsePanel('headers')}
-            >
-              Headers <span aria-hidden="true">{response.headers.length}</span>
-              <span className="sr-only">, {response.headers.length} returned</span>
-            </button>
-            <FormatChip format={response.format} contentType={response.contentType} />
+          {/* The row is not the tablist. It used to be, back when the only thing beside
+              the tabs was a presentational chip; a radiogroup and a select are not
+              allowed children of a tablist, and a screen reader walking one would find
+              controls that have no business being there. */}
+          <div className="response-tabs">
+            <div className="response-tablist" role="tablist" aria-label="Response sections" onKeyDown={onTabsKeyDown}>
+              <button
+                type="button"
+                role="tab"
+                id="response-tab-body"
+                aria-selected={responsePanel === 'body'}
+                aria-controls="response-content"
+                tabIndex={responsePanel === 'body' ? 0 : -1}
+                className={responsePanel === 'body' ? 'active' : ''}
+                onClick={() => setResponsePanel('body')}
+              >
+                Body
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="response-tab-headers"
+                aria-selected={responsePanel === 'headers'}
+                aria-controls="response-content"
+                tabIndex={responsePanel === 'headers' ? 0 : -1}
+                className={responsePanel === 'headers' ? 'active' : ''}
+                onClick={() => setResponsePanel('headers')}
+              >
+                Headers <span aria-hidden="true">{response.headers.length}</span>
+                <span className="sr-only">, {response.headers.length} returned</span>
+              </button>
+            </div>
+            {responsePanel === 'body' && response.format !== 'binary' && response.body ? (
+              <BodyControls view={view} language={language} contentType={response.contentType} onChange={patch => activeId && setBodyView(activeId, patch)} />
+            ) : (
+              <FormatChip format={response.format} contentType={response.contentType} />
+            )}
           </div>
           <div className="response-content" id="response-content" role="tabpanel" aria-labelledby={`response-tab-${responsePanel}`} tabIndex={-1}>
             {responsePanel === 'body' ? (
@@ -189,12 +291,17 @@ export function ResponseViewer() {
                 */
                 <>
                   {response.truncated && (
-                    <p className="response-notice">Showing the first {formatBytes(BODY_LIMIT)} of {formatBytes(response.sizeBytes)}.</p>
+                    <p className="response-notice">
+                      Showing the first {formatBytes(BODY_LIMIT)} of {formatBytes(response.sizeBytes)}.
+                    </p>
                   )}
+                  {/* Silent when the body was truncated: a cut-off body cannot parse by
+                      construction, and the notice above already says why. */}
+                  {formatFailed && !response.truncated && <p className="response-notice">This body is not valid JSON — showing it as it arrived.</p>}
                   <CodeMirror
-                    value={response.body}
+                    value={bodyText}
                     theme={httinyTheme}
-                    extensions={response.format === 'json' ? JSON_EXTENSIONS : PLAIN_EXTENSIONS}
+                    extensions={language === 'json' ? JSON_EXTENSIONS : PLAIN_EXTENSIONS}
                     editable={false}
                     basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: false }}
                   />

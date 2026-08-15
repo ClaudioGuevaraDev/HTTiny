@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { CollectionNode, HttpMethod, KeyValueRow, RequestDocument, ResponseSnapshot, SplitOrientation, TreeNode } from './types'
+import { DEFAULT_BODY_VIEW } from './responseBody'
+import type { BodyView, CollectionNode, HttpMethod, KeyValueRow, RequestDocument, ResponseSnapshot, SplitOrientation, TreeNode } from './types'
 
 /**
  * Layout bounds, defined here because the store is what clamps them. They used to
@@ -30,6 +31,13 @@ interface AppState {
   requestPanel: Panel
   responsePanel: 'body' | 'headers'
   responses: Record<string, ResponseSnapshot>
+  /**
+   * How each request's response body is being shown. Keyed by request id and pruned
+   * alongside `documents` and `responses`, because it is the same class of state:
+   * per request, and meaningless once the request is gone. Absent means
+   * `DEFAULT_BODY_VIEW` — nothing is written until something is chosen.
+   */
+  bodyViews: Record<string, BodyView>
 
   /** Most-recently-activated request ids, newest first, capped at 12. */
   recentIds: string[]
@@ -76,6 +84,7 @@ interface AppState {
   setRequestPanel: (panel: Panel) => void
   setResponsePanel: (panel: 'body' | 'headers') => void
   setResponse: (id: string, response: ResponseSnapshot) => void
+  setBodyView: (id: string, patch: Partial<BodyView>) => void
   setSidebarWidth: (width: number) => void
   toggleSidebar: () => void
   setSplitOrientation: (orientation: SplitOrientation) => void
@@ -244,6 +253,7 @@ export const useAppStore = create<AppState>(set => ({
   requestPanel: 'params',
   responsePanel: 'body',
   responses: {},
+  bodyViews: {},
   recentIds: [],
   sidebarWidth: SIDEBAR_WIDTH.default,
   sidebarCollapsed: false,
@@ -400,9 +410,11 @@ export const useAppStore = create<AppState>(set => ({
       const removed = target ? requestIdsIn(target) : []
       const documents = { ...s.documents }
       const responses = { ...s.responses }
+      const bodyViews = { ...s.bodyViews }
       removed.forEach(id => {
         delete documents[id]
         delete responses[id]
+        delete bodyViews[id]
       })
       const index = s.activeId ? s.tabs.indexOf(s.activeId) : -1
       const tabs = s.tabs.filter(tab => !removed.includes(tab))
@@ -424,6 +436,7 @@ export const useAppStore = create<AppState>(set => ({
         tree,
         documents,
         responses,
+        bodyViews,
         tabs,
         activeId,
         activeCollectionId,
@@ -447,6 +460,9 @@ export const useAppStore = create<AppState>(set => ({
   setRequestPanel: requestPanel => set({ requestPanel }),
   setResponsePanel: responsePanel => set({ responsePanel }),
   setResponse: (id, response) => set(s => ({ responses: { ...s.responses, [id]: response } })),
+  // Merged over the default rather than over the stored entry alone, so setting one
+  // field on a request that has never been touched still yields a whole `BodyView`.
+  setBodyView: (id, patch) => set(s => ({ bodyViews: { ...s.bodyViews, [id]: { ...DEFAULT_BODY_VIEW, ...s.bodyViews[id], ...patch } } })),
 
   setSidebarWidth: width => set({ sidebarWidth: Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, width)) }),
   toggleSidebar: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),

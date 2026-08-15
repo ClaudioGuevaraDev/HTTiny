@@ -845,6 +845,13 @@
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
+  /* The tablist is a child of the row rather than the row itself, so that the body
+   * controls beside it are not children of a `role="tablist"`. */
+  .response-tablist {
+    display: flex;
+    align-items: stretch;
+  }
+
   .panel-tabs button,
   .response-tabs button {
     min-width: 65px;
@@ -1239,6 +1246,51 @@
     color: var(--color-text-subtle);
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
+  }
+
+  /* The tabs row stretches its children to full height so the active tab's underline
+   * meets the border; these are controls, not tabs, so they centre instead. */
+  .body-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* `.response-tabs button` gives every button in this row a 65px floor and an
+   * underline slot for the selected-tab indicator. Neither belongs on a segment. */
+  .body-controls .segmented button {
+    min-width: 0;
+    border-bottom: 0;
+  }
+
+  .body-controls .segmented button:disabled {
+    color: var(--color-text-subtle);
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .body-language {
+    height: var(--h-control-xs);
+    padding: 0 4px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-xs);
+    background: none;
+    color: var(--color-text-subtle);
+    outline: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    cursor: pointer;
+  }
+
+  .body-language:hover {
+    color: var(--color-text);
+    border-color: var(--color-border-control);
+  }
+
+  /* The popup list is drawn by the OS and inherits nothing useful from the row. */
+  .body-language option {
+    background: var(--color-surface-3);
+    color: var(--color-text);
   }
 
   .response-content {
