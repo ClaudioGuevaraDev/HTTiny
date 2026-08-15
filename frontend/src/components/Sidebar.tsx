@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Boxes, ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, Search } from 'lucide-react'
+import { Boxes, ChevronDown, ChevronRight, Folder, Search } from 'lucide-react'
 import type { VisibleRow } from '../store'
 import { collectionsIn, useAppStore } from '../store'
 import type { CollectionNode } from '../types'
@@ -9,7 +9,7 @@ import { COLLECTION_PANEL_ID, collectionTabId } from '../collections'
 import { CollectionRail } from './CollectionRail'
 import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction, Shortcut } from './Placeholder'
-import { TreeRowMenu } from './TreeRowMenu'
+import { TreeRowActions } from './TreeRowActions'
 
 /**
  * The footer used to read "Mock responses", which was true and is not any more.
@@ -55,7 +55,6 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
   // used to be a denormalised copy that nothing kept in sync, so changing the method
   // in the editor left the tree showing the old one.
   const method = useAppStore(s => (node.type === 'request' ? s.documents[node.requestId]?.method : undefined))
-  const [menu, setMenu] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const selected = selectedNodeId === node.id
 
@@ -78,11 +77,13 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
         select()
       }}
       // Shift+F10 and the ContextMenu key are the standard way to reach a row's actions
-      // from the keyboard, since the trigger itself is deliberately not a tab stop.
+      // from the keyboard, since the buttons themselves are deliberately not tab stops.
+      // There is no popup any more, so they move focus onto the first one — which is
+      // also what reveals the group, through `:focus-within`.
       onKeyDown={event => {
         if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
           event.preventDefault()
-          setMenu(true)
+          event.currentTarget.querySelector<HTMLElement>('.tree-actions button')?.focus()
         }
       }}
     >
@@ -129,7 +130,10 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
       ) : (
         <span className="truncate flex-1">{node.name}</span>
       )}
-      <TreeRowMenu node={node} open={menu} onOpenChange={setMenu} onRename={() => setRenaming(true)} onReturnFocus={() => onFocusRow(node.id)} />
+      {/* Not while renaming: the group floats over the right edge of the row, so it
+          would cover the tail of the input the user is typing into — and it is showing
+          exactly then, since the focused input satisfies `:focus-within`. */}
+      {!renaming && <TreeRowActions node={node} onRename={() => setRenaming(true)} onReturnFocus={() => onFocusRow(node.id)} />}
     </div>
   )
 }
@@ -139,14 +143,13 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
  * home for the collection's own actions.
  *
  * Those actions need a home because the collection is no longer a row in the tree —
- * the rail replaced it — so `TreeRowMenu` is reused here against the collection
+ * the rail replaced it — so `TreeRowActions` is reused here against the collection
  * node. It already offers exactly New Request / New Folder / Rename / Delete for
- * branch nodes, and the inline rename mirrors what `TreeRow` does.
+ * branch nodes, and the inline rename mirrors what `TreeRow` does. The heading used
+ * to hand-roll two of those four buttons beside a menu that repeated them.
  */
 function CollectionHeading({ collection }: { collection: CollectionNode }) {
-  const addNode = useAppStore(s => s.addNode)
   const renameNode = useAppStore(s => s.renameNode)
-  const [menu, setMenu] = useState(false)
   const [renaming, setRenaming] = useState(false)
 
   return (
@@ -173,15 +176,7 @@ function CollectionHeading({ collection }: { collection: CollectionNode }) {
           {collection.name}
         </span>
       )}
-      <div>
-        <button className="icon-btn xs" aria-label="New folder" title="New folder" onClick={() => addNode('folder')}>
-          <FolderPlus size={14} aria-hidden="true" />
-        </button>
-        <button className="icon-btn xs" aria-label="New request" title="New request" onClick={() => addNode('request')}>
-          <FilePlus2 size={14} aria-hidden="true" />
-        </button>
-        <TreeRowMenu node={collection} open={menu} onOpenChange={setMenu} onRename={() => setRenaming(true)} onReturnFocus={() => undefined} />
-      </div>
+      {!renaming && <TreeRowActions node={collection} tabbable onRename={() => setRenaming(true)} onReturnFocus={() => undefined} />}
     </div>
   )
 }
@@ -237,7 +232,11 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             </div>
           ) : rows.length === 0 ? (
             <div className="tree-scroll">
-              <Placeholder icon={<Boxes size={20} />} title="Nothing here yet" description={`“${collection.name}” has no requests. Add one to send your first call.`}>
+              <Placeholder
+                icon={<Boxes size={20} />}
+                title="Nothing here yet"
+                description={`“${collection.name}” has no requests. Add one to send your first call.`}
+              >
                 <PlaceholderAction shortcut={shortcuts.newRequest} onClick={() => addNode('request')}>
                   New request
                 </PlaceholderAction>

@@ -51,10 +51,11 @@ export function useTreeNavigation() {
 
   const onKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
-      // The rename input and the row menu both live inside a row, and both want keys the
-      // tree also claims. They stop propagation themselves; this is the belt to that
+      // The rename input and the row's action buttons both live inside a row, and both
+      // want keys the tree also claims — Enter on a button would fire the button *and*
+      // open/toggle the row. They stop propagation themselves; this is the belt to that
       // braces, so a new in-row control cannot silently hand Enter to the tree.
-      if (event.target instanceof HTMLElement && event.target.closest('input, [role="menu"]')) return
+      if (event.target instanceof HTMLElement && event.target.closest('input, .tree-actions')) return
 
       const index = rows.findIndex(r => r.node.id === active)
       if (index === -1) return

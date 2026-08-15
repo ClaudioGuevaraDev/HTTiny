@@ -12,7 +12,7 @@ const optionId = (index: number) => `command-option-${index}`
 /**
  * Built on the native `<dialog>` with `showModal()`, which supplies four things for
  * free that would otherwise be hand-rolled: a real focus trap, top-layer rendering
- * (so it never fights `.tree-menu` over z-index), focus restoration to whatever was
+ * (so it never fights the sidebar over z-index), focus restoration to whatever was
  * focused before opening, and Escape handling.
  *
  * The dialog stays mounted permanently and only its *body* mounts while open, so it

@@ -95,8 +95,7 @@
 
     /* The blanket rule above would freeze the spinner mid-rotation, which reads as
      * "stuck". Drop the animation entirely and let the copy carry the state. */
-    .response-empty.loading svg,
-    .tree-menu {
+    .response-empty.loading svg {
       animation: none !important;
     }
   }
