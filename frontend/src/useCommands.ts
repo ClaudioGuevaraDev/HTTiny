@@ -97,6 +97,7 @@ export function useCommands(enabled: boolean): Command[] {
       () => useAppStore.getState().toggleSplitOrientation(),
       shortcuts.toggleSplit,
     )
+    action('settings', 'Open settings', 'preferences options theme appearance dark light storage', () => useAppStore.getState().openSettings(), shortcuts.settings)
 
     // Every request in the tree, searchable by name, method, URL and breadcrumb.
     for (const entry of requests) {

@@ -1,4 +1,4 @@
-import { Columns2, Command, Rows2 } from 'lucide-react'
+import { Columns2, Command, Rows2, Settings } from 'lucide-react'
 import { shortcutHint } from '../shortcuts'
 import { useAppStore } from '../store'
 
@@ -13,6 +13,7 @@ export function WorkspaceActions() {
   const orientation = useAppStore(s => s.splitOrientation)
   const toggleSplitOrientation = useAppStore(s => s.toggleSplitOrientation)
   const openPalette = useAppStore(s => s.openPalette)
+  const openSettings = useAppStore(s => s.openSettings)
   const stacked = orientation === 'rows'
 
   return (
@@ -34,6 +35,15 @@ export function WorkspaceActions() {
         onClick={() => openPalette('')}
       >
         <Command size={15} />
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="Open settings"
+        title={`Settings (${shortcutHint('settings')})`}
+        onClick={openSettings}
+      >
+        <Settings size={15} />
       </button>
     </div>
   )

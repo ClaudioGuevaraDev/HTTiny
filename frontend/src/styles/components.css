@@ -1700,8 +1700,9 @@
     overflow: hidden;
   }
 
-  .command-palette::backdrop {
-    background: rgb(0 0 0 / 0.55);
+  .command-palette::backdrop,
+  .settings-dialog::backdrop {
+    background: var(--color-scrim);
   }
 
   .palette-shell {
@@ -1823,6 +1824,144 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
+  }
+
+  /* ── Settings ──────────────────────────────────────────────────────────── */
+  /* Same plate as the palette — border, radius, surface, shadow — because they are
+   * the same kind of thing and the app has one modal language, not two. */
+  .settings-dialog {
+    width: min(720px, 92vw);
+    height: min(72vh, 520px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-xl);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    box-shadow: var(--shadow-menu);
+    overflow: hidden;
+  }
+
+  /* A fixed height rather than one that follows its content: General has one row
+   * today and Storage has none, so an auto height would resize the dialog under the
+   * pointer every time the section changed. */
+  .settings-shell {
+    position: relative;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    padding: 14px 8px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-surface-3);
+  }
+
+  .settings-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .settings-title {
+    margin: 0 0 10px 8px;
+    color: var(--color-text-strong);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .settings-nav button {
+    height: var(--h-control-md);
+    padding: 0 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .settings-nav button:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  .settings-nav button.active {
+    background: var(--color-surface-accent);
+    color: var(--color-text-strong);
+    box-shadow: inset 2px 0 var(--color-accent);
+  }
+
+  .settings-panel {
+    min-width: 0;
+    padding: 18px 20px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-heading {
+    margin: 0 0 12px;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  /* Label and description on the left, control on the right — the shape every
+   * further setting will reuse. */
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 10px 0;
+  }
+
+  .settings-label > span {
+    display: block;
+    color: var(--color-text);
+    font-size: var(--text-xs);
+  }
+
+  .settings-label p {
+    margin: 3px 0 0;
+    max-width: 34ch;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    text-wrap: pretty;
+  }
+
+  .settings-row .segmented {
+    flex: 0 0 auto;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-3);
+  }
+
+  .settings-row .segmented button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .settings-row .segmented button.active {
+    background: var(--color-surface-1);
+    color: var(--color-text-strong);
+  }
+
+  .settings-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
   }
 
   /* ── Text selection ────────────────────────────────────────────────────── */

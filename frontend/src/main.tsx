@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { hydrate } from './persistence'
+import { initTheme } from './theme'
 // Self-hosted: the app is an offline desktop binary and cannot fetch webfonts at
 // runtime. Imported here rather than through a CSS @import so Vite resolves the
 // bare specifiers and rewrites the .woff2 asset URLs deterministically. Both must
@@ -24,6 +25,10 @@ import './styles.css'
  * is invisible rather than a white flash.
  */
 void hydrate().then(() => {
+  // Between the two for the same reason the render is after the hydration: the theme
+  // has to be on the document before anything paints, and it can only be known once
+  // the stored preference has been read.
+  initTheme()
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

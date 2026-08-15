@@ -1,0 +1,125 @@
+/* HTTiny light palette.
+ *
+ * The parallel of `theme.css`, which owns the dark values and every non-colour token.
+ * Only colours are redefined here — type scale, radii, spacing, easing and heights are
+ * theme-independent and stay in one place.
+ *
+ * This has to be a plain selector rather than a second `@theme` block: Tailwind emits
+ * `@theme` variables onto bare `:root`, and `:root[data-theme='light']` outranks that
+ * on specificity (0,1,1 against 0,0,1). `theme.ts` writes the attribute, and it always
+ * writes a resolved value, so `system` never reaches CSS.
+ *
+ * The surface ladder keeps the dark theme's *direction* — higher number, more
+ * elevated — but reverses its sense: elevation rises toward white and the canvas is
+ * the darkest thing on screen, which is how elevation reads on light.
+ *
+ * Every ratio in the comments is measured, not estimated. Text clears 4.5:1 against
+ * the darkest surface it can land on (`surface-press`); accents, methods, collection
+ * initials and syntax clear 4.5:1 against the exact background they are drawn on,
+ * including the 16% `color-mix` chips, which are the tightest case in the file.
+ */
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* ── Surfaces ───────────────────────────────────────────────────────────── */
+  --color-surface-canvas: #e9ebef; /* app shell                                */
+  --color-surface-1: #ffffff; /* request + response panes                      */
+  --color-surface-2: #f6f7f9; /* sidebar, tab bar, chrome                      */
+  --color-surface-3: #eef0f3; /* inputs, inactive tabs, search                 */
+  --color-surface-4: #ffffff; /* menus, popovers, badges — separated by
+                                 border-strong and the shadow, not by tone     */
+  --color-surface-hover: #e4e7ec;
+  --color-surface-press: #d7dbe2;
+  --color-surface-accent: #dcf0e3; /* selected tree row                        */
+  --color-surface-danger: #fce9ec; /* error plate                              */
+  --color-surface-code-active: #f4f7f9; /* CodeMirror active line              */
+  /* Slate rather than black, and much lighter: 55% black over a white app reads as
+   * a power cut rather than as a dimmed background. */
+  --color-scrim: rgb(15 23 42 / 0.32);
+
+  /* ── Borders ────────────────────────────────────────────────────────────── */
+  /* Same contract as dark: the first three are decorative, border-control bounds
+   * form controls and must clear 3:1 (SC 1.4.11). */
+  --color-border-subtle: #e6e8ec; /* hairline row separators within a surface  */
+  --color-border: #d5d9e0; /* structural dividers between surfaces             */
+  --color-border-strong: #bfc4cd; /* edges of elevated surfaces                */
+  --color-border-control: #83888f; /* 3.57 s1 · 3.13 s3 · 3.40 s2              */
+  --color-border-accent: #8ac9a1;
+  --color-border-danger: #e5a3ad;
+
+  /* ── Text ───────────────────────────────────────────────────────────────── */
+  /* Worst case is surface-press, the darkest surface any text sits on — the
+   * mirror of the dark theme measuring against its lightest. */
+  --color-text-strong: #0c0d10; /* 13.99 worst · 17.42 on s1                   */
+  --color-text: #2b2e35; /*        9.79 worst · 12.18 on s1                    */
+  --color-text-muted: #494d56; /*  6.10 worst ·  7.59 on s1                    */
+  --color-text-subtle: #585c65; /* 4.83 worst ·  6.01 on s1                    */
+  --color-text-faint: #5c5f68; /*  4.59 worst — placeholders, gutter numbers;
+                                    the darkest legal text                     */
+  --color-text-on-accent: #ffffff; /* 5.89 on --color-accent                   */
+
+  /* ── Accent ─────────────────────────────────────────────────────────────── */
+  /* The dark theme's #22c55e renders about 2:1 on white, so the green drops two
+   * steps. Hover goes *darker* here, not lighter: on light, deeper reads as
+   * pressed the way brighter does on dark. */
+  --color-accent: #0f7434; /*       4.93 canvas · 5.89 s1                      */
+  --color-accent-hover: #0b5c29; /* 6.83 canvas                                */
+  --color-accent-soft: #dcf0e3;
+  --color-focus: #0f7434; /* 4.93–5.89 on every surface — the 3:1 minimum with
+                             room to spare                                     */
+
+  /* ── Status ─────────────────────────────────────────────────────────────── */
+  --color-success: #0f7434; /*      4.93 canvas                                */
+  --color-danger: #b81139; /*       5.54 canvas · 6.62 s1                      */
+  --color-danger-strong: #7a1622; /* 9.16 on --color-surface-danger            */
+  --color-danger-muted: #84434c; /*  7.27 s1 — error detail copy               */
+  --color-warning: #8f5a09; /*      4.84 canvas                                */
+
+  /* ── HTTP methods ───────────────────────────────────────────────────────── */
+  /* Measured on the chip each one paints for itself — `color-mix(… 16%, …)` over
+   * the sidebar — which is a far tighter background than the plain surface, and
+   * the reason these sit at 600/700 rather than at the dark theme's 400.
+   * GET 4.62, POST 4.72, PUT 4.51, PATCH 5.34, DELETE 4.66, HEAD 4.75,
+   * OPTIONS 5.91. GET keeps its push toward teal, away from the accent green. */
+  --color-method-get: #046e50;
+  --color-method-post: #9a4708;
+  --color-method-put: #03679e;
+  --color-method-patch: #6a24d3;
+  --color-method-delete: #b81139;
+  --color-method-head: #0c6780;
+  --color-method-options: #4f4f58;
+
+  /* ── Collections ────────────────────────────────────────────────────────── */
+  /* Same 16% square as dark, so the initials are measured on their own fill:
+   * 4.68, 4.69, 4.72, 4.69, 4.74, 4.51, 4.87, 4.72. */
+  --color-collection-1: #b01f60;
+  --color-collection-2: #a93809;
+  --color-collection-3: #895305;
+  --color-collection-4: #116e34;
+  --color-collection-5: #0d6a63;
+  --color-collection-6: #03679e;
+  --color-collection-7: #4b42e0;
+  --color-collection-8: #832bd0;
+
+  /* ── Syntax ─────────────────────────────────────────────────────────────── */
+  /* Ratios against surface-1, the editor background. The selection bands are pale
+   * on purpose: they have to leave every one of these above 4.5:1 while selected,
+   * and the darkest of them — the comment grey — is what sets the ceiling. */
+  --color-syntax-key: #02638f; /*         6.60                                 */
+  --color-syntax-string: #0f6e34; /*      6.36                                 */
+  --color-syntax-literal: #5f21c4; /*     8.40                                 */
+  --color-syntax-number: #9a4708; /*      6.40                                 */
+  --color-syntax-punctuation: #54585f; /* 7.15                                 */
+  --color-syntax-comment: #556270; /*     6.24                                 */
+  --color-selection: #d6ecdf; /* every syntax colour stays above 5.0:1 on it    */
+  --color-selection-match: #c7e4d3; /* … and above 4.5:1 on this one            */
+  --color-bracket-match: #dff0e6;
+
+  /* ── Shadows ────────────────────────────────────────────────────────────── */
+  /* The dark theme's near-opaque black would read as soot on a white panel. Light
+   * elevation is a soft slate cast plus a hairline ring doing the separating. */
+  --shadow-menu: 0 16px 40px -12px rgb(15 23 42 / 0.2), 0 0 0 1px rgb(15 23 42 / 0.06);
+  --shadow-accent: 0 1px 12px -2px #0f743433;
+  --shadow-dot: 0 0 8px #0f74345c;
+}

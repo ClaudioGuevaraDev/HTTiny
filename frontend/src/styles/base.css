@@ -3,7 +3,10 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
+    /* Concrete per theme: `theme.css` keeps `dark`, `theme-light.css` sets `light`.
+     * Declaring both here is what makes native scrollbars and form controls follow
+     * before either block is reached. */
+    color-scheme: light dark;
     /* Was `Inter`, which was never actually loaded anywhere and silently fell back
      * to the system UI font. */
     font-family: var(--font-sans);

@@ -1,30 +1,21 @@
 /* CodeMirror overrides — deliberately NOT wrapped in `@layer`.
  *
  * CodeMirror injects its own styles through StyleModule into <head> at runtime,
- * unlayered. Unlayered CSS beats every layer regardless of order, so moving these
- * rules into `@layer components` would silently stop them working, and reaching
- * for `!important` again would be treating the symptom.
+ * unlayered. Unlayered CSS beats every layer regardless of order, so moving this
+ * rule into `@layer components` would silently stop it working, and reaching for
+ * `!important` again would be treating the symptom.
  *
- * The `!important` declarations below are still fighting the `oneDark` theme that
- * `RequestEditor.tsx` imports. They go away with it, once the editor uses a theme
- * built from the design tokens — at which point only `.cm-theme` needs to stay,
- * because it sizes the React wrapper rather than anything CodeMirror owns.
+ * Only `.cm-theme` is left, which is what the previous version of this file said
+ * should happen: it sizes the React wrapper rather than anything CodeMirror owns.
+ * The `!important` background, gutter and font-size declarations that sat here were
+ * fighting the `oneDark` theme, which is gone — `editorTheme.ts` now sets all three
+ * from the design tokens. They outlived their opponent and were overriding the
+ * tokens with hardcoded near-blacks, which is also what kept the editor dark
+ * regardless of theme.
  */
 
 .cm-theme {
   flex: 1;
   min-height: 0;
   overflow: auto;
-}
-
-.cm-editor {
-  height: 100%;
-  background: #0d0d0f !important;
-  font-size: 11px;
-}
-
-.cm-gutters {
-  background: #0d0d0f !important;
-  border: 0 !important;
-  color: #404048 !important;
 }

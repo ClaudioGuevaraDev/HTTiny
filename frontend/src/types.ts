@@ -114,6 +114,13 @@ export interface RequestExecutor {
 
 export type SplitOrientation = 'rows' | 'columns'
 
+/**
+ * `system` is a preference, not a theme: it is stored, but it never reaches CSS —
+ * `theme.ts` resolves it against `prefers-color-scheme` first. Default, because an
+ * app that ignores the OS setting is making a decision it was not asked to make.
+ */
+export type ThemePreference = 'system' | 'light' | 'dark'
+
 export type MethodToken = Lowercase<HttpMethod>
 export const methodToken = (method: HttpMethod): MethodToken => method.toLowerCase() as MethodToken
 

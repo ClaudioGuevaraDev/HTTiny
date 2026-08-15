@@ -208,6 +208,7 @@ export async function hydrate(): Promise<void> {
       sidebarCollapsed: layout.sidebarCollapsed,
       splitOrientation: layout.splitOrientation,
       splitRatio: layout.splitRatio,
+      theme: layout.theme,
       persistenceState: 'ready',
       secretsAvailable,
       quarantinedPath: workspace.quarantined || null,

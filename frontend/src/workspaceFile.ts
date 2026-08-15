@@ -1,6 +1,6 @@
 import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW } from './responseBody'
 import { SIDEBAR_WIDTH, SPLIT_RATIO, methodOptions } from './store'
-import type { BodyView, HttpMethod, KeyValueRow, RequestDocument, SplitOrientation, TreeNode } from './types'
+import type { BodyView, HttpMethod, KeyValueRow, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
 
 /**
  * The on-disk schema.
@@ -70,6 +70,7 @@ export interface PrefsFile {
   sidebarCollapsed: boolean
   splitOrientation: SplitOrientation
   splitRatio: number
+  theme: ThemePreference
 }
 
 // ── Writing ────────────────────────────────────────────────────────────────────
@@ -122,6 +123,7 @@ export const toPrefsFile = (state: {
   sidebarCollapsed: boolean
   splitOrientation: SplitOrientation
   splitRatio: number
+  theme: ThemePreference
 }): PrefsFile => ({
   tabs: state.tabs,
   activeId: state.activeId,
@@ -136,6 +138,7 @@ export const toPrefsFile = (state: {
   sidebarCollapsed: state.sidebarCollapsed,
   splitOrientation: state.splitOrientation,
   splitRatio: state.splitRatio,
+  theme: state.theme,
 })
 
 // ── Reading ────────────────────────────────────────────────────────────────────
@@ -177,6 +180,7 @@ const readBodyViews = (value: unknown, documents: Record<string, RequestDocument
   return out
 }
 const ORIENTATIONS = ['rows', 'columns'] as const
+const THEMES = ['system', 'light', 'dark'] as const
 
 const readRows = (value: unknown, prefix: string): KeyValueRow[] => {
   if (!Array.isArray(value)) return []
@@ -343,6 +347,7 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     sidebarCollapsed: bool(raw.sidebarCollapsed, false),
     splitOrientation: oneOf(raw.splitOrientation, ORIENTATIONS, 'rows'),
     splitRatio: clamped(raw.splitRatio, SPLIT_RATIO),
+    theme: oneOf(raw.theme, THEMES, 'system'),
   }
 }
 

@@ -12,6 +12,7 @@ export const shortcuts = {
   newRequest: ['Ctrl', 'N'],
   toggleSidebar: ['Ctrl', 'B'],
   toggleSplit: ['Ctrl', '\\'],
+  settings: ['Ctrl', ','],
   cancel: ['Esc'],
 } as const
 

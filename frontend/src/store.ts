@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 import { DEFAULT_BODY_VIEW } from './responseBody'
-import type { BodyView, CollectionNode, HttpMethod, KeyValueRow, RequestDocument, ResponseSnapshot, SplitOrientation, TreeNode } from './types'
+import type {
+  BodyView,
+  CollectionNode,
+  HttpMethod,
+  KeyValueRow,
+  RequestDocument,
+  ResponseSnapshot,
+  SplitOrientation,
+  ThemePreference,
+  TreeNode,
+} from './types'
 
 /**
  * Layout bounds, defined here because the store is what clamps them. They used to
@@ -62,11 +72,16 @@ interface AppState {
   splitOrientation: SplitOrientation
   splitRatio: number
 
+  /** Applied by `theme.ts`, which resolves `system` before CSS ever sees it. */
+  theme: ThemePreference
+
   // Only open/closed lives here; the palette's query and highlighted index stay
   // local to the dialog, since they change on every keystroke and nothing outside
   // it reads them.
   paletteOpen: boolean
   paletteSeed: string
+  /** Not persisted: an open modal is not a preference worth restoring. */
+  settingsOpen: boolean
 
   openRequest: (id: string) => void
   closeRequest: (id: string) => void
@@ -90,8 +105,11 @@ interface AppState {
   setSplitOrientation: (orientation: SplitOrientation) => void
   toggleSplitOrientation: () => void
   setSplitRatio: (ratio: number) => void
+  setTheme: (theme: ThemePreference) => void
   openPalette: (seed?: string) => void
   closePalette: () => void
+  openSettings: () => void
+  closeSettings: () => void
 }
 
 const mapTree = (nodes: TreeNode[], fn: (node: TreeNode) => TreeNode): TreeNode[] =>
@@ -259,8 +277,10 @@ export const useAppStore = create<AppState>(set => ({
   sidebarCollapsed: false,
   splitOrientation: 'rows',
   splitRatio: SPLIT_RATIO.default,
+  theme: 'system',
   paletteOpen: false,
   paletteSeed: '',
+  settingsOpen: false,
   persistenceState: 'loading',
   saveState: 'idle',
   secretsAvailable: true,
@@ -469,8 +489,11 @@ export const useAppStore = create<AppState>(set => ({
   setSplitOrientation: splitOrientation => set({ splitOrientation }),
   toggleSplitOrientation: () => set(s => ({ splitOrientation: s.splitOrientation === 'rows' ? 'columns' : 'rows' })),
   setSplitRatio: ratio => set({ splitRatio: Math.min(SPLIT_RATIO.max, Math.max(SPLIT_RATIO.min, ratio)) }),
+  setTheme: theme => set({ theme }),
   openPalette: (seed = '') => set({ paletteOpen: true, paletteSeed: seed }),
   closePalette: () => set({ paletteOpen: false, paletteSeed: '' }),
+  openSettings: () => set({ settingsOpen: true }),
+  closeSettings: () => set({ settingsOpen: false }),
 }))
 
 /**

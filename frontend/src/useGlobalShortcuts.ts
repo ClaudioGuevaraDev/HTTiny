@@ -24,8 +24,16 @@ export function useGlobalShortcuts(): void {
         return
       }
 
-      // While the palette is open it owns the keyboard.
-      if (state.paletteOpen) return
+      if (matchesCombo(event, 'mod+,')) {
+        event.preventDefault()
+        if (state.settingsOpen) state.closeSettings()
+        else state.openSettings()
+        return
+      }
+
+      // While either modal is open it owns the keyboard. Escape still closes them —
+      // that is the dialog element's own behaviour, not this handler's.
+      if (state.paletteOpen || state.settingsOpen) return
 
       const id = state.activeId
 

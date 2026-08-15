@@ -38,6 +38,7 @@
   --color-surface-accent: #12301f; /* selected tree row                          */
   --color-surface-danger: #2a1418; /* error plate                                */
   --color-surface-code-active: #14141a; /* CodeMirror active line                */
+  --color-scrim: rgb(0 0 0 / 0.55); /* behind the modals                         */
 
   /* ── Borders ────────────────────────────────────────────────────────────── */
   /* subtle/default/strong are decorative — no contrast minimum applies to them.
@@ -169,6 +170,13 @@
   --shadow-menu: 0 16px 40px -12px rgb(0 0 0 / 0.72), 0 0 0 1px rgb(0 0 0 / 0.4);
   --shadow-accent: 0 1px 12px -2px #22c55e33;
   --shadow-dot: 0 0 8px #22c55e5c;
+}
+
+/* The values above are the dark ones and stay on bare `:root`, so dark is what the
+ * app is without anyone deciding anything. This only has to name the scheme, since
+ * `base.css` can no longer hardcode it — `theme-light.css` names the other one. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 /* Tailwind 4.3 has no namespace for any of the following, so putting them in
