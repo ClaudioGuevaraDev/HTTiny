@@ -1300,6 +1300,12 @@
     user-select: text;
   }
 
+  /* `.placeholder` centres itself with `flex: 1`, which does nothing to a child of a
+   * block container. Same fix, and the same reason, as `.tree-scroll > .placeholder`. */
+  .response-content > .placeholder {
+    height: 100%;
+  }
+
   .response-code {
     margin: 0;
     padding: 12px 17px 30px;

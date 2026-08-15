@@ -1,6 +1,6 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
-import { Check, ChevronDown, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, FileX2, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import { flushNow } from '../persistence'
 import { toggleRequest } from '../requestRunner'
@@ -122,7 +122,7 @@ function BodyEditor({ request }: { request: RequestDocument }) {
         )}
       </div>
       {request.body.type === 'none' ? (
-        <div className="subtle-empty">No body. Pick JSON or Text to add one.</div>
+        <Placeholder icon={<FileX2 size={20} />} title="No body" description="Pick JSON or Text above to send one." />
       ) : (
         <CodeMirror
           value={request.body.content}

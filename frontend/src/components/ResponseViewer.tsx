@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
-import { Binary, Braces, Check, Code, Copy, FileJson2, FileText, RotateCcw, Send, TriangleAlert, X } from 'lucide-react'
+import { Binary, Braces, Check, Code, Copy, FileJson2, FileText, FileX2, RotateCcw, Send, TriangleAlert, X } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import { formatBytes, formatDuration } from '../format'
 import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW, formatBody, resolveLanguage } from '../responseBody'
@@ -275,10 +275,11 @@ export function ResponseViewer() {
                 /* The bytes are deliberately never sent across the binding — a 4 MB
                    image would become 5.3 MB of string for CodeMirror to lay out, to
                    display nothing legible. Everything worth knowing is metadata. */
-                <div className="subtle-empty">
-                  Binary response · {formatBytes(response.sizeBytes)}
-                  {response.contentType && ` of ${response.contentType}`}. Not shown.
-                </div>
+                <Placeholder
+                  icon={<Binary size={20} />}
+                  title="Binary response"
+                  description={`${formatBytes(response.sizeBytes)}${response.contentType ? ` of ${response.contentType}` : ''}. Binary bodies are not sent to the viewer.`}
+                />
               ) : response.body ? (
                 /*
                   Read-only CodeMirror, replacing a regex highlighter that piped
@@ -307,7 +308,11 @@ export function ResponseViewer() {
                   />
                 </>
               ) : (
-                <div className="subtle-empty">{response.status === 204 ? 'The response body is empty (204 No Content).' : 'The response had no body.'}</div>
+                <Placeholder
+                  icon={<FileX2 size={20} />}
+                  title={response.status === 204 ? '204 No Content' : 'Empty body'}
+                  description={response.status === 204 ? 'The server answered without a body, by design.' : 'The response arrived with nothing in it.'}
+                />
               )
             ) : (
               /* A real table, not a grid of divs with <b> for column heads. Name/value
