@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { HardDrive, Settings2, X } from 'lucide-react'
-import type { MessageKey } from '../i18n'
+import type { MessageKey, PlainMessageKey } from '../i18n'
 import { useT } from '../language'
 import { useSystemTheme } from '../theme'
 import type { Locale, ThemePreference } from '../types'
-import { useAppStore } from '../store'
+import { SIDEBAR_WIDTH, SPLIT_RATIO, useAppStore } from '../store'
 import { useRovingFocus } from '../useRovingFocus'
 import { Placeholder } from './Placeholder'
 
@@ -138,9 +138,10 @@ function SettingsBody({ onDismiss }: { onDismiss: () => void }) {
 }
 
 /**
- * Two groups rather than one: "Appearance" promises how the app *looks*, and the
- * language changes what it *says*. Someone scanning for the language control should
- * not have to read past a heading that does not promise it.
+ * Three groups rather than one: "Appearance" and "Layout" both promise how the app
+ * *looks* — so they sit together — while the language changes what it *says*. Someone
+ * scanning for the language control should not have to read past a heading that does
+ * not promise it.
  */
 function GeneralSection() {
   const { t } = useT()
@@ -149,6 +150,9 @@ function GeneralSection() {
     <>
       <h3 className="settings-heading">{t('settings.appearance')}</h3>
       <ThemeRow />
+      <h3 className="settings-heading">{t('settings.layout.heading')}</h3>
+      <SidebarWidthRow />
+      <SplitRatioRow />
       <h3 className="settings-heading">{t('settings.language.heading')}</h3>
       <LanguageRow />
     </>
@@ -195,6 +199,121 @@ function ThemeRow() {
         ))}
       </select>
     </div>
+  )
+}
+
+/**
+ * The shared shape behind both layout rows.
+ *
+ * Native rather than reimplemented, for the same reasons as the `<select>` above: the
+ * platform draws a slider that already follows the theme through `accent-color`, and it
+ * supplies the arrow keys, Home/End and Page keys for nothing. `SplitHandle` had to
+ * hand-roll all of that because a resizer is a `role="separator"` on a 4px track, which
+ * has no native equivalent.
+ *
+ * The description and the readout arrive already translated, which is what lets `label`
+ * be a `PlainMessageKey` — a key carried as a value would otherwise widen to the whole
+ * union and make `t()` demand every param any message might want.
+ */
+function RangeRow({
+  id,
+  label,
+  description,
+  valueText,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  id: string
+  label: PlainMessageKey
+  description: string
+  valueText: string
+  value: number
+  min: number
+  max: number
+  onChange: (next: number) => void
+}) {
+  const { t } = useT()
+
+  return (
+    <div className="settings-row">
+      <div className="settings-label">
+        <label htmlFor={id}>{t(label)}</label>
+        <p id={`${id}-desc`}>{description}</p>
+      </div>
+      <div className="settings-range">
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          // Deliberately not the `step={16}` / `step={4}` the drag handles use for their
+          // keyboard increments: a range input snaps its value to the nearest multiple of
+          // `step`, so a coarse step would move the thumb off the value actually in the
+          // store — 330 is not `268 + 16n`. Step 1 keeps the thumb honest and gives the
+          // fine adjustment the handles cannot.
+          step={1}
+          value={value}
+          aria-describedby={`${id}-desc`}
+          // Without this a screen reader announces a bare "52", which says neither the
+          // unit nor which pane gets it.
+          aria-valuetext={valueText}
+          // `valueAsNumber`, not `Number(event.target.value)`: a range always yields a
+          // finite number, which sidesteps the `NaN` hole in `setSidebarWidth` /
+          // `setSplitRatio` — they clamp with `Math.min`/`Math.max`, which propagate it.
+          onChange={event => onChange(event.target.valueAsNumber)}
+        />
+        <output htmlFor={id} className="settings-range-value">
+          {valueText}
+        </output>
+      </div>
+    </div>
+  )
+}
+
+function SidebarWidthRow() {
+  const { t } = useT()
+  const width = useAppStore(s => s.sidebarWidth)
+  const collapsed = useAppStore(s => s.sidebarCollapsed)
+  const setSidebarWidth = useAppStore(s => s.setSidebarWidth)
+
+  return (
+    <RangeRow
+      id="settings-sidebar-width"
+      label="settings.layout.sidebar.label"
+      description={collapsed ? t('settings.layout.sidebar.desc.collapsed') : t('settings.layout.sidebar.desc')}
+      valueText={t('settings.layout.sidebar.value', { width: Math.round(width) })}
+      value={width}
+      min={SIDEBAR_WIDTH.min}
+      max={SIDEBAR_WIDTH.max}
+      onChange={setSidebarWidth}
+    />
+  )
+}
+
+function SplitRatioRow() {
+  const { t } = useT()
+  const orientation = useAppStore(s => s.splitOrientation)
+  const splitRatio = useAppStore(s => s.splitRatio)
+  const setSplitRatio = useAppStore(s => s.setSplitRatio)
+  // A drag leaves the ratio fractional (`delta / extent * 100`), and "47.31 / 52.69" is
+  // not a readout. Presentation only: the stored value is left alone until this slider
+  // is the thing that moves.
+  const request = Math.round(splitRatio)
+
+  return (
+    <RangeRow
+      id="settings-split-ratio"
+      label="settings.layout.split.label"
+      // Dotted keys are flat, so the orientation can be spliced in and still typecheck.
+      description={t(`settings.layout.split.desc.${orientation}`)}
+      valueText={t('settings.layout.split.value', { request, response: 100 - request })}
+      value={splitRatio}
+      min={SPLIT_RATIO.min}
+      max={SPLIT_RATIO.max}
+      onChange={setSplitRatio}
+    />
   )
 }
 

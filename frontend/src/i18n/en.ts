@@ -282,6 +282,20 @@ export const en = {
   'settings.theme.inline.dark': 'dark',
   'settings.theme.desc.system': 'Following the system, currently {theme}.',
   'settings.theme.desc.always': 'Always {theme}, whatever the system is set to.',
+  'settings.layout.heading': 'Layout',
+  'settings.layout.sidebar.label': 'Sidebar width',
+  'settings.layout.sidebar.desc': 'How much room the collections tree gets.',
+  // The width stays adjustable while the sidebar is hidden — the drag handle is not
+  // even mounted then, so this row is the only way to reach it. Without saying so the
+  // slider would look broken.
+  'settings.layout.sidebar.desc.collapsed': 'The sidebar is hidden — this applies when you show it again.',
+  'settings.layout.sidebar.value': '{width} px',
+  'settings.layout.split.label': 'Request and response',
+  // Two variants because the ratio divides the height in `rows` and the width in
+  // `columns`, the same distinction `app.resizeRows` / `app.resizeColumns` already make.
+  'settings.layout.split.desc.rows': 'How the height is split between the request and the response.',
+  'settings.layout.split.desc.columns': 'How the width is split between the request and the response.',
+  'settings.layout.split.value': '{request} / {response}',
   'settings.language.heading': 'Language',
   'settings.language.label': 'Language',
   'settings.language.desc': 'Choose the interface language.',
