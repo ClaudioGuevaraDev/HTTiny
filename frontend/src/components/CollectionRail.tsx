@@ -34,7 +34,9 @@ export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; on
         aria-label={collapsed ? 'Show collection panel' : 'Hide collection panel'}
         title={collapsed ? 'Show panel' : 'Hide panel'}
         aria-expanded={!collapsed}
-        aria-controls={COLLECTION_PANEL_ID}
+        // Only while the panel exists: collapsing unmounts it, and `aria-controls`
+        // pointing at an id that is not in the document is worse than omitting it.
+        aria-controls={collapsed ? undefined : COLLECTION_PANEL_ID}
         onClick={onToggle}
       >
         H<span>T</span>
@@ -54,7 +56,7 @@ export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; on
               aria-label={collection.name}
               title={collection.name}
               aria-selected={active}
-              aria-controls={COLLECTION_PANEL_ID}
+              aria-controls={collapsed ? undefined : COLLECTION_PANEL_ID}
               tabIndex={active ? 0 : -1}
               className="collection-square"
               data-hue={hueOf(collection.id)}

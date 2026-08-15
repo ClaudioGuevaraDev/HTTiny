@@ -216,8 +216,9 @@
   --resizer-track: 4px;
   --resizer-slop: 10px; /* pseudo-element hit expansion, reaching 24px total     */
   --scrollbar-size: 10px;
-  --sidebar-min: 220px;
-  --sidebar-max: 420px;
+  /* No --sidebar-min/max here. The sidebar is resized from JS, so its bounds are
+   * `SIDEBAR_WIDTH` in store.ts; the tokens that used to sit here were read by
+   * nothing and still claimed 220/420 after the rail widened the range to 268/468. */
   --sidebar-collapsed: 48px;
   --size-icon-xs: 13px;
   --size-icon-sm: 14px;

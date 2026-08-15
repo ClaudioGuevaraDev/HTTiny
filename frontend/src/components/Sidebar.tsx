@@ -203,7 +203,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
     /* One `<nav>` holding both the rail and the panel, so the landmark, the id and
        the `aria-controls` on the workspace toggle all keep pointing at a live
        element whether or not the panel is showing. */
-    <nav className={`sidebar ${collapsed ? 'collapsed' : ''}`} id="sidebar" aria-label="Collections">
+    <nav className="sidebar" id="sidebar" aria-label="Collections">
       <h1 className="sr-only">HTTiny</h1>
       <CollectionRail collapsed={collapsed} onToggle={onToggle} />
       {!collapsed && (

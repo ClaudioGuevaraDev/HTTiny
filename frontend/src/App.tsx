@@ -8,10 +8,12 @@ import { Sidebar } from './components/Sidebar'
 import { SplitHandle } from './components/SplitHandle'
 import { WorkspaceActions } from './components/WorkspaceActions'
 import { useGlobalShortcuts } from './useGlobalShortcuts'
-import { SIDEBAR_WIDTH, useAppStore } from './store'
+import { SIDEBAR_WIDTH, SPLIT_RATIO, useAppStore } from './store'
 
 /** Matches `--sidebar-collapsed`; the collapsed sidebar is exactly the rail. */
 const RAIL_WIDTH = 48
+/** Mirrors `--resizer-track`. */
+const RESIZER_WIDTH = 4
 
 export function App() {
   const sidebarWidth = useAppStore(s => s.sidebarWidth)
@@ -39,8 +41,19 @@ export function App() {
        `<main>` — three sibling landmarks, which is what the skip link jumps between.
 
        Collapsed, the sidebar track narrows to exactly the collection rail, so the
-       rail stays reachable while the panel goes away. */
-    <div className="app-shell" style={{ gridTemplateColumns: `${collapsed ? RAIL_WIDTH : sidebarWidth}px ${collapsed ? 0 : 4}px minmax(0, 1fr)` }}>
+       rail stays reachable while the panel goes away.
+
+       Two whole templates rather than one with a zero-width middle track, because the
+       resize handle below is only rendered when expanded and nothing here assigns an
+       explicit `grid-column`. Auto-placement fills tracks in order and leaves no gaps,
+       so a track list longer than the child list pushes `<main>` into the wrong
+       column — a `0px` one is not a safe place to park an unused track. */
+    <div
+      className="app-shell"
+      style={{
+        gridTemplateColumns: collapsed ? `${RAIL_WIDTH}px minmax(0, 1fr)` : `${sidebarWidth}px ${RESIZER_WIDTH}px minmax(0, 1fr)`,
+      }}
+    >
       <a className="skip-link" href="#workspace">
         Skip to Workspace
       </a>
@@ -82,10 +95,10 @@ export function App() {
             axis={columns ? 'x' : 'y'}
             unit="percent"
             value={splitRatio}
-            min={30}
-            max={72}
+            min={SPLIT_RATIO.min}
+            max={SPLIT_RATIO.max}
             step={4}
-            defaultValue={52}
+            defaultValue={SPLIT_RATIO.default}
             onChange={setSplitRatio}
             containerRef={splitRef}
           />
