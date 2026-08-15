@@ -144,19 +144,148 @@
   }
 
   /* ── Sidebar ───────────────────────────────────────────────────────────── */
+  /* A row, not a column: the rail sits beside the panel inside the same grid track,
+   * which is what lets the shell's existing collapsed width become "rail only"
+   * without adding a column to the app grid. */
   .sidebar {
     height: 100%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     min-width: 0;
     background: var(--color-surface-2);
     border-right: 0;
     overflow: visible;
   }
 
-  .sidebar.collapsed {
+  .sidebar-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Collection rail ───────────────────────────────────────────────────── */
+  .collection-rail {
+    width: var(--sidebar-collapsed);
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    padding-top: 8px;
+    gap: 6px;
+    padding: 8px 0;
+    border-right: 1px solid var(--color-border-subtle);
+    background: var(--color-surface-canvas);
+  }
+
+  .rail-tabs {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    /* Separates the collections from the brand mark above and the add button below
+     * without a border, which at 48px wide would read as a boxed-in column. */
+    border-block: 1px solid var(--color-border-subtle);
+  }
+
+  .collection-square {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in oklab, var(--collection) 30%, transparent);
+    background: color-mix(in oklab, var(--collection) 16%, transparent);
+    color: var(--collection);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: var(--tracking-tight);
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .collection-square:hover {
+    background: color-mix(in oklab, var(--collection) 26%, transparent);
+  }
+
+  .collection-square[aria-selected='true'] {
+    background: color-mix(in oklab, var(--collection) 34%, transparent);
+    border-color: color-mix(in oklab, var(--collection) 55%, transparent);
+    color: var(--color-text-strong);
+  }
+
+  /* The active marker is a shape, not a colour: the pill reads as "this one" even
+   * where the hue difference does not, which is the same reason the selected tree
+   * row carries an inset rail rather than only a tint. */
+  .collection-square[aria-selected='true']::before {
+    content: '';
+    position: absolute;
+    left: -9px;
+    width: 3px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    background: var(--color-text-strong);
+  }
+
+  .collection-square[data-hue='1'] {
+    --collection: var(--color-collection-1);
+  }
+
+  .collection-square[data-hue='2'] {
+    --collection: var(--color-collection-2);
+  }
+
+  .collection-square[data-hue='3'] {
+    --collection: var(--color-collection-3);
+  }
+
+  .collection-square[data-hue='4'] {
+    --collection: var(--color-collection-4);
+  }
+
+  .collection-square[data-hue='5'] {
+    --collection: var(--color-collection-5);
+  }
+
+  .collection-square[data-hue='6'] {
+    --collection: var(--color-collection-6);
+  }
+
+  .collection-square[data-hue='7'] {
+    --collection: var(--color-collection-7);
+  }
+
+  .collection-square[data-hue='8'] {
+    --collection: var(--color-collection-8);
+  }
+
+  .rail-add {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--color-border-control);
+    border-radius: var(--radius-lg);
+    background: none;
+    color: var(--color-text-subtle);
+    cursor: pointer;
+  }
+
+  .rail-add:hover {
+    border-style: solid;
+    border-color: var(--color-border-accent);
+    color: var(--color-accent);
   }
 
   .app-brand {
@@ -207,6 +336,13 @@
     letter-spacing: -2px;
   }
 
+  /* It is a button — the panel toggle — and had no hover feedback at all, which made
+   * it read as a logo you could not press. */
+  button.brand-mark:hover {
+    border-color: var(--color-accent);
+    background: var(--color-surface-4);
+  }
+
   .brand-mark span {
     color: var(--color-accent);
   }
@@ -222,7 +358,10 @@
     border-radius: var(--radius-xl);
   }
 
+  /* `position: relative` because this now hosts the active collection's TreeRowMenu,
+   * which anchors itself absolutely the way it does inside a tree row. */
   .sidebar-section-title {
+    position: relative;
     height: var(--h-section-title);
     padding: 0 8px 0 12px;
     display: flex;
@@ -236,6 +375,22 @@
   .sidebar-section-title > div {
     margin-left: auto;
     display: flex;
+  }
+
+  /* The menu trigger hides itself until its row is hovered or focused. There is no
+   * row here — this is the panel heading — so it stays visible, alongside the two
+   * buttons it sits with. */
+  .sidebar-section-title .tree-actions {
+    opacity: 1;
+  }
+
+  /* The collection name is user-supplied and the heading is a fixed-height flex row,
+   * so it has to be allowed to shrink before the buttons do. */
+  .sidebar-section-title > span {
+    min-width: 0;
+    color: var(--color-text-muted);
+    letter-spacing: var(--tracking-tight);
+    text-transform: none;
   }
 
   .tree-scroll {
@@ -1644,6 +1799,9 @@
   .add-row,
   .segmented button,
   .row-check::before,
+  button.brand-mark,
+  .collection-square,
+  .rail-add,
   .tree-menu button {
     transition:
       background-color var(--duration-fast) var(--ease-standard),

@@ -199,6 +199,7 @@ export async function hydrate(): Promise<void> {
       tabs: layout.tabs,
       activeId: layout.activeId,
       selectedNodeId: layout.selectedNodeId,
+      activeCollectionId: layout.activeCollectionId,
       recentIds: layout.recentIds,
       requestPanel: layout.requestPanel,
       responsePanel: layout.responsePanel,

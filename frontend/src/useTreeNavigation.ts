@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { flattenVisible, useAppStore } from './store'
+import { collectionsIn, flattenVisible, useAppStore } from './store'
 
 /**
  * Keyboard operation for the sidebar tree, per the WAI-ARIA tree pattern.
@@ -15,11 +15,21 @@ import { flattenVisible, useAppStore } from './store'
  */
 export function useTreeNavigation() {
   const tree = useAppStore(s => s.tree)
+  const activeCollectionId = useAppStore(s => s.activeCollectionId)
   const selectedNodeId = useAppStore(s => s.selectedNodeId)
   const openRequest = useAppStore(s => s.openRequest)
   const toggleNode = useAppStore(s => s.toggleNode)
 
-  const rows = useMemo(() => flattenVisible(tree), [tree])
+  // Scoped to the active collection's children, which is the whole of the rail's
+  // effect on the tree: depth, `aria-level`, posinset/setsize, the roving stop and
+  // the empty state all recompute from this one substitution. The collection itself
+  // is not a row — its name is the panel heading, the way Discord does not list the
+  // server among its channels.
+  const rows = useMemo(() => {
+    const collections = collectionsIn(tree)
+    const active = collections.find(c => c.id === activeCollectionId) ?? collections[0]
+    return flattenVisible(active?.children ?? [])
+  }, [tree, activeCollectionId])
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 

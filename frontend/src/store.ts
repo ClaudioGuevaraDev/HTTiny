@@ -1,5 +1,17 @@
 import { create } from 'zustand'
-import type { HttpMethod, KeyValueRow, RequestDocument, ResponseSnapshot, SplitOrientation, TreeNode } from './types'
+import type { CollectionNode, HttpMethod, KeyValueRow, RequestDocument, ResponseSnapshot, SplitOrientation, TreeNode } from './types'
+
+/**
+ * Layout bounds, defined here because the store is what clamps them. They used to
+ * live in `workspaceFile.ts` while `App.tsx` and the setters below each repeated the
+ * literals — three copies of the same four numbers.
+ *
+ * `sidebarWidth` covers the rail *and* the panel, so the minimum is the old tree
+ * minimum plus the rail. A width persisted before the rail existed still lands
+ * inside the new range, so no migration is needed.
+ */
+export const SIDEBAR_WIDTH = { min: 268, max: 468, default: 330 } as const
+export const SPLIT_RATIO = { min: 30, max: 72, default: 52 } as const
 
 type Panel = 'params' | 'headers' | 'body' | 'auth'
 
@@ -9,6 +21,12 @@ interface AppState {
   tabs: string[]
   activeId: string | null
   selectedNodeId: string | null
+  /**
+   * Which collection the sidebar is showing. The tree renders this collection's
+   * children only, so this is what the rail switches — and what has to follow along
+   * when a request is revealed from the command palette.
+   */
+  activeCollectionId: string | null
   requestPanel: Panel
   responsePanel: 'body' | 'headers'
   responses: Record<string, ResponseSnapshot>
@@ -45,6 +63,7 @@ interface AppState {
   openRequest: (id: string) => void
   closeRequest: (id: string) => void
   setActive: (id: string) => void
+  selectCollection: (id: string) => void
   setSaveState: (state: AppState['saveState']) => void
   setSecretsAvailable: (available: boolean) => void
   updateDocument: (id: string, patch: Partial<RequestDocument>) => void
@@ -163,12 +182,21 @@ const remember = (recentIds: string[], id: string): string[] => [id, ...recentId
  * no-op: it still created the document and opened a tab, leaving a request that
  * belonged to no tree and could never be found again once the tab was closed.
  */
-const containerFor = (nodes: TreeNode[], selectedNodeId: string | null): string | undefined => {
-  if (!selectedNodeId) return undefined
-  const node = findNode(nodes, selectedNodeId)
-  if (node && node.type !== 'request') return node.id
-  return ancestorIds(nodes, selectedNodeId)?.at(-1)
+const containerFor = (nodes: TreeNode[], selectedNodeId: string | null, activeCollectionId: string | null): string | undefined => {
+  if (selectedNodeId) {
+    const node = findNode(nodes, selectedNodeId)
+    if (node && node.type !== 'request') return node.id
+    const parent = ancestorIds(nodes, selectedNodeId)?.at(-1)
+    if (parent) return parent
+  }
+  // Falling back to the active collection rather than the root is what keeps a new
+  // request inside the collection you are looking at. Landing it at the root would
+  // now make it invisible, because the tree only renders one collection's children.
+  return activeCollectionId ?? undefined
 }
+
+/** Root-level collections, in order — exactly what the rail lists. */
+export const collectionsIn = (nodes: TreeNode[]): CollectionNode[] => nodes.filter((n): n is CollectionNode => n.type === 'collection')
 
 export const useAppStore = create<AppState>(set => ({
   // The app starts genuinely empty. There are no fixtures to seed from any more:
@@ -179,14 +207,15 @@ export const useAppStore = create<AppState>(set => ({
   tabs: [],
   activeId: null,
   selectedNodeId: null,
+  activeCollectionId: null,
   requestPanel: 'params',
   responsePanel: 'body',
   responses: {},
   recentIds: [],
-  sidebarWidth: 282,
+  sidebarWidth: SIDEBAR_WIDTH.default,
   sidebarCollapsed: false,
   splitOrientation: 'rows',
-  splitRatio: 52,
+  splitRatio: SPLIT_RATIO.default,
   paletteOpen: false,
   paletteSeed: '',
   persistenceState: 'loading',
@@ -225,6 +254,10 @@ export const useAppStore = create<AppState>(set => ({
       recentIds: remember(s.recentIds, id),
     })),
 
+  // Clears the tree selection: it belonged to the collection being left, and
+  // leaving it set would keep `containerFor` placing new nodes in the old one.
+  selectCollection: id => set({ activeCollectionId: id, selectedNodeId: null }),
+
   setSaveState: saveState => set({ saveState }),
   setSecretsAvailable: secretsAvailable => set({ secretsAvailable }),
 
@@ -240,7 +273,18 @@ export const useAppStore = create<AppState>(set => ({
   addNode: (type, parentId, name) =>
     set(s => {
       const stamp = Date.now()
-      const parent = parentId ?? containerFor(s.tree, s.selectedNodeId)
+
+      // A request or folder always ends up inside a collection, the way a channel
+      // always belongs to a server. Without this an empty workspace would put the
+      // first request at the root, where the collection-scoped tree cannot show it.
+      let tree = s.tree
+      let activeCollectionId = s.activeCollectionId
+      if (type !== 'collection' && !parentId && !collectionsIn(tree).length) {
+        activeCollectionId = `collection-${stamp}`
+        tree = [...tree, { id: activeCollectionId, type: 'collection', name: 'My Collection', expanded: true, children: [] }]
+      }
+
+      const parent = parentId ?? containerFor(tree, s.selectedNodeId, activeCollectionId)
       if (type === 'request') {
         // The node id and the document id were both `request-${Date.now()}` in the
         // same tick, so they came out identical — a latent collision between tree
@@ -262,11 +306,12 @@ export const useAppStore = create<AppState>(set => ({
           auth: { type: 'none', token: '', username: '', password: '' },
         }
         return {
-          tree: insertNode(s.tree, parent, { id: nodeId, type, requestId, name: doc.name }),
+          tree: insertNode(tree, parent, { id: nodeId, type, requestId, name: doc.name }),
           documents: { ...s.documents, [requestId]: doc },
           tabs: [...s.tabs, requestId],
           activeId: requestId,
           selectedNodeId: nodeId,
+          activeCollectionId,
           recentIds: remember(s.recentIds, requestId),
         }
       }
@@ -278,7 +323,15 @@ export const useAppStore = create<AppState>(set => ({
         expanded: true,
         children: [],
       }
-      return { tree: insertNode(s.tree, parent, child), selectedNodeId: id }
+      return {
+        // A collection is always a root node, whatever happens to be selected —
+        // nesting one inside a folder would hide it from the rail.
+        tree: insertNode(tree, type === 'collection' ? undefined : parent, child),
+        selectedNodeId: type === 'collection' ? null : id,
+        // A new collection becomes the one you are looking at, so the panel is not
+        // still showing the previous one's contents under its name.
+        activeCollectionId: type === 'collection' ? id : activeCollectionId,
+      }
     }),
 
   renameNode: (nodeId, name) =>
@@ -310,20 +363,36 @@ export const useAppStore = create<AppState>(set => ({
       const index = s.activeId ? s.tabs.indexOf(s.activeId) : -1
       const tabs = s.tabs.filter(tab => !removed.includes(tab))
       const activeId = s.activeId && removed.includes(s.activeId) ? (tabs[Math.min(index, tabs.length - 1)] ?? null) : s.activeId
+
+      const tree = removeNode(s.tree, nodeId)
+      // Deleting the collection you were looking at has to leave the rail pointing
+      // somewhere, or the panel renders under a name that no longer exists.
+      const collections = collectionsIn(tree)
+      const activeCollectionId =
+        s.activeCollectionId && collections.some(c => c.id === s.activeCollectionId) ? s.activeCollectionId : (collections[0]?.id ?? null)
+
       return {
-        tree: removeNode(s.tree, nodeId),
+        tree,
         documents,
         responses,
         tabs,
         activeId,
+        activeCollectionId,
         recentIds: s.recentIds.filter(recent => !removed.includes(recent)),
-        selectedNodeId: s.selectedNodeId === nodeId ? null : s.selectedNodeId,
+        // Was only cleared when the selection *was* the deleted node, so deleting a
+        // folder left `selectedNodeId` pointing inside the subtree that just went
+        // away — a dangling id that `containerFor` would then resolve against.
+        selectedNodeId: s.selectedNodeId && findNode(tree, s.selectedNodeId) ? s.selectedNodeId : null,
       }
     }),
 
   /**
-   * Expand every ancestor of a request and select it, so jumping there from the
-   * command palette scrolls the sidebar to the row instead of leaving it collapsed.
+   * Switch to the request's collection, expand every ancestor, and select it — so a
+   * jump from the command palette lands somewhere visible rather than selecting a
+   * row inside a collection the sidebar is not showing.
+   *
+   * All three palette paths (open tab, open request, "Reveal in sidebar") funnel
+   * through here, so the collection switch only has to exist in this one place.
    */
   revealNode: requestId =>
     set(s => {
@@ -333,6 +402,7 @@ export const useAppStore = create<AppState>(set => ({
       return {
         tree: mapTree(s.tree, n => (n.type !== 'request' && ancestors.includes(n.id) ? { ...n, expanded: true } : n)),
         selectedNodeId: nodeId,
+        activeCollectionId: ancestors[0] ?? s.activeCollectionId,
       }
     }),
 
@@ -340,11 +410,11 @@ export const useAppStore = create<AppState>(set => ({
   setResponsePanel: responsePanel => set({ responsePanel }),
   setResponse: (id, response) => set(s => ({ responses: { ...s.responses, [id]: response } })),
 
-  setSidebarWidth: width => set({ sidebarWidth: Math.min(420, Math.max(220, width)) }),
+  setSidebarWidth: width => set({ sidebarWidth: Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, width)) }),
   toggleSidebar: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSplitOrientation: splitOrientation => set({ splitOrientation }),
   toggleSplitOrientation: () => set(s => ({ splitOrientation: s.splitOrientation === 'rows' ? 'columns' : 'rows' })),
-  setSplitRatio: ratio => set({ splitRatio: Math.min(72, Math.max(30, ratio)) }),
+  setSplitRatio: ratio => set({ splitRatio: Math.min(SPLIT_RATIO.max, Math.max(SPLIT_RATIO.min, ratio)) }),
   openPalette: (seed = '') => set({ paletteOpen: true, paletteSeed: seed }),
   closePalette: () => set({ paletteOpen: false, paletteSeed: '' }),
 }))

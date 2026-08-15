@@ -88,6 +88,21 @@
   --color-method-head: #22d3ee;
   --color-method-options: #a1a1aa;
 
+  /* ── Collections ────────────────────────────────────────────────────────── */
+  /* One hue per collection square, assigned by hashing the collection id. Same
+   * recipe as the method chips above — fill and border are derived at 16%/30% via
+   * color-mix — so the rail speaks the existing visual language rather than
+   * introducing a second one. All eight sit at the same 400-level lightness on
+   * --color-surface-2, which keeps the initials clear of 4.5:1. */
+  --color-collection-1: #f472b6;
+  --color-collection-2: #fb923c;
+  --color-collection-3: #facc15;
+  --color-collection-4: #4ade80;
+  --color-collection-5: #2dd4bf;
+  --color-collection-6: #38bdf8;
+  --color-collection-7: #818cf8;
+  --color-collection-8: #c084fc;
+
   /* ── Syntax ─────────────────────────────────────────────────────────────── */
   /* One palette, consumed by both CodeMirror and the response viewer. Ratios are
    * against surface-1, the editor background. */

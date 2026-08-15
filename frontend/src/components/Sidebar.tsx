@@ -1,9 +1,12 @@
-import { useState } from 'react'
-import { Boxes, ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, Plus, Search } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Boxes, ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, Search } from 'lucide-react'
 import type { VisibleRow } from '../store'
-import { useAppStore } from '../store'
+import { collectionsIn, useAppStore } from '../store'
+import type { CollectionNode } from '../types'
 import { useTreeNavigation } from '../useTreeNavigation'
 import { shortcuts } from '../shortcuts'
+import { COLLECTION_PANEL_ID, collectionTabId } from '../collections'
+import { CollectionRail } from './CollectionRail'
 import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction, Shortcut } from './Placeholder'
 import { TreeRowMenu } from './TreeRowMenu'
@@ -128,82 +131,128 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
   )
 }
 
+/**
+ * The active collection's name, doubling as the tree's accessible name and as the
+ * home for the collection's own actions.
+ *
+ * Those actions need a home because the collection is no longer a row in the tree —
+ * the rail replaced it — so `TreeRowMenu` is reused here against the collection
+ * node. It already offers exactly New Request / New Folder / Rename / Delete for
+ * branch nodes, and the inline rename mirrors what `TreeRow` does.
+ */
+function CollectionHeading({ collection }: { collection: CollectionNode }) {
+  const addNode = useAppStore(s => s.addNode)
+  const renameNode = useAppStore(s => s.renameNode)
+  const [menu, setMenu] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+
+  return (
+    <div className="sidebar-section-title">
+      {renaming ? (
+        <input
+          autoFocus
+          className="tree-rename"
+          aria-label={`Rename ${collection.name}`}
+          defaultValue={collection.name}
+          autoComplete="off"
+          spellCheck={false}
+          onBlur={e => {
+            renameNode(collection.id, e.target.value.trim() || collection.name)
+            setRenaming(false)
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') setRenaming(false)
+          }}
+        />
+      ) : (
+        <span id="collections-label" className="truncate">
+          {collection.name}
+        </span>
+      )}
+      <div>
+        <button className="icon-btn xs" aria-label="New folder" title="New folder" onClick={() => addNode('folder')}>
+          <FolderPlus size={14} aria-hidden="true" />
+        </button>
+        <button className="icon-btn xs" aria-label="New request" title="New request" onClick={() => addNode('request')}>
+          <FilePlus2 size={14} aria-hidden="true" />
+        </button>
+        <TreeRowMenu node={collection} open={menu} onOpenChange={setMenu} onRename={() => setRenaming(true)} onReturnFocus={() => undefined} />
+      </div>
+    </div>
+  )
+}
+
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const addNode = useAppStore(s => s.addNode)
   const openPalette = useAppStore(s => s.openPalette)
+  const tree = useAppStore(s => s.tree)
+  const activeCollectionId = useAppStore(s => s.activeCollectionId)
   const { containerRef, rows, activeId, onKeyDown, focusRow } = useTreeNavigation()
 
-  if (collapsed)
-    return (
-      <nav className="sidebar collapsed" id="sidebar" aria-label="Collections">
-        <h1 className="sr-only">HTTiny</h1>
-        <button className="brand-mark" aria-label="Show sidebar" title="Show sidebar" onClick={onToggle}>
-          H<span>T</span>
-        </button>
-      </nav>
-    )
+  // Derived from `tree` rather than selected as `s => collectionsIn(s.tree)`: that
+  // selector would build a new array on every store change, and zustand compares
+  // with Object.is, so the whole sidebar would re-render on every keystroke.
+  const collections = useMemo(() => collectionsIn(tree), [tree])
+  const collection = collections.find(c => c.id === activeCollectionId) ?? collections[0]
 
   return (
-    <nav className="sidebar" id="sidebar" aria-label="Collections">
-      <header className="app-brand">
-        <button className="brand-mark" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={onToggle}>
-          H<span>T</span>
-        </button>
-        <div>
-          <h1>HTTiny</h1>
-          <small>HTTP workspace</small>
-        </div>
-        <button className="icon-btn ml-auto" aria-label="New collection" title="New collection" onClick={() => addNode('collection')}>
-          <Plus size={16} aria-hidden="true" />
-        </button>
-      </header>
-      <div className="sidebar-section-title">
-        <span id="collections-label">COLLECTIONS</span>
-        <div>
-          <button className="icon-btn xs" aria-label="New folder" title="New folder" onClick={() => addNode('folder')}>
-            <FolderPlus size={14} aria-hidden="true" />
+    /* One `<nav>` holding both the rail and the panel, so the landmark, the id and
+       the `aria-controls` on the workspace toggle all keep pointing at a live
+       element whether or not the panel is showing. */
+    <nav className={`sidebar ${collapsed ? 'collapsed' : ''}`} id="sidebar" aria-label="Collections">
+      <h1 className="sr-only">HTTiny</h1>
+      <CollectionRail collapsed={collapsed} onToggle={onToggle} />
+      {!collapsed && (
+        <div
+          className="sidebar-panel"
+          id={COLLECTION_PANEL_ID}
+          role={collection ? 'tabpanel' : undefined}
+          aria-labelledby={collection ? collectionTabId(collection.id) : undefined}
+        >
+          {collection && <CollectionHeading collection={collection} />}
+          {/*
+            This was an in-tree filter, but it only ever matched direct children, so
+            searching for a request nested two levels deep emptied the entire tree. It
+            now opens the command palette, which searches every request by name, method
+            and URL, and reveals the match in place instead of collapsing everything
+            around it.
+          */}
+          <button type="button" className="search-trigger" onClick={() => openPalette('')}>
+            <Search size={13} aria-hidden="true" />
+            <span>Search requests</span>
+            <Shortcut keys={shortcuts.palette} />
           </button>
-          <button className="icon-btn xs" aria-label="New request" title="New request" onClick={() => addNode('request')}>
-            <FilePlus2 size={14} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-      {/*
-        This was an in-tree filter, but it only ever matched direct children, so
-        searching for a request nested two levels deep emptied the entire tree. It
-        now opens the command palette, which searches every request by name, method
-        and URL, and reveals the match in place instead of collapsing everything
-        around it.
-      */}
-      <button type="button" className="search-trigger" onClick={() => openPalette('')}>
-        <Search size={13} aria-hidden="true" />
-        <span>Search requests</span>
-        <Shortcut keys={shortcuts.palette} />
-      </button>
-      {rows.length === 0 ? (
-        /* Deleting the last collection used to leave a blank panel with no way back
-           except the header's `+`. */
-        <div className="tree-scroll">
-          {/* This is both the "you deleted everything" state and the very first thing
-              a new user sees, so it leads with the request — the thing the app is for —
-              and offers the collection as the way to organise them afterwards. */}
-          <Placeholder icon={<Boxes size={20} />} title="No requests yet" description="Create a request to send your first call, or start with a collection.">
-            <PlaceholderAction shortcut={shortcuts.newRequest} onClick={() => addNode('request')}>
-              New request
-            </PlaceholderAction>
-            <PlaceholderAction variant="secondary" onClick={() => addNode('collection')}>
-              New collection
-            </PlaceholderAction>
-          </Placeholder>
-        </div>
-      ) : (
-        <div className="tree-scroll" ref={containerRef} role="tree" aria-labelledby="collections-label" onKeyDown={onKeyDown}>
-          {rows.map(row => (
-            <TreeRow key={row.node.id} row={row} active={row.node.id === activeId} onFocusRow={focusRow} />
-          ))}
+          {/* Two empty states, not one: with the tree scoped to a collection, "no
+              rows" no longer means "nothing exists" — it usually means this
+              collection is empty, which needs a different way out. */}
+          {!collection ? (
+            <div className="tree-scroll">
+              <Placeholder icon={<Boxes size={20} />} title="No collections yet" description="Collections group your requests. Create one to get started.">
+                <PlaceholderAction onClick={() => addNode('collection')}>New collection</PlaceholderAction>
+              </Placeholder>
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="tree-scroll">
+              <Placeholder icon={<Boxes size={20} />} title="Nothing here yet" description={`“${collection.name}” has no requests. Add one to send your first call.`}>
+                <PlaceholderAction shortcut={shortcuts.newRequest} onClick={() => addNode('request')}>
+                  New request
+                </PlaceholderAction>
+                <PlaceholderAction variant="secondary" onClick={() => addNode('folder')}>
+                  New folder
+                </PlaceholderAction>
+              </Placeholder>
+            </div>
+          ) : (
+            <div className="tree-scroll" ref={containerRef} role="tree" aria-labelledby="collections-label" onKeyDown={onKeyDown}>
+              {rows.map(row => (
+                <TreeRow key={row.node.id} row={row} active={row.node.id === activeId} onFocusRow={focusRow} />
+              ))}
+            </div>
+          )}
+          <SaveStatus />
         </div>
       )}
-      <SaveStatus />
     </nav>
   )
 }

@@ -1,4 +1,4 @@
-import { methodOptions } from './store'
+import { SIDEBAR_WIDTH, SPLIT_RATIO, methodOptions } from './store'
 import type { HttpMethod, KeyValueRow, RequestDocument, SplitOrientation, TreeNode } from './types'
 
 /**
@@ -54,6 +54,7 @@ export interface PrefsFile {
   tabs: string[]
   activeId: string | null
   selectedNodeId: string | null
+  activeCollectionId: string | null
   recentIds: string[]
   collapsedNodeIds: string[]
   requestPanel: 'params' | 'headers' | 'body' | 'auth'
@@ -63,11 +64,6 @@ export interface PrefsFile {
   splitOrientation: SplitOrientation
   splitRatio: number
 }
-
-/** Clamp bounds, exported so the store setters, App's SplitHandle props and the
- *  loader cannot drift apart — they were three separate copies of these numbers. */
-export const SIDEBAR_WIDTH = { min: 220, max: 420, default: 282 } as const
-export const SPLIT_RATIO = { min: 30, max: 72, default: 52 } as const
 
 // ── Writing ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +102,7 @@ export const toPrefsFile = (state: {
   tabs: string[]
   activeId: string | null
   selectedNodeId: string | null
+  activeCollectionId: string | null
   recentIds: string[]
   requestPanel: PrefsFile['requestPanel']
   responsePanel: PrefsFile['responsePanel']
@@ -117,6 +114,7 @@ export const toPrefsFile = (state: {
   tabs: state.tabs,
   activeId: state.activeId,
   selectedNodeId: state.selectedNodeId,
+  activeCollectionId: state.activeCollectionId,
   recentIds: state.recentIds,
   collapsedNodeIds: collapsedIn(state.tree),
   requestPanel: state.requestPanel,
@@ -224,6 +222,26 @@ const reachable = (nodes: TreeNode[], out: Set<string> = new Set()): Set<string>
   return out
 }
 
+/**
+ * Moves any root-level folder or request into a collection.
+ *
+ * The sidebar only renders one collection's children, so anything left loose at the
+ * root would be unreachable through the UI — invisible, undeletable, and still
+ * taking up space in the file. Hand-edited workspaces and files written before the
+ * rail existed are both sources of these, so the reader repairs rather than trusts.
+ */
+const adopt = (nodes: TreeNode[]): TreeNode[] => {
+  const stray = nodes.filter(node => node.type !== 'collection')
+  if (!stray.length) return nodes
+
+  const collections = nodes.filter(node => node.type === 'collection')
+  const first = collections[0]
+  if (first && first.type === 'collection') {
+    return [{ ...first, children: [...first.children, ...stray] }, ...collections.slice(1)]
+  }
+  return [{ id: 'collection-recovered', type: 'collection', name: 'My Collection', expanded: true, children: stray }]
+}
+
 export interface LoadedWorkspace {
   tree: TreeNode[]
   documents: Record<string, RequestDocument>
@@ -240,7 +258,7 @@ export function readWorkspace(payload: unknown, collapsedNodeIds: readonly strin
     }
   }
 
-  const tree = readTree(payload.tree, documents, new Set(collapsedNodeIds), new Set())
+  const tree = adopt(readTree(payload.tree, documents, new Set(collapsedNodeIds), new Set()))
 
   // Drop orphans: a document no node points at can never be opened or deleted
   // through the UI, so keeping it would only grow the file forever.
@@ -272,10 +290,17 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
   walk(tree)
   const selectedCandidate = typeof raw.selectedNodeId === 'string' ? raw.selectedNodeId : null
 
+  // Falls back to the first collection rather than to null: with the tree scoped to
+  // the active collection, a null here would render an empty panel on a workspace
+  // that plainly has collections in it.
+  const collectionIds = tree.filter(node => node.type === 'collection').map(node => node.id)
+  const collectionCandidate = typeof raw.activeCollectionId === 'string' ? raw.activeCollectionId : null
+
   return {
     tabs,
     activeId,
     selectedNodeId: selectedCandidate && nodeIds.has(selectedCandidate) ? selectedCandidate : null,
+    activeCollectionId: collectionCandidate && collectionIds.includes(collectionCandidate) ? collectionCandidate : (collectionIds[0] ?? null),
     recentIds: ids(raw.recentIds).filter(id => documents[id]).slice(0, 12),
     collapsedNodeIds: ids(raw.collapsedNodeIds),
     requestPanel: oneOf(raw.requestPanel, PANELS, 'params'),

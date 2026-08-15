@@ -8,7 +8,10 @@ import { Sidebar } from './components/Sidebar'
 import { SplitHandle } from './components/SplitHandle'
 import { WorkspaceActions } from './components/WorkspaceActions'
 import { useGlobalShortcuts } from './useGlobalShortcuts'
-import { useAppStore } from './store'
+import { SIDEBAR_WIDTH, useAppStore } from './store'
+
+/** Matches `--sidebar-collapsed`; the collapsed sidebar is exactly the rail. */
+const RAIL_WIDTH = 48
 
 export function App() {
   const sidebarWidth = useAppStore(s => s.sidebarWidth)
@@ -33,13 +36,30 @@ export function App() {
     /* The shell was `<main>` with the sidebar `<aside>` nested inside it, which put the
        navigation *inside* the main landmark and left the app with no main region of its
        own. The grid is now a plain div, the sidebar is `<nav>` and the workspace is
-       `<main>` — three sibling landmarks, which is what the skip link jumps between. */
-    <div className="app-shell" style={{ gridTemplateColumns: `${collapsed ? 48 : sidebarWidth}px 4px minmax(0, 1fr)` }}>
+       `<main>` — three sibling landmarks, which is what the skip link jumps between.
+
+       Collapsed, the sidebar track narrows to exactly the collection rail, so the
+       rail stays reachable while the panel goes away. */
+    <div className="app-shell" style={{ gridTemplateColumns: `${collapsed ? RAIL_WIDTH : sidebarWidth}px ${collapsed ? 0 : 4}px minmax(0, 1fr)` }}>
       <a className="skip-link" href="#workspace">
         Skip to Workspace
       </a>
       <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
-      <SplitHandle label="Resize sidebar" axis="x" unit="px" value={sidebarWidth} min={220} max={420} step={16} defaultValue={282} onChange={setSidebarWidth} />
+      {/* Hidden while collapsed: with only the rail showing there is nothing to
+          resize, and a separator with no adjacent panel is a stray tab stop. */}
+      {!collapsed && (
+        <SplitHandle
+          label="Resize sidebar"
+          axis="x"
+          unit="px"
+          value={sidebarWidth}
+          min={SIDEBAR_WIDTH.min}
+          max={SIDEBAR_WIDTH.max}
+          step={16}
+          defaultValue={SIDEBAR_WIDTH.default}
+          onChange={setSidebarWidth}
+        />
+      )}
       <main className="workspace" id="workspace">
         <div className="workspace-top">
           <button
