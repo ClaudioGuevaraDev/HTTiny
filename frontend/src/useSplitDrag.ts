@@ -12,6 +12,13 @@ export interface SplitDragOptions {
   onChange: (next: number) => void
   /** Required for `unit: 'percent'` — the element the percentage is measured against. */
   containerRef?: RefObject<HTMLElement | null>
+  /**
+   * The interface zoom, for `unit: 'px'` only. A pointer delta is in client pixels while
+   * the value is written into a length that the root's `zoom` then multiplies, so at 150%
+   * an uncompensated drag would run half again ahead of the cursor. `unit: 'percent'`
+   * needs nothing: it measures against a rect that is already scaled.
+   */
+  scale?: number
 }
 
 /**
@@ -22,7 +29,7 @@ export interface SplitDragOptions {
  * keyboard support: the old handles were mouse-only, which is a straight WCAG 2.1.1
  * failure on a control that determines how much of the app you can see.
  */
-export function useSplitDrag({ axis, unit, value, min, max, step, defaultValue, onChange, containerRef }: SplitDragOptions) {
+export function useSplitDrag({ axis, unit, value, min, max, step, defaultValue, onChange, containerRef, scale = 1 }: SplitDragOptions) {
   const clamp = useCallback((next: number) => Math.min(max, Math.max(min, next)), [min, max])
 
   const onPointerDown = useCallback(
@@ -36,7 +43,7 @@ export function useSplitDrag({ axis, unit, value, min, max, step, defaultValue, 
 
       const move = (moveEvent: PointerEvent) => {
         const delta = (axis === 'x' ? moveEvent.clientX : moveEvent.clientY) - start
-        onChange(clamp(startValue + (unit === 'percent' ? (delta / extent) * 100 : delta)))
+        onChange(clamp(startValue + (unit === 'percent' ? (delta / extent) * 100 : delta / scale)))
       }
       const stop = () => {
         handle.releasePointerCapture(event.pointerId)
@@ -48,7 +55,7 @@ export function useSplitDrag({ axis, unit, value, min, max, step, defaultValue, 
       handle.addEventListener('pointerup', stop)
       handle.addEventListener('pointercancel', stop)
     },
-    [axis, unit, value, containerRef, onChange, clamp],
+    [axis, unit, value, containerRef, scale, onChange, clamp],
   )
 
   const onKeyDown = useCallback(

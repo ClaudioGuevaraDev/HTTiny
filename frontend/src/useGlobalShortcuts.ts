@@ -31,8 +31,31 @@ export function useGlobalShortcuts(): void {
         return
       }
 
+      // Not `matchesCombo`, and deliberately so. It compares modifiers exactly, but on a
+      // US keyboard `Ctrl++` arrives as `Ctrl+Shift+=` — a browser takes both, and so
+      // should this. Its combo strings could not express it either, since the parser
+      // splits on `+`. Numpad `+`/`-` land here too, as their own unshifted keys.
+      const mod = (event.ctrlKey || event.metaKey) && !event.altKey
+      if (mod && (event.key === '+' || event.key === '=')) {
+        event.preventDefault()
+        state.zoomIn()
+        return
+      }
+      if (mod && (event.key === '-' || event.key === '_')) {
+        event.preventDefault()
+        state.zoomOut()
+        return
+      }
+      if (mod && !event.shiftKey && event.key === '0') {
+        event.preventDefault()
+        state.resetZoom()
+        return
+      }
+
       // While either modal is open it owns the keyboard. Escape still closes them —
-      // that is the dialog element's own behaviour, not this handler's.
+      // that is the dialog element's own behaviour, not this handler's. Zoom is above
+      // this line with the palette and the settings: it has to answer while the panel
+      // that offers it is open.
       if (state.paletteOpen || state.settingsOpen) return
 
       const id = state.activeId

@@ -7,6 +7,15 @@
      * Declaring both here is what makes native scrollbars and form controls follow
      * before either block is reached. */
     color-scheme: light dark;
+    /* The interface zoom. `zoom.ts` writes `--zoom` from the stored preference; the
+     * fallback is what a browser preview with no hydration yet renders at.
+     *
+     * `zoom` and not `transform: scale()`: it scales layout rather than painting over
+     * it, so every px in this stylesheet keeps meaning what it says and nothing has to
+     * be compensated for. The one thing it does not compose with is viewport units,
+     * which resolve against the unscaled viewport and are then multiplied — the two
+     * dialogs sized in `vw`/`vh` divide by `--zoom` to cancel that. */
+    zoom: var(--zoom, 1);
     /* Was `Inter`, which was never actually loaded anywhere and silently fell back
      * to the system UI font. */
     font-family: var(--font-sans);

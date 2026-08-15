@@ -13,6 +13,11 @@ export const shortcuts = {
   toggleSidebar: ['Ctrl', 'B'],
   toggleSplit: ['Ctrl', '\\'],
   settings: ['Ctrl', ','],
+  // `+` rather than `=`, because that is the key the user is aiming for even though the
+  // event arrives as `=` unshifted. `useGlobalShortcuts` accepts both.
+  zoomIn: ['Ctrl', '+'],
+  zoomOut: ['Ctrl', '-'],
+  zoomReset: ['Ctrl', '0'],
   cancel: ['Esc'],
 } as const
 

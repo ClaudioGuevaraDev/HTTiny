@@ -27,6 +27,24 @@ import type {
 export const SIDEBAR_WIDTH = { min: 268, max: 468, default: 330 } as const
 export const SPLIT_RATIO = { min: 30, max: 72, default: 52 } as const
 
+/**
+ * A percentage, and an integer one: it is written to `ui.json` on every change, and a
+ * ratio would accumulate the usual binary dust there for nothing.
+ */
+export const ZOOM = { min: 80, max: 150, default: 100 } as const
+/** The stops the stepper and the shortcuts move between. `ZOOM.min`/`max` are its ends. */
+export const ZOOM_STEPS = [80, 90, 100, 110, 125, 150] as const
+
+/**
+ * The next stop in a direction. `findIndex` rather than `indexOf` so a value that is not
+ * a stop at all — a hand-edited `ui.json` — still moves instead of sticking: the first
+ * stop past it in that direction wins.
+ */
+const stepZoom = (zoom: number, direction: 1 | -1): number => {
+  const next = direction === 1 ? ZOOM_STEPS.find(stop => stop > zoom) : [...ZOOM_STEPS].reverse().find(stop => stop < zoom)
+  return next ?? (direction === 1 ? ZOOM.max : ZOOM.min)
+}
+
 type Panel = 'params' | 'headers' | 'body' | 'auth'
 
 interface AppState {
@@ -75,6 +93,8 @@ interface AppState {
   splitOrientation: SplitOrientation
   splitRatio: number
 
+  /** Applied by `zoom.ts` as a CSS `zoom` on the root, in percent. */
+  zoom: number
   /** Applied by `theme.ts`, which resolves `system` before CSS ever sees it. */
   theme: ThemePreference
   /** Applied by `language.ts`, which pushes it into the message runtime and onto `<html lang>`. */
@@ -116,6 +136,10 @@ interface AppState {
   setSplitOrientation: (orientation: SplitOrientation) => void
   toggleSplitOrientation: () => void
   setSplitRatio: (ratio: number) => void
+  setZoom: (zoom: number) => void
+  zoomIn: () => void
+  zoomOut: () => void
+  resetZoom: () => void
   setTheme: (theme: ThemePreference) => void
   setLanguage: (language: Locale) => void
   setDefaultBodyLanguage: (language: BodyLanguage | null) => void
@@ -290,6 +314,7 @@ export const useAppStore = create<AppState>(set => ({
   sidebarCollapsed: false,
   splitOrientation: 'rows',
   splitRatio: SPLIT_RATIO.default,
+  zoom: ZOOM.default,
   theme: 'system',
   language: 'en',
   defaultBodyLanguage: null,
@@ -507,6 +532,12 @@ export const useAppStore = create<AppState>(set => ({
   setSplitOrientation: splitOrientation => set({ splitOrientation }),
   toggleSplitOrientation: () => set(s => ({ splitOrientation: s.splitOrientation === 'rows' ? 'columns' : 'rows' })),
   setSplitRatio: ratio => set({ splitRatio: Math.min(SPLIT_RATIO.max, Math.max(SPLIT_RATIO.min, ratio)) }),
+  // Stepping lives here rather than in the stepper for the same reason the split toggle
+  // does: three surfaces call it — the buttons, the keyboard and the palette.
+  setZoom: zoom => set({ zoom: Math.min(ZOOM.max, Math.max(ZOOM.min, zoom)) }),
+  zoomIn: () => set(s => ({ zoom: stepZoom(s.zoom, 1) })),
+  zoomOut: () => set(s => ({ zoom: stepZoom(s.zoom, -1) })),
+  resetZoom: () => set({ zoom: ZOOM.default }),
   setTheme: theme => set({ theme }),
   setLanguage: language => set({ language }),
   setDefaultBodyLanguage: defaultBodyLanguage => set({ defaultBodyLanguage }),

@@ -1,5 +1,5 @@
 import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW } from './responseBody'
-import { SIDEBAR_WIDTH, SPLIT_RATIO, methodOptions } from './store'
+import { SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
 import type { BodyLanguage, BodyView, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
 
 /**
@@ -72,6 +72,8 @@ export interface PrefsFile {
   splitRatio: number
   theme: ThemePreference
   language: Locale
+  /** A percentage: 100 is unscaled. */
+  zoom: number
   /** `null` is "automatic" — the viewer follows whatever Go classified the body as. */
   defaultBodyLanguage: BodyLanguage | null
 }
@@ -128,6 +130,7 @@ export const toPrefsFile = (state: {
   splitRatio: number
   theme: ThemePreference
   language: Locale
+  zoom: number
   defaultBodyLanguage: BodyLanguage | null
 }): PrefsFile => ({
   tabs: state.tabs,
@@ -145,6 +148,7 @@ export const toPrefsFile = (state: {
   splitRatio: state.splitRatio,
   theme: state.theme,
   language: state.language,
+  zoom: state.zoom,
   defaultBodyLanguage: state.defaultBodyLanguage,
 })
 
@@ -364,6 +368,7 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     splitRatio: clamped(raw.splitRatio, SPLIT_RATIO),
     theme: oneOf(raw.theme, THEMES, 'system'),
     language: oneOf(raw.language, LOCALES, 'en'),
+    zoom: clamped(raw.zoom, ZOOM),
     // Not `oneOf`, for the same reason as `readBodyViews` above: the fallback is `null`,
     // which is not one of the allowed values.
     defaultBodyLanguage: BODY_LANGUAGES.find(candidate => candidate === raw.defaultBodyLanguage) ?? null,

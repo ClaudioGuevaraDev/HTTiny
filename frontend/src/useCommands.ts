@@ -115,6 +115,9 @@ export function useCommands(enabled: boolean): Command[] {
       shortcuts.toggleSplit,
     )
     action('settings', 'command.settings.title', 'command.settings.keywords', () => useAppStore.getState().openSettings(), shortcuts.settings)
+    action('zoom-in', 'command.zoomIn.title', 'command.zoomIn.keywords', () => useAppStore.getState().zoomIn(), shortcuts.zoomIn)
+    action('zoom-out', 'command.zoomOut.title', 'command.zoomOut.keywords', () => useAppStore.getState().zoomOut(), shortcuts.zoomOut)
+    action('zoom-reset', 'command.zoomReset.title', 'command.zoomReset.keywords', () => useAppStore.getState().resetZoom(), shortcuts.zoomReset)
 
     // Every request in the tree, searchable by name, method, URL and breadcrumb.
     for (const entry of requests) {

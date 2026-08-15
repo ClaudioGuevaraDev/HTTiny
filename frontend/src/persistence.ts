@@ -213,6 +213,7 @@ export async function hydrate(): Promise<void> {
       // `setState` takes a Partial, so the language would save correctly and load into
       // nothing, resetting to English on every launch.
       language: layout.language,
+      zoom: layout.zoom,
       defaultBodyLanguage: layout.defaultBodyLanguage,
       persistenceState: 'ready',
       secretsAvailable,

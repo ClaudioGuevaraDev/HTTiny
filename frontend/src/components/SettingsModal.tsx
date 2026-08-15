@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { HardDrive, Settings2, X } from 'lucide-react'
+import { HardDrive, Minus, Plus, Settings2, X } from 'lucide-react'
 import type { MessageKey, PlainMessageKey } from '../i18n'
 import { useT } from '../language'
 import { BODY_LANGUAGES, bodyLanguageLabel } from '../responseBody'
 import { useSystemTheme } from '../theme'
 import type { Locale, ThemePreference } from '../types'
-import { SIDEBAR_WIDTH, SPLIT_RATIO, useAppStore } from '../store'
+import { shortcuts } from '../shortcuts'
+import { SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, useAppStore } from '../store'
 import { useRovingFocus } from '../useRovingFocus'
-import { Placeholder } from './Placeholder'
+import { Placeholder, Shortcut } from './Placeholder'
 
 type Section = 'general' | 'storage'
 
@@ -151,6 +152,7 @@ function GeneralSection() {
     <>
       <h3 className="settings-heading">{t('settings.appearance')}</h3>
       <ThemeRow />
+      <ZoomRow />
       <h3 className="settings-heading">{t('settings.layout.heading')}</h3>
       {/* First in the group on purpose: the orientation decides *what* the split slider
           divides, and that row's description reads "height" or "width" off it. */}
@@ -204,6 +206,51 @@ function ThemeRow() {
           </option>
         ))}
       </select>
+    </div>
+  )
+}
+
+/**
+ * A stepper rather than a select or a slider: zoom is the one preference people already
+ * know as a pair of buttons and a percentage, and the three shortcuts map onto its three
+ * controls one for one.
+ */
+function ZoomRow() {
+  const { t } = useT()
+  const zoom = useAppStore(s => s.zoom)
+  const zoomIn = useAppStore(s => s.zoomIn)
+  const zoomOut = useAppStore(s => s.zoomOut)
+  const resetZoom = useAppStore(s => s.resetZoom)
+
+  return (
+    <div className="settings-row">
+      <div className="settings-label">
+        {/* A `<span>`, not a `<label htmlFor>`: the control is a group of three buttons,
+            and a group can only be named through `aria-labelledby` — the same reason the
+            theme row used one back when it was a radiogroup. */}
+        <span id="settings-zoom-label">{t('settings.zoom.label')}</span>
+        <p id="settings-zoom-desc">{t('settings.zoom.desc')}</p>
+        {/* The keys in the same order as the buttons they stand for. `Shortcut` is
+            `aria-hidden`, so this repeats nothing the buttons' labels already say. */}
+        <div className="settings-shortcuts">
+          <Shortcut keys={shortcuts.zoomOut} />
+          <Shortcut keys={shortcuts.zoomReset} />
+          <Shortcut keys={shortcuts.zoomIn} />
+        </div>
+      </div>
+      <div className="settings-stepper" role="group" aria-labelledby="settings-zoom-label" aria-describedby="settings-zoom-desc">
+        <button type="button" className="icon-btn" aria-label={t('settings.zoom.out')} disabled={zoom <= ZOOM.min} onClick={zoomOut}>
+          <Minus size={14} aria-hidden="true" />
+        </button>
+        {/* The readout is the reset button, the way a browser's zoom indicator is: it
+            gives the third shortcut somewhere to live besides the keyboard. */}
+        <button type="button" className="settings-stepper-value" aria-label={t('settings.zoom.reset')} onClick={resetZoom}>
+          {t('settings.zoom.value', { zoom })}
+        </button>
+        <button type="button" className="icon-btn" aria-label={t('settings.zoom.in')} disabled={zoom >= ZOOM.max} onClick={zoomIn}>
+          <Plus size={14} aria-hidden="true" />
+        </button>
+      </div>
     </div>
   )
 }

@@ -40,6 +40,20 @@
     height: var(--h-control-xs);
   }
 
+  /* Same treatment as the response body's mode buttons, the only other control in the
+   * app that goes dead: it stays in place and stops responding to the pointer, rather
+   * than vanishing at the ends of a range and making the row jump. */
+  .icon-btn:disabled {
+    color: var(--color-text-subtle);
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .icon-btn:disabled:hover {
+    color: var(--color-text-subtle);
+    background: transparent;
+  }
+
   /* Destructive icon buttons stay neutral at rest — a row of icons all shouting is a
    * row nobody reads — and only turn red under the pointer, where the action is about
    * to happen. The confirm dialog is what actually guards the click. */
@@ -1693,9 +1707,14 @@
    * rendering (so it never fights the sidebar for z-index), ::backdrop, focus
    * restoration on close and native Escape handling. */
   .command-palette {
-    width: min(640px, 92vw);
-    max-height: min(60vh, 520px);
-    margin: 12vh auto auto;
+    /* Only the viewport-relative terms are divided by `--zoom`. `zoom` multiplies the
+     * rendered size, but `vw`/`vh` resolve against the unscaled viewport and would then
+     * be scaled on top of that — a 92vw dialog reaches past the window edge at 150%.
+     * The px caps are deliberately left alone: those are meant to grow with the zoom,
+     * which is the whole point of zooming. */
+    width: min(640px, calc(92vw / var(--zoom, 1)));
+    max-height: min(calc(60vh / var(--zoom, 1)), 520px);
+    margin: calc(12vh / var(--zoom, 1)) auto auto;
     padding: 0;
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-xl);
@@ -1835,8 +1854,9 @@
   /* Same plate as the palette — border, radius, surface, shadow — because they are
    * the same kind of thing and the app has one modal language, not two. */
   .settings-dialog {
-    width: min(720px, 92vw);
-    height: min(72vh, 520px);
+    /* Viewport terms divided by `--zoom`, px caps left to grow — see the palette above. */
+    width: min(720px, calc(92vw / var(--zoom, 1)));
+    height: min(calc(72vh / var(--zoom, 1)), 520px);
     margin: auto;
     padding: 0;
     border: 1px solid var(--color-border-strong);
@@ -2022,6 +2042,43 @@
     font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
     text-align: right;
+  }
+
+  .settings-stepper {
+    /* `.settings-row` is `space-between`, like every other control in this panel. */
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* Reserved width and monospace figures so the row does not shift when 90% becomes
+   * 125%, the same reasoning as `.settings-range-value`. A button rather than a span:
+   * clicking the percentage is what resets it. */
+  .settings-stepper-value {
+    min-width: 52px;
+    height: var(--h-control-sm);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .settings-stepper-value:hover {
+    background: var(--color-surface-4);
+  }
+
+  /* Under the description rather than beside the buttons: the control column is already
+   * three items wide, and these are a legend, not controls. */
+  .settings-shortcuts {
+    margin-top: 7px;
+    display: flex;
+    gap: 10px;
   }
 
   /* Same construction as `.row-check`: a `role="switch"` button whose visual is drawn

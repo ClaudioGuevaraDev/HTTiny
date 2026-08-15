@@ -25,6 +25,8 @@ export function App() {
   const toggleSidebar = useAppStore(s => s.toggleSidebar)
   const splitOrientation = useAppStore(s => s.splitOrientation)
   const splitRatio = useAppStore(s => s.splitRatio)
+  // Only the sidebar handle needs it: its value is a length, and a length gets scaled.
+  const zoom = useAppStore(s => s.zoom)
   const setSplitRatio = useAppStore(s => s.setSplitRatio)
   const splitRef = useRef<HTMLDivElement>(null)
 
@@ -74,6 +76,7 @@ export function App() {
           step={16}
           defaultValue={SIDEBAR_WIDTH.default}
           onChange={setSidebarWidth}
+          scale={zoom / 100}
         />
       )}
       <main className="workspace" id="workspace">

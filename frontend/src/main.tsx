@@ -4,6 +4,7 @@ import { App } from './App'
 import { initLanguage } from './language'
 import { hydrate } from './persistence'
 import { initTheme } from './theme'
+import { initZoom } from './zoom'
 // Self-hosted: the app is an offline desktop binary and cannot fetch webfonts at
 // runtime. Imported here rather than through a CSS @import so Vite resolves the
 // bare specifiers and rewrites the .woff2 asset URLs deterministically. Both must
@@ -26,12 +27,13 @@ import './styles.css'
  * is invisible rather than a white flash.
  */
 void hydrate().then(() => {
-  // Both between the two for the same reason the render is after the hydration: the
-  // theme and the language have to be on the document before anything paints, and
-  // neither can be known until the stored preferences have been read. The catalogues
+  // All three between the two for the same reason the render is after the hydration: the
+  // theme, the language and the zoom have to be on the document before anything paints,
+  // and none can be known until the stored preferences have been read. The catalogues
   // are static imports, so there is nothing to await for the language.
   initTheme()
   initLanguage()
+  initZoom()
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

@@ -235,6 +235,12 @@ export const en = {
   'command.toggleSidebar.keywords': 'hide show collapse panel',
   'command.toggleSplit.title': 'Toggle split orientation',
   'command.toggleSplit.keywords': 'layout columns rows side by side stacked',
+  'command.zoomIn.title': 'Zoom in',
+  'command.zoomIn.keywords': 'zoom in bigger larger scale text size',
+  'command.zoomOut.title': 'Zoom out',
+  'command.zoomOut.keywords': 'zoom out smaller scale text size',
+  'command.zoomReset.title': 'Reset zoom',
+  'command.zoomReset.keywords': 'zoom reset actual size 100',
   'command.settings.title': 'Open settings',
   'command.settings.keywords': 'preferences options theme appearance dark light storage language',
   'command.setMethod.title': 'Set method to {method}',
@@ -282,6 +288,14 @@ export const en = {
   'settings.theme.inline.dark': 'dark',
   'settings.theme.desc.system': 'Following the system, currently {theme}.',
   'settings.theme.desc.always': 'Always {theme}, whatever the system is set to.',
+  'settings.zoom.label': 'Zoom',
+  'settings.zoom.desc': 'Scales the whole interface.',
+  // No space before the sign in English, one in Spanish — which is the whole reason this
+  // is a message with a slot rather than a template in the component.
+  'settings.zoom.value': '{zoom}%',
+  'settings.zoom.in': 'Zoom in',
+  'settings.zoom.out': 'Zoom out',
+  'settings.zoom.reset': 'Reset zoom',
   'settings.layout.heading': 'Layout',
   // A switch is labelled by what turning it *on* does, not by the name of the setting:
   // "Layout" beside a switch would not say which way is which. `rows` is the default, so
