@@ -272,12 +272,14 @@ export const en = {
   // ── Settings ─────────────────────────────────────────────────────────────────
   'settings.title': 'Settings',
   'settings.sections': 'Settings sections',
+  // The tab labels double as the heading of their panel, which is why no panel prints one.
   'settings.section.general': 'General',
+  'settings.section.appearance': 'Appearance',
+  'settings.section.layout': 'Layout',
   'settings.section.storage': 'Storage',
   'settings.close': 'Close settings',
   'settings.storage.title': 'Nothing here yet',
   'settings.storage.desc': 'Storage settings will live in this panel.',
-  'settings.appearance': 'Appearance',
   'settings.theme.label': 'Theme',
   'settings.theme.system': 'System',
   'settings.theme.light': 'Light',
@@ -302,7 +304,6 @@ export const en = {
   'settings.codeFont.in': 'Larger code text',
   'settings.codeFont.out': 'Smaller code text',
   'settings.codeFont.reset': 'Reset code text size',
-  'settings.layout.heading': 'Layout',
   // A switch is labelled by what turning it *on* does, not by the name of the setting:
   // "Layout" beside a switch would not say which way is which. `rows` is the default, so
   // off is the factory state.
@@ -321,13 +322,11 @@ export const en = {
   'settings.layout.split.desc.rows': 'How the height is split between the request and the response.',
   'settings.layout.split.desc.columns': 'How the width is split between the request and the response.',
   'settings.layout.split.value': '{request} / {response}',
-  'settings.response.heading': 'Response',
   // Echoes the viewer's own control (`response.interpretAs`) on purpose: it is the same
   // setting in two places, and reading it as two would be worse than the repetition.
   'settings.response.format.label': 'Interpret bodies as',
   'settings.response.format.desc': 'What the viewer opens a body as. Automatic follows the content type, and a format picked in the viewer wins for that request.',
   'settings.response.format.auto': 'Automatic',
-  'settings.language.heading': 'Language',
   'settings.language.label': 'Language',
   'settings.language.desc': 'Choose the interface language.',
 

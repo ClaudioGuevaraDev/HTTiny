@@ -1924,27 +1924,19 @@
     box-shadow: inset 2px 0 var(--color-accent);
   }
 
+  /* The top padding clears `.settings-close`, which is absolutely positioned at 10px and
+   * is 28px tall. It used to be 18px, which was enough while every panel opened with a
+   * short left-aligned heading; now that the tab name carries that job and a panel opens
+   * straight into a row, the first control ran up under the dismiss button.
+   *
+   * 42px is also where the nav's first tab starts — 14px of its own padding, plus the
+   * title and its margin — so the two columns now begin on the same line. */
   .settings-panel {
     min-width: 0;
-    padding: 18px 20px;
+    padding: 42px 20px;
     overflow: auto;
     display: flex;
     flex-direction: column;
-  }
-
-  .settings-heading {
-    margin: 0 0 12px;
-    color: var(--color-text-subtle);
-    font-size: var(--text-2xs);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--tracking-label);
-    text-transform: uppercase;
-  }
-
-  /* A second group needs air above it; the first still sits flush with the panel's
-   * own padding. */
-  .settings-heading:not(:first-child) {
-    margin-top: 14px;
   }
 
   /* Label and description on the left, control on the right — the shape every

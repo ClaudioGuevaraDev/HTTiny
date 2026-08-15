@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { HardDrive, Minus, Plus, Settings2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { HardDrive, Minus, Palette, PanelsTopLeft, Plus, Settings2, X } from 'lucide-react'
 import type { MessageKey, PlainMessageKey } from '../i18n'
 import { useT } from '../language'
 import { BODY_LANGUAGES, bodyLanguageLabel } from '../responseBody'
@@ -10,12 +10,29 @@ import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, useAppStore } from '.
 import { useRovingFocus } from '../useRovingFocus'
 import { Placeholder, Shortcut } from './Placeholder'
 
-type Section = 'general' | 'storage'
-
+/**
+ * The tablist is the table of contents, so the split is by what a row *is* and every
+ * panel stays short enough not to scroll. Everything used to live under General, which
+ * had grown four headings deep and overflowed while this list sat at two entries with one
+ * of them empty — the navigation dividing a panel between one.
+ *
+ * Appearance and Layout are apart even though both are "how it looks": one is what the app
+ * *looks* like (colour, type sizes) and the other is its *geometry*. Together they would
+ * be six rows and the scrollbar would be back.
+ *
+ * The panel is a field here rather than a branch at the render site. It used to be a
+ * ternary, where a new section fell into the `else` and silently came out as the storage
+ * placeholder.
+ */
 const SECTIONS = [
-  { id: 'general', label: 'settings.section.general', icon: Settings2 },
-  { id: 'storage', label: 'settings.section.storage', icon: HardDrive },
-] as const satisfies readonly { id: Section; label: MessageKey; icon: typeof Settings2 }[]
+  { id: 'general', label: 'settings.section.general', icon: Settings2, Panel: GeneralSection },
+  { id: 'appearance', label: 'settings.section.appearance', icon: Palette, Panel: AppearanceSection },
+  { id: 'layout', label: 'settings.section.layout', icon: PanelsTopLeft, Panel: LayoutSection },
+  { id: 'storage', label: 'settings.section.storage', icon: HardDrive, Panel: StorageSection },
+] as const satisfies readonly { id: string; label: MessageKey; icon: typeof Settings2; Panel: () => ReactNode }[]
+
+/** Derived from the table rather than declared beside it: a section cannot exist without a panel. */
+type Section = (typeof SECTIONS)[number]['id']
 
 /**
  * No icons: an `<option>` is drawn by the OS and cannot carry one. Nothing is lost that
@@ -92,6 +109,9 @@ function SettingsBody({ onDismiss }: { onDismiss: () => void }) {
   // Vertical, unlike every other tablist in the app: the sections are a column, and
   // the ARIA pattern says the arrow keys have to follow the layout, not the role.
   const onNavKeyDown = useRovingFocus('[role="tab"]', 'vertical')
+  // `?? SECTIONS[0]` rather than a `!`: it is a tuple, index 0 exists, and nothing has to
+  // be asserted to say so.
+  const { Panel: ActivePanel } = SECTIONS.find(entry => entry.id === section) ?? SECTIONS[0]
 
   return (
     <div className="settings-shell">
@@ -122,11 +142,7 @@ function SettingsBody({ onDismiss }: { onDismiss: () => void }) {
       </div>
 
       <div className="settings-panel" role="tabpanel" id={panelId(section)} aria-labelledby={tabId(section)} tabIndex={-1}>
-        {section === 'general' ? (
-          <GeneralSection />
-        ) : (
-          <Placeholder icon={<HardDrive size={20} />} title={t('settings.storage.title')} description={t('settings.storage.desc')} />
-        )}
+        <ActivePanel />
       </div>
 
       {/* The dialog can already be dismissed with Escape and by clicking outside, but
@@ -140,32 +156,48 @@ function SettingsBody({ onDismiss }: { onDismiss: () => void }) {
 }
 
 /**
- * Three groups rather than one: "Appearance" and "Layout" both promise how the app
- * *looks* — so they sit together — while the language changes what it *says*. Someone
- * scanning for the language control should not have to read past a heading that does
- * not promise it.
+ * What is left once appearance and geometry have their own tabs: the app-level defaults.
+ * The language leads because this is the tab the modal opens on, and someone who cannot
+ * read the interface has to find it without hunting.
+ *
+ * No headings in any of these panels — the tab name is the heading, and printing it again
+ * at the top of its own panel is noise.
  */
 function GeneralSection() {
-  const { t } = useT()
-
   return (
     <>
-      <h3 className="settings-heading">{t('settings.appearance')}</h3>
+      <LanguageRow />
+      <BodyLanguageRow />
+    </>
+  )
+}
+
+function AppearanceSection() {
+  return (
+    <>
       <ThemeRow />
       <ZoomRow />
       <CodeFontRow />
-      <h3 className="settings-heading">{t('settings.layout.heading')}</h3>
-      {/* First in the group on purpose: the orientation decides *what* the split slider
-          divides, and that row's description reads "height" or "width" off it. */}
+    </>
+  )
+}
+
+function LayoutSection() {
+  return (
+    <>
+      {/* First on purpose: the orientation decides *what* the split slider divides, and
+          that row's description reads "height" or "width" off it. */}
       <SplitOrientationRow />
       <SidebarWidthRow />
       <SplitRatioRow />
-      <h3 className="settings-heading">{t('settings.response.heading')}</h3>
-      <BodyLanguageRow />
-      <h3 className="settings-heading">{t('settings.language.heading')}</h3>
-      <LanguageRow />
     </>
   )
+}
+
+function StorageSection() {
+  const { t } = useT()
+
+  return <Placeholder icon={<HardDrive size={20} />} title={t('settings.storage.title')} description={t('settings.storage.desc')} />
 }
 
 function ThemeRow() {
