@@ -40,7 +40,7 @@ function SaveStatus() {
     <footer className="sidebar-footer" data-tone={tone} title={dataDir || undefined}>
       <span className="status-dot" aria-hidden="true" />
       {label}
-      <span className="ml-auto">v{__APP_VERSION__}</span>
+      <span className="ml-auto">{__APP_VERSION__}</span>
     </footer>
   )
 }
