@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Plus } from 'lucide-react'
 import { COLLECTION_PANEL_ID, collectionTabId, hueOf, initialsOf } from '../collections'
+import { useT } from '../language'
 import { collectionsIn, useAppStore } from '../store'
 import { useRovingFocus } from '../useRovingFocus'
 
@@ -13,6 +14,7 @@ import { useRovingFocus } from '../useRovingFocus'
  * panel and the shell's existing 48px collapsed track is exactly the rail.
  */
 export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const { t } = useT()
   const tree = useAppStore(s => s.tree)
   const activeCollectionId = useAppStore(s => s.activeCollectionId)
   const selectCollection = useAppStore(s => s.selectCollection)
@@ -47,8 +49,8 @@ export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; on
       <button
         type="button"
         className="brand-mark"
-        aria-label={collapsed ? 'Show collection panel' : 'Hide collection panel'}
-        title={collapsed ? 'Show panel' : 'Hide panel'}
+        aria-label={collapsed ? t('rail.showPanel.aria') : t('rail.hidePanel.aria')}
+        title={collapsed ? t('rail.showPanel.title') : t('rail.hidePanel.title')}
         aria-expanded={!collapsed}
         // Only while the panel exists: collapsing unmounts it, and `aria-controls`
         // pointing at an id that is not in the document is worse than omitting it.
@@ -58,7 +60,7 @@ export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; on
         H<span>T</span>
       </button>
 
-      <div className="rail-tabs" role="tablist" aria-orientation="vertical" aria-label="Collections" onKeyDown={onKeyDown}>
+      <div className="rail-tabs" role="tablist" aria-orientation="vertical" aria-label={t('rail.collections')} onKeyDown={onKeyDown}>
         {collections.map(collection => {
           const active = collection.id === shown
           return (
@@ -85,7 +87,7 @@ export function CollectionRail({ collapsed, onToggle }: { collapsed: boolean; on
         })}
       </div>
 
-      <button type="button" className="rail-add" aria-label="New collection" title="New collection" onClick={() => addNode('collection')}>
+      <button type="button" className="rail-add" aria-label={t('rail.newCollection')} title={t('rail.newCollection')} onClick={() => addNode('collection')}>
         <Plus size={16} aria-hidden="true" />
       </button>
     </div>

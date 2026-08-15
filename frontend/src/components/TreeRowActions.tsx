@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { FilePlus2, FolderPlus, PenLine, Trash2 } from 'lucide-react'
+import { useT } from '../language'
 import { findNode, requestIdsIn, useAppStore } from '../store'
 import type { TreeNode } from '../types'
 
@@ -31,6 +32,7 @@ export function TreeRowActions({
   onRename: () => void
   onReturnFocus: () => void
 }) {
+  const { t, plural } = useT()
   const addNode = useAppStore(s => s.addNode)
   const deleteNode = useAppStore(s => s.deleteNode)
   const groupRef = useRef<HTMLDivElement>(null)
@@ -66,12 +68,23 @@ export function TreeRowActions({
     // responses — so the confirmation says how much is going, not just the name.
     const target = findNode(useAppStore.getState().tree, node.id)
     const count = target ? requestIdsIn(target).length : 0
-    const detail = node.type === 'request' ? '' : count === 1 ? ' and the 1 request inside it' : ` and the ${count} requests inside it`
-    if (window.confirm(`Delete “${node.name}”${detail}? This cannot be undone.`)) deleteNode(node.id)
+    // Whole sentences rather than a clause spliced into one. Spanish puts the count
+    // inside an agreeing noun phrase — "y las 3 solicitudes que contiene" — which no
+    // amount of concatenation can produce. Zero gets its own message because neither
+    // language has a CLDR `zero` category to select.
+    const message =
+      node.type === 'request'
+        ? t('tree.confirm.request', { name: node.name })
+        : count === 0
+          ? t('tree.confirm.empty', { name: node.name })
+          : plural('tree.confirm.container', count, { name: node.name })
+    // The OK/Cancel labels come from the OS, not from the app, so the question has to
+    // carry the whole meaning and must never name a button.
+    if (window.confirm(message)) deleteNode(node.id)
   }
 
   return (
-    <div ref={groupRef} className="tree-actions" role="group" aria-label={`Actions for ${node.name}`} onKeyDown={onKeyDown}>
+    <div ref={groupRef} className="tree-actions" role="group" aria-label={t('tree.actions', { name: node.name })} onKeyDown={onKeyDown}>
       {/* Four icons with no text on the same row: each label has to say what it acts on,
           or "New folder" reads as "new folder somewhere". */}
       {node.type !== 'request' && (
@@ -80,8 +93,8 @@ export function TreeRowActions({
             type="button"
             className="icon-btn xs"
             tabIndex={tabbable ? undefined : -1}
-            aria-label={`New request in ${node.name}`}
-            title={`New request in “${node.name}”`}
+            aria-label={t('tree.newRequestIn.aria', { name: node.name })}
+            title={t('tree.newRequestIn.title', { name: node.name })}
             onClick={run(() => addNode('request', node.id))}
           >
             <FilePlus2 size={13} aria-hidden="true" />
@@ -90,8 +103,8 @@ export function TreeRowActions({
             type="button"
             className="icon-btn xs"
             tabIndex={tabbable ? undefined : -1}
-            aria-label={`New folder in ${node.name}`}
-            title={`New folder in “${node.name}”`}
+            aria-label={t('tree.newFolderIn.aria', { name: node.name })}
+            title={t('tree.newFolderIn.title', { name: node.name })}
             onClick={run(() => addNode('folder', node.id))}
           >
             <FolderPlus size={13} aria-hidden="true" />
@@ -105,8 +118,8 @@ export function TreeRowActions({
         type="button"
         className="icon-btn xs"
         tabIndex={tabbable ? undefined : -1}
-        aria-label={`Rename ${node.name}`}
-        title={`Rename “${node.name}”`}
+        aria-label={t('tree.rename.aria', { name: node.name })}
+        title={t('tree.rename.title', { name: node.name })}
         onClick={event => {
           event.stopPropagation()
           onRename()
@@ -118,8 +131,8 @@ export function TreeRowActions({
         type="button"
         className="icon-btn xs danger"
         tabIndex={tabbable ? undefined : -1}
-        aria-label={`Delete ${node.name}`}
-        title={`Delete “${node.name}”`}
+        aria-label={t('tree.delete.aria', { name: node.name })}
+        title={t('tree.delete.title', { name: node.name })}
         onClick={run(confirmDelete)}
       >
         <Trash2 size={13} aria-hidden="true" />

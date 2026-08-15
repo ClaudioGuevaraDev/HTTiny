@@ -1,4 +1,5 @@
-import type { HttpMethod, RequestDocument, TreeNode } from './types'
+import type { PlainMessageKey, Translate } from './i18n'
+import type { HttpMethod, Locale, RequestDocument, TreeNode } from './types'
 
 export type CommandGroup = 'navigation' | 'action' | 'request' | 'method'
 
@@ -23,12 +24,22 @@ export interface CommandMatch extends Command {
 
 const GROUP_WEIGHT: Record<CommandGroup, number> = { navigation: 0, action: 1, request: 2, method: 3 }
 
-export const GROUP_LABEL: Record<CommandGroup, string> = {
-  navigation: 'Open tabs',
-  action: 'Actions',
-  request: 'Requests',
-  method: 'Change method',
+const GROUP_LABEL: Record<CommandGroup, PlainMessageKey> = {
+  navigation: 'palette.group.navigation',
+  action: 'palette.group.action',
+  request: 'palette.group.request',
+  method: 'palette.group.method',
 }
+
+/**
+ * Strips diacritics so `parametros` finds `Parámetros`.
+ *
+ * Length-preserving on purpose, one character in and one out: `ranges` indexes into the
+ * untouched title to place the `<mark>` elements, so the usual
+ * `normalize('NFD').replace(/\p{Diacritic}/gu, '')` — which changes every offset after
+ * the first accent — would highlight the wrong characters.
+ */
+const fold = (text: string): string => text.replace(/[À-ɏ]/g, char => char.normalize('NFD')[0])
 
 /**
  * Subsequence matcher. Deliberately hand-rolled rather than pulling in `cmdk` or
@@ -37,8 +48,8 @@ export const GROUP_LABEL: Record<CommandGroup, string> = {
  */
 export function fuzzyScore(query: string, text: string): { score: number; ranges: [number, number][] } | null {
   if (!query) return { score: 0, ranges: [] }
-  const haystack = text.toLowerCase()
-  const needle = query.toLowerCase()
+  const haystack = fold(text.toLowerCase())
+  const needle = fold(query.toLowerCase())
   const ranges: [number, number][] = []
   let score = 0
   let index = 0
@@ -63,7 +74,7 @@ export function fuzzyScore(query: string, text: string): { score: number; ranges
   return { score, ranges }
 }
 
-export function filterCommands(commands: readonly Command[], rawQuery: string): CommandMatch[] {
+export function filterCommands(commands: readonly Command[], rawQuery: string, locale: Locale): CommandMatch[] {
   const actionsOnly = rawQuery.startsWith('>')
   const query = (actionsOnly ? rawQuery.slice(1) : rawQuery).trim()
   const pool = actionsOnly ? commands.filter(command => command.group === 'action') : commands
@@ -83,7 +94,9 @@ export function filterCommands(commands: readonly Command[], rawQuery: string): 
     if (onKeywords) matches.push({ ...command, score: onKeywords.score * 0.6, ranges: [] })
   }
 
-  return matches.sort((a, b) => b.score - a.score || GROUP_WEIGHT[a.group] - GROUP_WEIGHT[b.group] || a.title.localeCompare(b.title)).slice(0, 40)
+  // The tiebreak collates in the app's language, not the OS's, so the order agrees with
+  // the alphabet the titles are actually written in.
+  return matches.sort((a, b) => b.score - a.score || GROUP_WEIGHT[a.group] - GROUP_WEIGHT[b.group] || a.title.localeCompare(b.title, locale)).slice(0, 40)
 }
 
 /** Flattens the tree into request rows carrying a `Collection / Folder` breadcrumb. */
@@ -95,14 +108,17 @@ export function flattenRequests(nodes: readonly TreeNode[], trail: string[] = []
   )
 }
 
-export function groupResults(results: readonly CommandMatch[]): { id: CommandGroup; label: string; items: { item: CommandMatch; index: number }[] }[] {
+export function groupResults(
+  results: readonly CommandMatch[],
+  t: Translate,
+): { id: CommandGroup; label: string; items: { item: CommandMatch; index: number }[] }[] {
   const groups = new Map<CommandGroup, { item: CommandMatch; index: number }[]>()
   results.forEach((item, index) => {
     const bucket = groups.get(item.group) ?? []
     bucket.push({ item, index })
     groups.set(item.group, bucket)
   })
-  return [...groups.entries()].sort(([a], [b]) => GROUP_WEIGHT[a] - GROUP_WEIGHT[b]).map(([id, items]) => ({ id, label: GROUP_LABEL[id], items }))
+  return [...groups.entries()].sort(([a], [b]) => GROUP_WEIGHT[a] - GROUP_WEIGHT[b]).map(([id, items]) => ({ id, label: t(GROUP_LABEL[id]), items }))
 }
 
 export const documentKeywords = (doc: RequestDocument, breadcrumb: string): string => `${doc.name} ${doc.method} ${doc.url} ${breadcrumb}`.toLowerCase()

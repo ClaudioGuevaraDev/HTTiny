@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Boxes, CornerDownLeft, Search, Zap } from 'lucide-react'
 import { filterCommands, groupResults, type Command, type CommandGroup } from '../commands'
+import { useLocale, useT } from '../language'
 import { useCommands } from '../useCommands'
 import { useAppStore } from '../store'
 import { MethodChip } from './MethodChip'
@@ -20,6 +21,7 @@ const optionId = (index: number) => `command-option-${index}`
  * than the store directly, so the DOM and the store can never desync.
  */
 export function CommandPalette() {
+  const { t } = useT()
   const open = useAppStore(s => s.paletteOpen)
   const closePalette = useAppStore(s => s.closePalette)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -36,7 +38,7 @@ export function CommandPalette() {
       ref={dialogRef}
       className="command-palette"
       aria-modal="true"
-      aria-label="Command palette"
+      aria-label={t('palette.dialog')}
       onClose={closePalette}
       onClick={event => {
         if (event.target === dialogRef.current) dialogRef.current?.close()
@@ -48,6 +50,8 @@ export function CommandPalette() {
 }
 
 function CommandPaletteBody({ onDismiss }: { onDismiss: () => void }) {
+  const { t, plural } = useT()
+  const locale = useLocale()
   const seed = useAppStore(s => s.paletteSeed)
   // Query and highlight live in one state object so that typing resets the
   // highlight in the same update. Keeping them separate meant an effect that reset
@@ -58,8 +62,8 @@ function CommandPaletteBody({ onDismiss }: { onDismiss: () => void }) {
     setSearch(current => ({ query: current.query, active: typeof next === 'function' ? next(current.active) : next }))
   const listRef = useRef<HTMLDivElement>(null)
   const commands = useCommands(true)
-  const results = useMemo(() => filterCommands(commands, query), [commands, query])
-  const groups = useMemo(() => groupResults(results), [results])
+  const results = useMemo(() => filterCommands(commands, query, locale), [commands, query, locale])
+  const groups = useMemo(() => groupResults(results, t), [results, t])
 
   useEffect(() => {
     listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' })
@@ -136,8 +140,8 @@ function CommandPaletteBody({ onDismiss }: { onDismiss: () => void }) {
           aria-controls={LIST_ID}
           aria-autocomplete="list"
           aria-activedescendant={results.length ? optionId(active) : undefined}
-          aria-label="Search requests and commands"
-          placeholder="Search requests, or type > for commands…"
+          aria-label={t('palette.input.aria')}
+          placeholder={t('palette.input.placeholder')}
           value={query}
           spellCheck={false}
           onChange={event => setQuery(event.target.value)}
@@ -145,7 +149,7 @@ function CommandPaletteBody({ onDismiss }: { onDismiss: () => void }) {
         <Shortcut keys={['Esc']} />
       </div>
 
-      <div className="palette-results" ref={listRef} role="listbox" id={LIST_ID} aria-label="Results">
+      <div className="palette-results" ref={listRef} role="listbox" id={LIST_ID} aria-label={t('palette.results')}>
         {groups.map(group => (
           <div key={group.id} role="group" aria-label={group.label} className="palette-group">
             <p className="palette-group-label" aria-hidden="true">
@@ -170,22 +174,22 @@ function CommandPaletteBody({ onDismiss }: { onDismiss: () => void }) {
             ))}
           </div>
         ))}
-        {results.length === 0 && <p className="palette-void">No matches for “{query}”</p>}
+        {results.length === 0 && <p className="palette-void">{t('palette.empty', { query })}</p>}
       </div>
 
       <footer className="palette-footer" aria-hidden="true">
         <span>
-          <Shortcut keys={['↑', '↓']} /> navigate
+          <Shortcut keys={['↑', '↓']} /> {t('palette.footer.navigate')}
         </span>
         <span>
-          <Shortcut keys={['↵']} /> run
+          <Shortcut keys={['↵']} /> {t('palette.footer.run')}
         </span>
         <span>
-          <Shortcut keys={['>']} /> commands
+          <Shortcut keys={['>']} /> {t('palette.footer.commands')}
         </span>
       </footer>
       <p className="sr-only" role="status" aria-live="polite">
-        {results.length} results
+        {plural('palette.count', results.length)}
       </p>
     </div>
   )

@@ -2,6 +2,8 @@ import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { Check, ChevronDown, FileX2, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
+import type { MessageKey } from '../i18n'
+import { useT } from '../language'
 import { flushNow } from '../persistence'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
@@ -14,7 +16,13 @@ import { Placeholder, PlaceholderAction } from './Placeholder'
 
 const freshRow = (): KeyValueRow => ({ id: crypto.randomUUID(), enabled: true, key: '', value: '', description: '' })
 
-const FIELD_LABEL = { key: 'Key', value: 'Value', description: 'Description' } as const
+type Field = 'key' | 'value' | 'description'
+
+const FIELD_LABEL = {
+  key: 'editor.kv.key',
+  value: 'editor.kv.value',
+  description: 'editor.kv.description',
+} as const satisfies Record<Field, MessageKey>
 
 /**
  * Deliberately generic rather than worked examples. The example-pattern rule is for
@@ -22,9 +30,32 @@ const FIELD_LABEL = { key: 'Key', value: 'Value', description: 'Description' } a
  * one. In a repeating grid any example is arbitrary, and it repeats down every empty
  * row, where two greyed "page…" cells read as duplicated data rather than as a hint.
  */
-const PLACEHOLDER = { key: 'Key…', value: 'Value…', description: 'Optional description…' } as const
+const PLACEHOLDER = {
+  key: 'editor.kv.keyPlaceholder',
+  value: 'editor.kv.valuePlaceholder',
+  description: 'editor.kv.descriptionPlaceholder',
+} as const satisfies Record<Field, MessageKey>
+
+type Panel = 'params' | 'headers' | 'body' | 'auth'
+
+/**
+ * The visible labels used to be derived as `panel[0].toUpperCase() + panel.slice(1)`,
+ * which tied them to the persisted union. A real map lets the token and the label
+ * diverge, which they must: `auth` stays `Auth` in Spanish because the strip is four
+ * tabs wide and that is the word the ecosystem uses.
+ */
+const PANEL_LABEL = {
+  params: 'editor.panel.params',
+  headers: 'editor.panel.headers',
+  body: 'editor.panel.body',
+  auth: 'editor.panel.auth',
+} as const satisfies Record<Panel, MessageKey>
+
+/** Two roots, not one: the count renders under Params (m.) and Headers (f.), and Spanish agrees. */
+const PANEL_COUNT = { params: 'editor.panel.paramsEnabled', headers: 'editor.panel.headersEnabled' } as const
 
 function KeyValueEditor({ request, field }: { request: RequestDocument; field: 'params' | 'headers' }) {
+  const { t } = useT()
   const setRows = useAppStore(s => s.setRows)
   const updateDocument = useAppStore(s => s.updateDocument)
   const rows = request[field]
@@ -36,9 +67,11 @@ function KeyValueEditor({ request, field }: { request: RequestDocument; field: '
     <div className="kv-wrap">
       <div className="kv-header">
         <span />
-        <span>KEY</span>
-        <span>VALUE</span>
-        <span>DESCRIPTION</span>
+        {/* Sentence case in the catalogue; `.kv-header` does the uppercasing, so a
+            Spanish accent is never lost to a hand-typed capital. */}
+        <span>{t('editor.kv.key')}</span>
+        <span>{t('editor.kv.value')}</span>
+        <span>{t('editor.kv.description')}</span>
         <span />
       </div>
       {rows.map(row => (
@@ -48,7 +81,7 @@ function KeyValueEditor({ request, field }: { request: RequestDocument; field: '
             className={`row-check ${row.enabled ? 'on' : ''}`}
             role="switch"
             aria-checked={row.enabled}
-            aria-label={row.key ? `Enable ${row.key}` : 'Enable row'}
+            aria-label={row.key ? t('editor.kv.enableNamed', { name: row.key }) : t('editor.kv.enableRow')}
             onClick={() => commit(rows.map(r => (r.id === row.id ? { ...r, enabled: !r.enabled } : r)))}
           >
             {row.enabled && <Check size={11} aria-hidden="true" />}
@@ -59,8 +92,8 @@ function KeyValueEditor({ request, field }: { request: RequestDocument; field: '
               className="technical-input"
               value={row[key]}
               name={`${field}-${key}`}
-              aria-label={FIELD_LABEL[key]}
-              placeholder={PLACEHOLDER[key]}
+              aria-label={t(FIELD_LABEL[key])}
+              placeholder={t(PLACEHOLDER[key])}
               // Header names and values are code tokens, not prose: a password manager
               // offering to fill them, or a red squiggle under `X-Api-Key`, is noise.
               autoComplete="off"
@@ -68,20 +101,23 @@ function KeyValueEditor({ request, field }: { request: RequestDocument; field: '
               onChange={e => commit(rows.map(r => (r.id === row.id ? { ...r, [key]: e.target.value } : r)))}
             />
           ))}
-          <button type="button" className="icon-btn xs row-delete" aria-label="Delete row" onClick={() => commit(rows.filter(r => r.id !== row.id))}>
+          <button type="button" className="icon-btn xs row-delete" aria-label={t('editor.kv.deleteRow')} onClick={() => commit(rows.filter(r => r.id !== row.id))}>
             <Trash2 size={13} aria-hidden="true" />
           </button>
         </div>
       ))}
       <button type="button" className="add-row" onClick={() => commit([...rows, freshRow()])}>
         <Plus size={13} aria-hidden="true" />
-        Add {field === 'params' ? 'Parameter' : 'Header'}
+        {/* One whole message per field rather than "Add" plus a noun: the article and
+            the gender travel with the noun in Spanish. */}
+        {field === 'params' ? t('editor.kv.addParam') : t('editor.kv.addHeader')}
       </button>
     </div>
   )
 }
 
 function BodyEditor({ request }: { request: RequestDocument }) {
+  const { t } = useT()
   const updateDocument = useAppStore(s => s.updateDocument)
   const onSegmentKeyDown = useRovingFocus('[role="radio"]')
   const setBody = (patch: Partial<RequestDocument['body']>) => updateDocument(request.id, { body: { ...request.body, ...patch } })
@@ -90,7 +126,7 @@ function BodyEditor({ request }: { request: RequestDocument }) {
       <div className="editor-toolbar">
         {/* A radiogroup rather than a tablist: these pick what the body *is*, they do not
             switch between panels. Arrow keys move within it, per the ARIA radio pattern. */}
-        <div className="segmented" role="radiogroup" aria-label="Body type" onKeyDown={onSegmentKeyDown}>
+        <div className="segmented" role="radiogroup" aria-label={t('editor.body.type')} onKeyDown={onSegmentKeyDown}>
           {(['none', 'json', 'text'] as const).map(type => (
             <button
               type="button"
@@ -101,7 +137,7 @@ function BodyEditor({ request }: { request: RequestDocument }) {
               className={request.body.type === type ? 'active' : ''}
               onClick={() => setBody({ type })}
             >
-              {type === 'none' ? 'None' : type.toUpperCase()}
+              {type === 'none' ? t('editor.body.none') : type.toUpperCase()}
             </button>
           ))}
         </div>
@@ -117,12 +153,12 @@ function BodyEditor({ request }: { request: RequestDocument }) {
               }
             }}
           >
-            Format JSON
+            {t('editor.body.formatJson')}
           </button>
         )}
       </div>
       {request.body.type === 'none' ? (
-        <Placeholder icon={<FileX2 size={20} />} title="No body" description="Pick JSON or Text above to send one." />
+        <Placeholder icon={<FileX2 size={20} />} title={t('editor.body.emptyTitle')} description={t('editor.body.emptyDesc')} />
       ) : (
         <CodeMirror
           value={request.body.content}
@@ -131,7 +167,7 @@ function BodyEditor({ request }: { request: RequestDocument }) {
           extensions={request.body.type === 'json' ? [json()] : []}
           onChange={content => setBody({ content })}
           basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: true }}
-          aria-label={`Request body (${request.body.type.toUpperCase()})`}
+          aria-label={t('editor.body.aria', { type: request.body.type.toUpperCase() })}
         />
       )}
     </div>
@@ -139,19 +175,20 @@ function BodyEditor({ request }: { request: RequestDocument }) {
 }
 
 function AuthEditor({ request }: { request: RequestDocument }) {
+  const { t } = useT()
   const updateDocument = useAppStore(s => s.updateDocument)
   const setAuth = (patch: Partial<RequestDocument['auth']>) => updateDocument(request.id, { auth: { ...request.auth, ...patch } })
   return (
     <div className="auth-editor">
       <label>
-        Auth type
+        {t('editor.auth.type')}
         <select value={request.auth.type} onChange={e => setAuth({ type: e.target.value as RequestDocument['auth']['type'] })}>
-          <option value="none">No Auth</option>
-          <option value="bearer">Bearer Token</option>
-          <option value="basic">Basic Auth</option>
+          <option value="none">{t('editor.auth.none')}</option>
+          <option value="bearer">{t('editor.auth.bearer')}</option>
+          <option value="basic">{t('editor.auth.basic')}</option>
         </select>
       </label>
-      {request.auth.type === 'none' && <p>No auth. Requests are sent without credentials.</p>}
+      {request.auth.type === 'none' && <p>{t('editor.auth.noneNote')}</p>}
       {/*
         These are credentials for the *target API*, not for HTTiny, so every one of them
         opts out of autofill: a password manager offering to save them would file another
@@ -160,7 +197,7 @@ function AuthEditor({ request }: { request: RequestDocument }) {
       */}
       {request.auth.type === 'bearer' && (
         <label>
-          Token
+          {t('editor.auth.token')}
           <input
             className="technical-input"
             name="api-token"
@@ -175,7 +212,7 @@ function AuthEditor({ request }: { request: RequestDocument }) {
       {request.auth.type === 'basic' && (
         <div className="auth-grid">
           <label>
-            Username
+            {t('editor.auth.username')}
             <input
               className="technical-input"
               name="api-username"
@@ -187,7 +224,7 @@ function AuthEditor({ request }: { request: RequestDocument }) {
             />
           </label>
           <label>
-            Password
+            {t('editor.auth.password')}
             <input
               className="technical-input"
               type="password"
@@ -256,6 +293,7 @@ const parseParams = (url: string, existing: KeyValueRow[]): KeyValueRow[] => {
 }
 
 export function RequestEditor() {
+  const { t, plural } = useT()
   const activeId = useAppStore(s => s.activeId)
   const request = useAppStore(s => (s.activeId ? s.documents[s.activeId] : undefined))
   const requestPanel = useAppStore(s => s.requestPanel)
@@ -275,14 +313,14 @@ export function RequestEditor() {
               H<span>T</span>
             </div>
           }
-          title="No request open"
-          description="Open something from the sidebar, or start a new request."
+          title={t('editor.empty.title')}
+          description={t('editor.empty.desc')}
         >
           <PlaceholderAction shortcut={shortcuts.newRequest} onClick={() => addNode('request')}>
-            New request
+            {t('editor.empty.newRequest')}
           </PlaceholderAction>
           <PlaceholderAction variant="secondary" shortcut={shortcuts.palette} onClick={() => openPalette('')}>
-            <Search size={13} aria-hidden="true" /> Search requests
+            <Search size={13} aria-hidden="true" /> {t('editor.empty.search')}
           </PlaceholderAction>
         </Placeholder>
       </div>
@@ -303,7 +341,7 @@ export function RequestEditor() {
           <ChevronDown size={12} aria-hidden="true" />
           <select
             className="method-native"
-            aria-label="HTTP method"
+            aria-label={t('editor.method')}
             value={request.method}
             onChange={e => updateDocument(activeId, { method: e.target.value as HttpMethod })}
           >
@@ -324,7 +362,7 @@ export function RequestEditor() {
         <input
           id="request-url"
           name="request-url"
-          aria-label="Request URL"
+          aria-label={t('editor.url')}
           className="url-input"
           value={request.url}
           // Re-derives the rows as you type rather than on blur, which is what
@@ -348,8 +386,8 @@ export function RequestEditor() {
         <button
           type="button"
           className="icon-btn save-btn"
-          aria-label={`Save now (${shortcutHint('save')})`}
-          title={`Save now (${shortcutHint('save')})`}
+          aria-label={t('editor.save.title', { keys: shortcutHint('save') })}
+          title={t('editor.save.title', { keys: shortcutHint('save') })}
           onClick={flushNow}
         >
           <Save size={16} aria-hidden="true" />
@@ -357,13 +395,15 @@ export function RequestEditor() {
         <button
           type="button"
           className={`send-btn ${sending ? 'cancel' : ''}`}
-          title={sending ? `Cancel request (${shortcutHint('cancel')})` : `Send request (${shortcutHint('send')})`}
+          title={
+            sending ? t('editor.cancel.title', { keys: shortcutHint('cancel') }) : t('editor.send.title', { keys: shortcutHint('send') })
+          }
           onClick={() => toggleRequest(activeId)}
         >
-          {sending ? <Square size={13} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} {sending ? 'Cancel' : 'Send'}
+          {sending ? <Square size={13} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} {sending ? t('editor.cancel') : t('editor.send')}
         </button>
       </div>
-      <div className="panel-tabs" role="tablist" aria-label="Request sections" onKeyDown={onPanelKeyDown}>
+      <div className="panel-tabs" role="tablist" aria-label={t('editor.sections')} onKeyDown={onPanelKeyDown}>
         {(['params', 'headers', 'body', 'auth'] as const).map(panel => {
           const count = panel === 'params' || panel === 'headers' ? request[panel].filter(r => r.enabled && r.key).length : null
           return (
@@ -378,11 +418,11 @@ export function RequestEditor() {
               className={requestPanel === panel ? 'active' : ''}
               onClick={() => setRequestPanel(panel)}
             >
-              {panel[0].toUpperCase() + panel.slice(1)}
+              {t(PANEL_LABEL[panel])}
               {count !== null && (
                 <>
                   <span aria-hidden="true">{count}</span>
-                  <span className="sr-only">, {count} enabled</span>
+                  <span className="sr-only">{plural(PANEL_COUNT[panel === 'params' ? 'params' : 'headers'], count)}</span>
                 </>
               )}
             </button>

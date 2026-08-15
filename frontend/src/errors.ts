@@ -1,34 +1,56 @@
+import type { Translate } from './i18n'
+
 /**
- * Failure copy, kept separate from any one executor so `requestRunner` can resolve
+ * Failure copy, kept separate from any one executor so the response panes can resolve
  * it without importing the transport. The codes themselves are produced by the Go
- * service in `internal/httpexec` — a code added there without an entry here still
- * works, it just falls back to the generic copy below.
+ * service in `internal/httpexec` — a code added there without an entry in the
+ * catalogue still works, it just falls back to the generic copy.
  *
- * Each entry is [title, detail]. The detail should say what to do about it, not
- * restate the title.
+ * Resolution happens at render rather than at failure time, which is what lets a
+ * switch of language retranslate a failure that is already on screen. `ResponseSnapshot`
+ * keeps the code and the raw diagnostic; the prose lives here.
  */
-export const errorCopy: Record<string, [string, string]> = {
-  INVALID_URL: ['Invalid URL', 'Enter a complete URL beginning with http:// or https://.'],
-  TIMEOUT: ['Request timed out', 'No response arrived in time. The server may be slow or unreachable.'],
-  DNS_ERROR: ['Host not found', 'That hostname could not be resolved. Check it for typos.'],
-  CONNECTION_REFUSED: ['Connection refused', 'Nothing is listening on that host and port.'],
-  TLS_ERROR: ['Certificate not trusted', 'The TLS certificate could not be verified. Check the host, or use http:// if this is a local server.'],
-  TOO_MANY_REDIRECTS: ['Too many redirects', 'The server redirected more than 10 times. Check the URL and any auth you are sending.'],
-  NETWORK_ERROR: ['Network error', 'The connection failed before a response arrived. Check the host, the port and your network.'],
-  BACKEND_UNAVAILABLE: ['Desktop backend unavailable', 'Requests are sent by the HTTiny app itself. Run `wails3 task dev` — the browser dev server has no network layer.'],
+const KNOWN = ['INVALID_URL', 'TIMEOUT', 'DNS_ERROR', 'CONNECTION_REFUSED', 'TLS_ERROR', 'TOO_MANY_REDIRECTS', 'NETWORK_ERROR', 'BACKEND_UNAVAILABLE'] as const
+
+type KnownCode = (typeof KNOWN)[number]
+
+const isKnown = (code: string): code is KnownCode => (KNOWN as readonly string[]).includes(code)
+
+/** Mirrors maxRedirects in internal/httpexec — only ever used to word the copy. */
+export const MAX_REDIRECTS = 10
+
+/** Passed in as a param rather than written into the catalogue: a translator cannot mistype a command they never see. */
+const DEV_COMMAND = 'wails3 task dev'
+
+/**
+ * The two codes whose Go-side `errorText` is *our own prose* ("the URL is empty",
+ * "stopped after 10 redirects") rather than a system diagnostic. For those the
+ * translated copy wins; for every other code the transport's own message wins, because
+ * "connectex: no connection could be made" locates the problem in a way that "nothing
+ * is listening on that host and port" cannot — and because the value of a diagnostic is
+ * that it can be pasted into a search box verbatim.
+ */
+const PROSE_CODES = new Set<string>(['INVALID_URL', 'TOO_MANY_REDIRECTS'])
+
+export function errorCopy(t: Translate, code: string, diagnostic = ''): { title: string; detail: string } {
+  if (!isKnown(code)) return { title: t('error.UNKNOWN.title'), detail: diagnostic || t('error.UNKNOWN.detail') }
+
+  const curated =
+    code === 'TOO_MANY_REDIRECTS'
+      ? t('error.TOO_MANY_REDIRECTS.detail', { limit: MAX_REDIRECTS })
+      : code === 'BACKEND_UNAVAILABLE'
+        ? t('error.BACKEND_UNAVAILABLE.detail', { command: DEV_COMMAND })
+        : t(`error.${code}.detail`)
+
+  return { title: t(`error.${code}.title`), detail: PROSE_CODES.has(code) ? curated : diagnostic || curated }
 }
-
-export const UNKNOWN_ERROR: [string, string] = ['Request failed', 'Something went wrong before a response arrived.']
-
-export const resolveError = (code: string): [string, string] => errorCopy[code] ?? UNKNOWN_ERROR
 
 /**
  * Lets an executor carry a specific diagnostic alongside the code.
  *
- * The code alone drives the headline and the UI's special cases, but the curated
- * copy is necessarily generic — "nothing is listening on that host and port" is
- * less use than the underlying "connectex: no connection could be made". Throwing
- * a bare `new Error(CODE)` is still supported for callers with nothing to add.
+ * The code alone drives the headline and the UI's special cases, but the curated copy
+ * is necessarily generic. Throwing a bare `new Error(CODE)` is still supported for
+ * callers with nothing to add.
  */
 export class RequestFailure extends Error {
   readonly code: string

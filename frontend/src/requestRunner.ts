@@ -1,4 +1,4 @@
-import { RequestFailure, resolveError } from './errors'
+import { RequestFailure } from './errors'
 import { goExecutor } from './goExecutor'
 import { useAppStore } from './store'
 import type { RequestExecutor } from './types'
@@ -43,12 +43,12 @@ export async function runRequest(id: string): Promise<void> {
   } catch (error) {
     if (controller.signal.aborted) return
     const code = error instanceof RequestFailure ? error.code : error instanceof Error ? error.message : 'UNKNOWN'
-    const [message, fallback] = resolveError(code)
-    // The executor's own diagnostic wins over the curated copy when there is one:
-    // "connectex: no connection could be made" locates the problem in a way that
-    // "nothing is listening on that host and port" cannot.
-    const detail = (error instanceof RequestFailure && error.detail) || fallback
-    useAppStore.getState().setResponse(id, { state: 'error', code, message, detail })
+    // Only the code and the raw diagnostic are recorded. The prose is resolved from the
+    // code where it is rendered, so a failure on screen follows a change of language
+    // instead of being frozen in whichever one it happened in. `errors.ts` owns the
+    // rule about which of the two wins.
+    const detail = (error instanceof RequestFailure && error.detail) || ''
+    useAppStore.getState().setResponse(id, { state: 'error', code, detail })
   } finally {
     controllers.delete(id)
   }

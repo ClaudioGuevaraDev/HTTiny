@@ -9,6 +9,7 @@ import { Sidebar } from './components/Sidebar'
 import { SplitHandle } from './components/SplitHandle'
 import { WorkspaceActions } from './components/WorkspaceActions'
 import { useGlobalShortcuts } from './useGlobalShortcuts'
+import { useT } from './language'
 import { SIDEBAR_WIDTH, SPLIT_RATIO, useAppStore } from './store'
 
 /** Matches `--sidebar-collapsed`; the collapsed sidebar is exactly the rail. */
@@ -17,6 +18,7 @@ const RAIL_WIDTH = 48
 const RESIZER_WIDTH = 4
 
 export function App() {
+  const { t } = useT()
   const sidebarWidth = useAppStore(s => s.sidebarWidth)
   const setSidebarWidth = useAppStore(s => s.setSidebarWidth)
   const collapsed = useAppStore(s => s.sidebarCollapsed)
@@ -56,14 +58,14 @@ export function App() {
       }}
     >
       <a className="skip-link" href="#workspace">
-        Skip to Workspace
+        {t('app.skipLink')}
       </a>
       <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
       {/* Hidden while collapsed: with only the rail showing there is nothing to
           resize, and a separator with no adjacent panel is a stray tab stop. */}
       {!collapsed && (
         <SplitHandle
-          label="Resize sidebar"
+          label={t('app.resizeSidebar')}
           axis="x"
           unit="px"
           value={sidebarWidth}
@@ -78,10 +80,10 @@ export function App() {
         <div className="workspace-top">
           <button
             className="icon-btn panel-toggle"
-            aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+            aria-label={collapsed ? t('app.showSidebar') : t('app.hideSidebar')}
             aria-expanded={!collapsed}
             aria-controls="sidebar"
-            title={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+            title={collapsed ? t('app.showSidebar') : t('app.hideSidebar')}
             onClick={toggleSidebar}
           >
             {collapsed ? <PanelLeftOpen size={15} aria-hidden="true" /> : <PanelLeftClose size={15} aria-hidden="true" />}
@@ -92,7 +94,7 @@ export function App() {
         <div className="editor-split" ref={splitRef} data-orientation={splitOrientation} style={splitStyle}>
           <RequestEditor />
           <SplitHandle
-            label={columns ? 'Resize request and response columns' : 'Resize request and response rows'}
+            label={columns ? t('app.resizeColumns') : t('app.resizeRows')}
             axis={columns ? 'x' : 'y'}
             unit="percent"
             value={splitRatio}

@@ -209,6 +209,10 @@ export async function hydrate(): Promise<void> {
       splitOrientation: layout.splitOrientation,
       splitRatio: layout.splitRatio,
       theme: layout.theme,
+      // The one field here that no type error would catch if it were forgotten:
+      // `setState` takes a Partial, so the language would save correctly and load into
+      // nothing, resetting to English on every launch.
+      language: layout.language,
       persistenceState: 'ready',
       secretsAvailable,
       quarantinedPath: workspace.quarantined || null,

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { initLanguage } from './language'
 import { hydrate } from './persistence'
 import { initTheme } from './theme'
 // Self-hosted: the app is an offline desktop binary and cannot fetch webfonts at
@@ -25,10 +26,12 @@ import './styles.css'
  * is invisible rather than a white flash.
  */
 void hydrate().then(() => {
-  // Between the two for the same reason the render is after the hydration: the theme
-  // has to be on the document before anything paints, and it can only be known once
-  // the stored preference has been read.
+  // Both between the two for the same reason the render is after the hydration: the
+  // theme and the language have to be on the document before anything paints, and
+  // neither can be known until the stored preferences have been read. The catalogues
+  // are static imports, so there is nothing to await for the language.
   initTheme()
+  initLanguage()
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

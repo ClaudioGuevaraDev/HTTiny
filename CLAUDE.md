@@ -84,6 +84,51 @@ The store starts genuinely empty (`tree: []`, `documents: {}`, `activeId: null`)
 
 `ResponseSnapshot` is a discriminated union on `state` (`idle | loading | error | success`) — branch on it exhaustively rather than checking for optional fields. The success variant also carries `contentType`, `format` (`json | html | xml | text | binary`) and `truncated`; `format` is decided in Go, and a body that claims to be text but is not valid UTF-8 is downgraded to `binary`, whose `body` is empty by design. Cancellation lives in `requestRunner`'s `AbortController` registry, and the global Escape shortcut is handled in `useGlobalShortcuts.ts`.
 
+### i18n
+
+English and Spanish, from a hand-rolled catalogue in `frontend/src/i18n/` — no library, for
+the same reason `commands.ts` has its own fuzzy matcher. `en.ts` is `as const` and is the
+**source of truth for the key set**; `es.ts` is annotated `: Catalog`, so a missing key is a
+`tsc -b` error rather than an `undefined` on screen. That type check is the only safety net
+this project's rules allow, so do not weaken it to `satisfies`, and do not drop the
+`as const` — the `{name}` slots are read out of the literal message types to check every
+call site's params.
+
+- `t('key')` / `t('key', { name })` — a missing, misspelled or extra param is a compile
+  error. `t.plural` is `plural(root, count, params?)` over `Intl.PluralRules`, with
+  `<root>.one` / `<root>.other` keys.
+- `PlainMessageKey` is the subset of keys whose message takes no params. Use it whenever a
+  key is carried around as a *value* (a label map, a command definition) — otherwise the
+  variable's type is the whole union and `t()` demands every param any member might want.
+- Components: `const { t } = useT()` (from `language.ts`). The one non-React caller is
+  `store.ts`, which uses `translate()` for the default node names; `errors.ts` takes a `t`
+  instead, so it stays free of both the store and React. Treat a new `translate()` call as a
+  signal that a string is about to stop following a change of language.
+- **`i18n/index.ts` must not import `store.ts`.** It owns the current locale in module
+  state; `language.ts` is the only bridge from the store to it, which is what lets the
+  store import `translate` for default node names without a cycle. Neither module may ever
+  export a component — that would break Fast Refresh for the file everything imports.
+- Keys are flat and dotted, so `t(\`error.${code}.title\`)` and `t(\`editor.panel.${panel}\`)`
+  typecheck. Two identical strings on different surfaces get different keys.
+- A `import.meta.env.DEV` block in `i18n/index.ts` reports a translation that invents a slot
+  (`{name}` → `{nombre}`), which the type system cannot see. Dropping a slot is allowed — a
+  Spanish singular usually reads better without the number.
+- The preference is `language: Locale` in the store, persisted in `ui.json` like `theme`,
+  and applied by `initLanguage()` in `main.tsx` — which writes `document.documentElement.lang`
+  and pushes the locale into the runtime, and **never writes back into the store**.
+- `formatDuration` / `formatBytes` take the locale as an argument (`useLocale()`), so numbers
+  follow the app's language rather than the OS's.
+- Failure copy is resolved from `code` at render (`errorCopy(t, code, detail)`), so switching
+  language retranslates an error already on screen. Go's `errorText` stays verbatim and
+  untranslated except for `INVALID_URL` and `TOO_MANY_REDIRECTS`, whose Go text is our own
+  prose — see `PROSE_CODES`.
+- Not translated: the brand, HTTP methods and status reason phrases, format badges, byte and
+  time units, key-cap names, technical placeholders, Go transport diagnostics, and the
+  language endonyms in Settings. Default node names *are* translated at creation and then
+  live as user data; `workspaceFile.ts`'s recovery fallbacks stay English.
+- Casing is CSS (`.kv-header`, `.response-headers th`, `.metric-label` all uppercase), so the
+  copy stays sentence case and no accent is lost to a hand-typed capital.
+
 Layout and shortcuts live in `App.tsx` and `useGlobalShortcuts.ts`: a CSS-grid shell with pointer-event resizers (sidebar width in px, request/response split as an `fr` percentage) and window-level `Ctrl/Cmd+S` (flush to disk now), `Ctrl/Cmd+W` (close), `Ctrl/Cmd+Enter` (send), and `Escape` (abort in-flight).
 
 URL and query params stay bidirectionally synced: editing param rows rewrites the URL through `replaceQuery` (preserving any `#hash`), and blurring the URL input re-derives rows via `parseParams`, reusing existing row ids so React keys and descriptions survive.

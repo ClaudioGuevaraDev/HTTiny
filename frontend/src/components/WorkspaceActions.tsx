@@ -1,4 +1,5 @@
 import { Columns2, Command, Rows2, Settings } from 'lucide-react'
+import { useT } from '../language'
 import { shortcutHint } from '../shortcuts'
 import { useAppStore } from '../store'
 
@@ -10,6 +11,7 @@ import { useAppStore } from '../store'
  * the result, which reads better than "toggle button, pressed".
  */
 export function WorkspaceActions() {
+  const { t } = useT()
   const orientation = useAppStore(s => s.splitOrientation)
   const toggleSplitOrientation = useAppStore(s => s.toggleSplitOrientation)
   const openPalette = useAppStore(s => s.openPalette)
@@ -21,8 +23,12 @@ export function WorkspaceActions() {
       <button
         type="button"
         className="icon-btn"
-        aria-label={stacked ? 'Switch to side-by-side layout' : 'Switch to stacked layout'}
-        title={`${stacked ? 'Side by side' : 'Stacked'} (${shortcutHint('toggleSplit')})`}
+        aria-label={stacked ? t('workspace.sideBySide.aria') : t('workspace.stacked.aria')}
+        title={
+          stacked
+            ? t('workspace.sideBySide.title', { keys: shortcutHint('toggleSplit') })
+            : t('workspace.stacked.title', { keys: shortcutHint('toggleSplit') })
+        }
         onClick={toggleSplitOrientation}
       >
         {stacked ? <Columns2 size={15} /> : <Rows2 size={15} />}
@@ -30,8 +36,8 @@ export function WorkspaceActions() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Open command palette"
-        title={`Search (${shortcutHint('palette')})`}
+        aria-label={t('workspace.palette.aria')}
+        title={t('workspace.palette.title', { keys: shortcutHint('palette') })}
         onClick={() => openPalette('')}
       >
         <Command size={15} />
@@ -39,8 +45,8 @@ export function WorkspaceActions() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Open settings"
-        title={`Settings (${shortcutHint('settings')})`}
+        aria-label={t('workspace.settings.aria')}
+        title={t('workspace.settings.title', { keys: shortcutHint('settings') })}
         onClick={openSettings}
       >
         <Settings size={15} />

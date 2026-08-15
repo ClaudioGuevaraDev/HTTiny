@@ -930,6 +930,9 @@
     font-size: var(--text-2xs);
     font-weight: var(--font-weight-bold);
     letter-spacing: var(--tracking-label);
+    /* Casing is presentation, the way it already is for `.metric-label`. The copy
+     * carries sentence case so a translation never has to hand-uppercase an accent. */
+    text-transform: uppercase;
   }
 
   .kv-header span:not(:last-child),
@@ -1374,6 +1377,8 @@
     font-size: var(--text-2xs);
     font-weight: var(--font-weight-bold);
     letter-spacing: var(--tracking-label);
+    /* Same reason as `.kv-header`: the copy stays sentence case. */
+    text-transform: uppercase;
   }
 
   /* ── Placeholders: empty, loading and error states ─────────────────────── */
@@ -1914,6 +1919,12 @@
     font-weight: var(--font-weight-semibold);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
+  }
+
+  /* A second group needs air above it; the first still sits flush with the panel's
+   * own padding. */
+  .settings-heading:not(:first-child) {
+    margin-top: 14px;
   }
 
   /* Label and description on the left, control on the right — the shape every

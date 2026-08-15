@@ -1,6 +1,6 @@
 import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW } from './responseBody'
 import { SIDEBAR_WIDTH, SPLIT_RATIO, methodOptions } from './store'
-import type { BodyView, HttpMethod, KeyValueRow, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
+import type { BodyView, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
 
 /**
  * The on-disk schema.
@@ -71,6 +71,7 @@ export interface PrefsFile {
   splitOrientation: SplitOrientation
   splitRatio: number
   theme: ThemePreference
+  language: Locale
 }
 
 // ── Writing ────────────────────────────────────────────────────────────────────
@@ -124,6 +125,7 @@ export const toPrefsFile = (state: {
   splitOrientation: SplitOrientation
   splitRatio: number
   theme: ThemePreference
+  language: Locale
 }): PrefsFile => ({
   tabs: state.tabs,
   activeId: state.activeId,
@@ -139,6 +141,7 @@ export const toPrefsFile = (state: {
   splitOrientation: state.splitOrientation,
   splitRatio: state.splitRatio,
   theme: state.theme,
+  language: state.language,
 })
 
 // ── Reading ────────────────────────────────────────────────────────────────────
@@ -146,6 +149,12 @@ export const toPrefsFile = (state: {
 // Everything below is defensive on purpose. This is the one place where data the
 // app did not write enters it — a hand edit, a file from a newer build, a partial
 // sync — so nothing is asserted with `as` and every field has a fallback.
+//
+// The names those fallbacks supply — 'Untitled', 'Collection', 'Folder' — stay in
+// English, unlike the names `store.ts` gives to nodes the user creates. They are
+// repair markers on a damaged file rather than copy, they are most useful when they
+// read the same in every bug report, and they are produced during hydration, before
+// the stored language has been applied.
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
@@ -181,6 +190,8 @@ const readBodyViews = (value: unknown, documents: Record<string, RequestDocument
 }
 const ORIENTATIONS = ['rows', 'columns'] as const
 const THEMES = ['system', 'light', 'dark'] as const
+/** `satisfies` so a locale that has no catalogue cannot be listed here as readable. */
+const LOCALES = ['en', 'es'] as const satisfies readonly Locale[]
 
 const readRows = (value: unknown, prefix: string): KeyValueRow[] => {
   if (!Array.isArray(value)) return []
@@ -348,6 +359,7 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     splitOrientation: oneOf(raw.splitOrientation, ORIENTATIONS, 'rows'),
     splitRatio: clamped(raw.splitRatio, SPLIT_RATIO),
     theme: oneOf(raw.theme, THEMES, 'system'),
+    language: oneOf(raw.language, LOCALES, 'en'),
   }
 }
 

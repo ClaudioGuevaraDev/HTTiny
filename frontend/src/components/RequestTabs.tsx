@@ -1,11 +1,13 @@
 import { X } from 'lucide-react'
 import { requestTabId } from '../domIds'
+import { useT } from '../language'
 import { cancelRequest } from '../requestRunner'
 import { useAppStore } from '../store'
 import { useRovingFocus } from '../useRovingFocus'
 import { MethodChip } from './MethodChip'
 
 export function RequestTabs() {
+  const { t } = useT()
   const tabs = useAppStore(s => s.tabs)
   const activeId = useAppStore(s => s.activeId)
   const documents = useAppStore(s => s.documents)
@@ -14,7 +16,7 @@ export function RequestTabs() {
   const onKeyDown = useRovingFocus('[role="tab"]')
 
   return (
-    <div className="request-tabs" role="tablist" aria-label="Open requests" onKeyDown={onKeyDown}>
+    <div className="request-tabs" role="tablist" aria-label={t('tabs.list')} onKeyDown={onKeyDown}>
       {tabs.map(id => {
         const doc = documents[id]
         if (!doc) return null
@@ -51,7 +53,7 @@ export function RequestTabs() {
               <MethodChip method={doc.method} variant="compact" decorative />
               <span className="truncate">{doc.name}</span>
             </button>
-            <button type="button" className="tab-close" aria-label={`Close ${doc.name}`} onClick={close}>
+            <button type="button" className="tab-close" aria-label={t('tabs.close', { name: doc.name })} onClick={close}>
               <X size={13} aria-hidden="true" />
             </button>
           </div>

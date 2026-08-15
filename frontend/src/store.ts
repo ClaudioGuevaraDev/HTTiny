@@ -1,10 +1,12 @@
 import { create } from 'zustand'
+import { translate } from './i18n'
 import { DEFAULT_BODY_VIEW } from './responseBody'
 import type {
   BodyView,
   CollectionNode,
   HttpMethod,
   KeyValueRow,
+  Locale,
   RequestDocument,
   ResponseSnapshot,
   SplitOrientation,
@@ -74,6 +76,8 @@ interface AppState {
 
   /** Applied by `theme.ts`, which resolves `system` before CSS ever sees it. */
   theme: ThemePreference
+  /** Applied by `language.ts`, which pushes it into the message runtime and onto `<html lang>`. */
+  language: Locale
 
   // Only open/closed lives here; the palette's query and highlighted index stay
   // local to the dialog, since they change on every keystroke and nothing outside
@@ -106,6 +110,7 @@ interface AppState {
   toggleSplitOrientation: () => void
   setSplitRatio: (ratio: number) => void
   setTheme: (theme: ThemePreference) => void
+  setLanguage: (language: Locale) => void
   openPalette: (seed?: string) => void
   closePalette: () => void
   openSettings: () => void
@@ -278,6 +283,7 @@ export const useAppStore = create<AppState>(set => ({
   splitOrientation: 'rows',
   splitRatio: SPLIT_RATIO.default,
   theme: 'system',
+  language: 'en',
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
@@ -355,7 +361,7 @@ export const useAppStore = create<AppState>(set => ({
       let activeCollectionId = s.activeCollectionId
       if (type !== 'collection' && !parentId && !collectionsIn(tree).length) {
         activeCollectionId = `collection-${stamp}`
-        tree = [...tree, { id: activeCollectionId, type: 'collection', name: 'My Collection', expanded: true, children: [] }]
+        tree = [...tree, { id: activeCollectionId, type: 'collection', name: translate('data.myCollection'), expanded: true, children: [] }]
       }
 
       const parent = parentId ?? containerFor(tree, s.selectedNodeId, activeCollectionId)
@@ -368,7 +374,10 @@ export const useAppStore = create<AppState>(set => ({
         const doc: RequestDocument = {
           id: requestId,
           kind: 'http',
-          name: name?.trim() || 'New Request',
+          // Named in the app's language and then stored as ordinary user data, which is
+          // what it is: switching language later does not rename anything that exists,
+          // because by then the name is content and not copy.
+          name: name?.trim() || translate('data.newRequest'),
           method: 'GET',
           // Empty rather than a `https://` stub: the input's placeholder already
           // shows the expected shape, and a prefilled scheme has to be deleted
@@ -393,7 +402,7 @@ export const useAppStore = create<AppState>(set => ({
       const child: TreeNode = {
         id,
         type,
-        name: name?.trim() || (type === 'collection' ? 'New Collection' : 'New Folder'),
+        name: name?.trim() || translate(type === 'collection' ? 'data.newCollection' : 'data.newFolder'),
         expanded: true,
         children: [],
       }
@@ -490,6 +499,7 @@ export const useAppStore = create<AppState>(set => ({
   toggleSplitOrientation: () => set(s => ({ splitOrientation: s.splitOrientation === 'rows' ? 'columns' : 'rows' })),
   setSplitRatio: ratio => set({ splitRatio: Math.min(SPLIT_RATIO.max, Math.max(SPLIT_RATIO.min, ratio)) }),
   setTheme: theme => set({ theme }),
+  setLanguage: language => set({ language }),
   openPalette: (seed = '') => set({ paletteOpen: true, paletteSeed: seed }),
   closePalette: () => set({ paletteOpen: false, paletteSeed: '' }),
   openSettings: () => set({ settingsOpen: true }),

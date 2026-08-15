@@ -3,7 +3,10 @@ import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { Binary, Braces, Check, Code, Copy, FileJson2, FileText, FileX2, RotateCcw, Send, TriangleAlert, X } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
+import { errorCopy } from '../errors'
 import { formatBytes, formatDuration } from '../format'
+import type { MessageKey } from '../i18n'
+import { useLocale, useT } from '../language'
 import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW, formatBody, resolveLanguage } from '../responseBody'
 import type { BodyLanguage, BodyView, ResponseFormat } from '../types'
 import { cancelRequest, runRequest } from '../requestRunner'
@@ -65,7 +68,12 @@ function FormatChip({ format, contentType }: { format: ResponseFormat; contentTy
   )
 }
 
-const LANGUAGE_LABEL: Record<BodyLanguage, string> = { json: 'JSON', html: 'HTML', xml: 'XML', text: 'Text' }
+/**
+ * Three of these are format names and stay as they are; only `text` is a word rather
+ * than a token, and it sits inside a control labelled "Interpret body as", where it
+ * reads as a choice in a sentence.
+ */
+const LANGUAGE_LABEL = { json: null, html: null, xml: null, text: 'response.language.text' } as const satisfies Record<BodyLanguage, MessageKey | null>
 
 /**
  * Takes the chip's place while the body panel is showing something an editor can
@@ -87,6 +95,7 @@ function BodyControls({
   contentType: string
   onChange: (patch: Partial<BodyView>) => void
 }) {
+  const { t } = useT()
   const onSegmentKeyDown = useRovingFocus('[role="radio"]')
   // Nothing else can be re-indented without pulling in a formatter per language. The
   // control stays visible and disabled rather than disappearing: a control that comes
@@ -100,8 +109,8 @@ function BodyControls({
       <div
         className="segmented"
         role="radiogroup"
-        aria-label="Body formatting"
-        title={canFormat ? undefined : 'Only JSON can be reformatted'}
+        aria-label={t('response.formatting')}
+        title={canFormat ? undefined : t('response.formatting.onlyJson')}
         onKeyDown={onSegmentKeyDown}
       >
         {BODY_MODES.map(mode => (
@@ -115,7 +124,7 @@ function BodyControls({
             className={view.mode === mode ? 'active' : ''}
             onClick={() => onChange({ mode })}
           >
-            {mode === 'pretty' ? 'Pretty' : 'Raw'}
+            {mode === 'pretty' ? t('response.mode.pretty') : t('response.mode.raw')}
           </button>
         ))}
       </div>
@@ -123,7 +132,7 @@ function BodyControls({
           what its body actually is — and picking one pins it from then on. */}
       <select
         className="body-language"
-        aria-label="Interpret body as"
+        aria-label={t('response.interpretAs')}
         title={contentType || undefined}
         value={language}
         onChange={event => {
@@ -133,17 +142,22 @@ function BodyControls({
           if (next) onChange({ language: next })
         }}
       >
-        {BODY_LANGUAGES.map(option => (
-          <option key={option} value={option}>
-            {LANGUAGE_LABEL[option]}
-          </option>
-        ))}
+        {BODY_LANGUAGES.map(option => {
+          const label = LANGUAGE_LABEL[option]
+          return (
+            <option key={option} value={option}>
+              {label ? t(label) : option.toUpperCase()}
+            </option>
+          )
+        })}
       </select>
     </div>
   )
 }
 
 export function ResponseViewer() {
+  const { t, plural } = useT()
+  const locale = useLocale()
   const activeId = useAppStore(s => s.activeId)
   const responsePanel = useAppStore(s => s.responsePanel)
   const setResponsePanel = useAppStore(s => s.setResponsePanel)
@@ -164,16 +178,19 @@ export function ResponseViewer() {
   // Reparsing several MB of JSON on every render — and this component re-renders ten
   // times a second while a *later* request is in flight — is not affordable.
   const { text: bodyText, failed: formatFailed } = useMemo(() => formatBody(rawBody, language, view.mode), [rawBody, language, view.mode])
+  // Hoisted above the JSX rather than resolved inline, so the error branch stays a
+  // plain expression and no hook sits inside a conditional.
+  const failure = response.state === 'error' ? errorCopy(t, response.code, response.detail) : null
 
   return (
-    <section className="response-viewer" aria-label="Response">
+    <section className="response-viewer" aria-label={t('response.region')}>
       <ResponseStatus response={response} elapsed={elapsed}>
         {response.state === 'success' && (
           <button
             type="button"
             className="icon-btn xs"
-            aria-label={copyStatus === 'copied' ? 'Response body copied' : 'Copy response body'}
-            title={copyStatus === 'copied' ? 'Copied' : 'Copy body'}
+            aria-label={copyStatus === 'copied' ? t('response.copiedBody.aria') : t('response.copyBody.aria')}
+            title={copyStatus === 'copied' ? t('response.copied.title') : t('response.copyBody.title')}
             /* What is on screen, not what arrived: pasting the indented body is the
                point of having indented it. */
             onClick={() => copy(bodyText)}
@@ -182,7 +199,13 @@ export function ResponseViewer() {
           </button>
         )}
         {(response.state === 'success' || response.state === 'error') && activeId && (
-          <button type="button" className="icon-btn xs" aria-label="Clear response" title="Clear" onClick={() => setResponse(activeId, { state: 'idle' })}>
+          <button
+            type="button"
+            className="icon-btn xs"
+            aria-label={t('response.clear.aria')}
+            title={t('response.clear.title')}
+            onClick={() => setResponse(activeId, { state: 'idle' })}
+          >
             <X size={13} aria-hidden="true" />
           </button>
         )}
@@ -192,13 +215,13 @@ export function ResponseViewer() {
           call: nothing moved on screen, nothing was announced, and a rejected promise —
           a denied clipboard permission — was indistinguishable from success. */}
       <p className="sr-only" role="status" aria-live="polite">
-        {copyStatus === 'copied' ? 'Copied to clipboard' : copyStatus === 'failed' ? 'Could not copy — clipboard access was denied' : ''}
+        {copyStatus === 'copied' ? t('response.copied.live') : copyStatus === 'failed' ? t('response.copyFailed.live') : ''}
       </p>
 
       {response.state === 'idle' && (
-        <Placeholder icon={<FileJson2 size={22} />} title="Nothing sent yet" description="Run this request to inspect its status, headers and body.">
+        <Placeholder icon={<FileJson2 size={22} />} title={t('response.idle.title')} description={t('response.idle.desc')}>
           <PlaceholderAction shortcut={shortcuts.send} onClick={() => activeId && void runRequest(activeId)}>
-            <Send size={13} aria-hidden="true" /> Send request
+            <Send size={13} aria-hidden="true" /> {t('response.idle.send')}
           </PlaceholderAction>
         </Placeholder>
       )}
@@ -206,25 +229,25 @@ export function ResponseViewer() {
       {response.state === 'loading' && (
         <div className="response-loading" aria-busy="true">
           <SkeletonLines count={9} />
-          <p className="loading-note">Waiting for a response… · {formatDuration(elapsed)}</p>
+          <p className="loading-note">{t('response.loading.note', { elapsed: formatDuration(elapsed, locale) })}</p>
           <PlaceholderAction variant="secondary" shortcut={shortcuts.cancel} onClick={() => activeId && cancelRequest(activeId)}>
-            Cancel
+            {t('response.loading.cancel')}
           </PlaceholderAction>
         </div>
       )}
 
-      {response.state === 'error' && (
-        <Placeholder tone="danger" icon={<TriangleAlert size={20} />} title={response.message} description={response.detail}>
+      {response.state === 'error' && failure && (
+        <Placeholder tone="danger" icon={<TriangleAlert size={20} />} title={failure.title} description={failure.detail}>
           <PlaceholderAction shortcut={shortcuts.send} onClick={() => activeId && void runRequest(activeId)}>
-            <RotateCcw size={13} aria-hidden="true" /> Retry
+            <RotateCcw size={13} aria-hidden="true" /> {t('response.error.retry')}
           </PlaceholderAction>
           {response.code === 'INVALID_URL' && (
             <PlaceholderAction variant="secondary" onClick={() => document.getElementById('request-url')?.focus()}>
-              Fix the URL
+              {t('response.error.fixUrl')}
             </PlaceholderAction>
           )}
-          <PlaceholderAction variant="secondary" onClick={() => copy(`${response.code}: ${response.detail}`)}>
-            {copyStatus === 'copied' ? 'Copied' : 'Copy Details'}
+          <PlaceholderAction variant="secondary" onClick={() => copy(`${response.code}: ${failure.detail}`)}>
+            {copyStatus === 'copied' ? t('response.error.copied') : t('response.error.copyDetails')}
           </PlaceholderAction>
         </Placeholder>
       )}
@@ -236,7 +259,7 @@ export function ResponseViewer() {
               allowed children of a tablist, and a screen reader walking one would find
               controls that have no business being there. */}
           <div className="response-tabs">
-            <div className="response-tablist" role="tablist" aria-label="Response sections" onKeyDown={onTabsKeyDown}>
+            <div className="response-tablist" role="tablist" aria-label={t('response.sections')} onKeyDown={onTabsKeyDown}>
               <button
                 type="button"
                 role="tab"
@@ -247,7 +270,7 @@ export function ResponseViewer() {
                 className={responsePanel === 'body' ? 'active' : ''}
                 onClick={() => setResponsePanel('body')}
               >
-                Body
+                {t('response.tab.body')}
               </button>
               <button
                 type="button"
@@ -259,8 +282,8 @@ export function ResponseViewer() {
                 className={responsePanel === 'headers' ? 'active' : ''}
                 onClick={() => setResponsePanel('headers')}
               >
-                Headers <span aria-hidden="true">{response.headers.length}</span>
-                <span className="sr-only">, {response.headers.length} returned</span>
+                {t('response.tab.headers')} <span aria-hidden="true">{response.headers.length}</span>
+                <span className="sr-only">{plural('response.tab.returned', response.headers.length)}</span>
               </button>
             </div>
             {responsePanel === 'body' && response.format !== 'binary' && response.body ? (
@@ -277,8 +300,15 @@ export function ResponseViewer() {
                    display nothing legible. Everything worth knowing is metadata. */
                 <Placeholder
                   icon={<Binary size={20} />}
-                  title="Binary response"
-                  description={`${formatBytes(response.sizeBytes)}${response.contentType ? ` of ${response.contentType}` : ''}. Binary bodies are not sent to the viewer.`}
+                  title={t('response.binary.title')}
+                  /* Two whole messages rather than an optional clause spliced into one:
+                     where the media type lands in the sentence is the translation's
+                     business, not this component's. */
+                  description={
+                    response.contentType
+                      ? t('response.binary.descWithType', { size: formatBytes(response.sizeBytes, locale), type: response.contentType })
+                      : t('response.binary.desc', { size: formatBytes(response.sizeBytes, locale) })
+                  }
                 />
               ) : response.body ? (
                 /*
@@ -293,12 +323,12 @@ export function ResponseViewer() {
                 <>
                   {response.truncated && (
                     <p className="response-notice">
-                      Showing the first {formatBytes(BODY_LIMIT)} of {formatBytes(response.sizeBytes)}.
+                      {t('response.truncated', { limit: formatBytes(BODY_LIMIT, locale), size: formatBytes(response.sizeBytes, locale) })}
                     </p>
                   )}
                   {/* Silent when the body was truncated: a cut-off body cannot parse by
                       construction, and the notice above already says why. */}
-                  {formatFailed && !response.truncated && <p className="response-notice">This body is not valid JSON — showing it as it arrived.</p>}
+                  {formatFailed && !response.truncated && <p className="response-notice">{t('response.invalidJson')}</p>}
                   <CodeMirror
                     value={bodyText}
                     theme={httinyTheme}
@@ -310,8 +340,8 @@ export function ResponseViewer() {
               ) : (
                 <Placeholder
                   icon={<FileX2 size={20} />}
-                  title={response.status === 204 ? '204 No Content' : 'Empty body'}
-                  description={response.status === 204 ? 'The server answered without a body, by design.' : 'The response arrived with nothing in it.'}
+                  title={response.status === 204 ? t('response.noContent.title') : t('response.emptyBody.title')}
+                  description={response.status === 204 ? t('response.noContent.desc') : t('response.emptyBody.desc')}
                 />
               )
             ) : (
@@ -319,11 +349,12 @@ export function ResponseViewer() {
                  pairs are tabular data, and a screen reader can only navigate them
                  column-by-column if the markup says so. */
               <table className="response-headers">
-                <caption className="sr-only">Response headers</caption>
+                <caption className="sr-only">{t('response.headers.caption')}</caption>
                 <thead>
                   <tr>
-                    <th scope="col">NAME</th>
-                    <th scope="col">VALUE</th>
+                    {/* Sentence case here too; `.response-headers th` uppercases. */}
+                    <th scope="col">{t('response.headers.name')}</th>
+                    <th scope="col">{t('response.headers.value')}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { documentKeywords, flattenRequests, type Command } from './commands'
+import type { PlainMessageKey } from './i18n'
+import { useT } from './language'
 import { flushNow } from './persistence'
 import { cancelRequest, runRequest, toggleRequest } from './requestRunner'
 import { shortcuts } from './shortcuts'
@@ -14,6 +16,10 @@ const EMPTY: Command[] = []
  * the values used to build it, so a stale list can never act on stale state.
  */
 export function useCommands(enabled: boolean): Command[] {
+  // Stable per locale — `translatorFor` is a lookup into a table built once — which is
+  // what makes it safe in the dependency array below. A fresh closure per render would
+  // rebuild this whole list on every keystroke in the URL bar.
+  const { t } = useT()
   const tree = useAppStore(s => s.tree)
   const documents = useAppStore(s => s.documents)
   const tabs = useAppStore(s => s.tabs)
@@ -48,32 +54,37 @@ export function useCommands(enabled: boolean): Command[] {
     }
 
     const store = useAppStore.getState()
-    const action = (id: string, title: string, keywords: string, run: () => void, shortcut?: readonly string[]) =>
-      commands.push({ id: `action:${id}`, group: 'action', title, keywords: keywords.toLowerCase(), shortcut, run })
+    // `keywords` is a hidden haystack, never rendered — the Spanish catalogue keeps the
+    // English synonyms alongside its own, because a developer types `send` and `save`
+    // from muscle memory whatever the interface is set to.
+    const action = (id: string, title: PlainMessageKey, keywords: PlainMessageKey, run: () => void, shortcut?: readonly string[]) =>
+      commands.push({ id: `action:${id}`, group: 'action', title: t(title), keywords: t(keywords).toLowerCase(), shortcut, run })
 
-    action('new-request', 'New request', 'create add request', () => useAppStore.getState().addNode('request'), shortcuts.newRequest)
-    action('new-folder', 'New folder', 'create add folder group', () => useAppStore.getState().addNode('folder'))
-    action('new-collection', 'New collection', 'create add collection', () => useAppStore.getState().addNode('collection'))
+    action('new-request', 'command.newRequest.title', 'command.newRequest.keywords', () => useAppStore.getState().addNode('request'), shortcuts.newRequest)
+    action('new-folder', 'command.newFolder.title', 'command.newFolder.keywords', () => useAppStore.getState().addNode('folder'))
+    action('new-collection', 'command.newCollection.title', 'command.newCollection.keywords', () => useAppStore.getState().addNode('collection'))
 
     if (activeId) {
       const doc = documents[activeId]
       if (sending) {
-        action('cancel', 'Cancel request', 'stop abort halt', () => cancelRequest(activeId), shortcuts.cancel)
+        action('cancel', 'command.cancel.title', 'command.cancel.keywords', () => cancelRequest(activeId), shortcuts.cancel)
       } else {
-        action('send', 'Send request', 'run execute fire', () => toggleRequest(activeId), shortcuts.send)
+        action('send', 'command.send.title', 'command.send.keywords', () => toggleRequest(activeId), shortcuts.send)
       }
-      action('save', 'Save now', 'persist store write flush disk', () => flushNow(), shortcuts.save)
-      action('close', 'Close tab', 'dismiss hide', () => useAppStore.getState().closeRequest(activeId), shortcuts.close)
-      action('reveal', 'Reveal in sidebar', 'find locate show tree', () => useAppStore.getState().revealNode(activeId))
-      action('copy-url', 'Copy request URL', 'clipboard link', () => void navigator.clipboard.writeText(doc?.url ?? ''))
+      action('save', 'command.save.title', 'command.save.keywords', () => flushNow(), shortcuts.save)
+      action('close', 'command.close.title', 'command.close.keywords', () => useAppStore.getState().closeRequest(activeId), shortcuts.close)
+      action('reveal', 'command.reveal.title', 'command.reveal.keywords', () => useAppStore.getState().revealNode(activeId))
+      action('copy-url', 'command.copyUrl.title', 'command.copyUrl.keywords', () => void navigator.clipboard.writeText(doc?.url ?? ''))
 
       const response = store.responses[activeId]
       if (response?.state === 'success') {
-        action('copy-body', 'Copy response body', 'clipboard json', () => void navigator.clipboard.writeText(response.body))
-        action('clear-response', 'Clear response', 'reset dismiss', () => useAppStore.getState().setResponse(activeId, { state: 'idle' }))
+        action('copy-body', 'command.copyBody.title', 'command.copyBody.keywords', () => void navigator.clipboard.writeText(response.body))
+        action('clear-response', 'command.clearResponse.title', 'command.clearResponse.keywords', () =>
+          useAppStore.getState().setResponse(activeId, { state: 'idle' }),
+        )
       }
       if (response?.state === 'error') {
-        action('retry', 'Retry request', 'again resend', () => void runRequest(activeId), shortcuts.send)
+        action('retry', 'command.retry.title', 'command.retry.keywords', () => void runRequest(activeId), shortcuts.send)
       }
 
       for (const method of methodOptions) {
@@ -81,23 +92,29 @@ export function useCommands(enabled: boolean): Command[] {
         commands.push({
           id: `method:${method}`,
           group: 'method',
-          title: `Set method to ${method}`,
-          keywords: `method ${method}`.toLowerCase(),
+          title: t('command.setMethod.title', { method }),
+          keywords: t('command.setMethod.keywords', { method }).toLowerCase(),
           method,
           run: () => useAppStore.getState().updateDocument(activeId, { method }),
         })
       }
     }
 
-    action('toggle-sidebar', 'Toggle sidebar', 'hide show collapse panel', () => useAppStore.getState().toggleSidebar(), shortcuts.toggleSidebar)
+    action(
+      'toggle-sidebar',
+      'command.toggleSidebar.title',
+      'command.toggleSidebar.keywords',
+      () => useAppStore.getState().toggleSidebar(),
+      shortcuts.toggleSidebar,
+    )
     action(
       'toggle-split',
-      'Toggle split orientation',
-      'layout columns rows side by side stacked',
+      'command.toggleSplit.title',
+      'command.toggleSplit.keywords',
       () => useAppStore.getState().toggleSplitOrientation(),
       shortcuts.toggleSplit,
     )
-    action('settings', 'Open settings', 'preferences options theme appearance dark light storage', () => useAppStore.getState().openSettings(), shortcuts.settings)
+    action('settings', 'command.settings.title', 'command.settings.keywords', () => useAppStore.getState().openSettings(), shortcuts.settings)
 
     // Every request in the tree, searchable by name, method, URL and breadcrumb.
     for (const entry of requests) {
@@ -115,5 +132,5 @@ export function useCommands(enabled: boolean): Command[] {
     }
 
     return commands
-  }, [enabled, tree, documents, tabs, recentIds, activeId, sending])
+  }, [enabled, tree, documents, tabs, recentIds, activeId, sending, t])
 }

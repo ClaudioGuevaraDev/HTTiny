@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { ArrowRightLeft, Ban, CircleCheck, CircleDashed, LoaderCircle, OctagonAlert, TriangleAlert } from 'lucide-react'
+import { errorCopy } from '../errors'
 import { formatBytes, formatDuration, statusBucket } from '../format'
+import { useLocale, useT } from '../language'
 import type { ResponseSnapshot } from '../types'
 
 const BUCKET_ICON = {
@@ -17,19 +19,22 @@ const BUCKET_ICON = {
  * Rendered in all four states so the panel chrome keeps a constant height.
  */
 export function ResponseStatus({ response, elapsed, children }: { response: ResponseSnapshot; elapsed: number; children?: ReactNode }) {
+  const { t } = useT()
+  const locale = useLocale()
+
   return (
     <header className="response-status" data-state={response.state}>
       <StatusPill response={response} />
       <dl className="status-metrics">
         {response.state === 'success' && (
           <>
-            <Metric label="Time" value={formatDuration(response.time)} />
-            <Metric label="Size" value={formatBytes(response.sizeBytes)} />
-            <Metric label="Headers" value={String(response.headers.length)} />
+            <Metric label={t('response.metric.time')} value={formatDuration(response.time, locale)} />
+            <Metric label={t('response.metric.size')} value={formatBytes(response.sizeBytes, locale)} />
+            <Metric label={t('response.metric.headers')} value={String(response.headers.length)} />
           </>
         )}
-        {response.state === 'loading' && <Metric label="Elapsed" value={formatDuration(elapsed)} />}
-        {response.state === 'error' && <Metric label="Code" value={response.code} />}
+        {response.state === 'loading' && <Metric label={t('response.metric.elapsed')} value={formatDuration(elapsed, locale)} />}
+        {response.state === 'error' && <Metric label={t('response.metric.code')} value={response.code} />}
       </dl>
       {children && <div className="status-actions">{children}</div>}
       <Announcement response={response} />
@@ -46,14 +51,21 @@ export function ResponseStatus({ response, elapsed, children }: { response: Resp
  * changed on a state boundary means one utterance per request instead of hundreds.
  */
 function Announcement({ response }: { response: ResponseSnapshot }) {
-  const text =
-    response.state === 'loading'
-      ? 'Sending…'
-      : response.state === 'success'
-        ? `${response.status} ${response.statusText} · ${formatDuration(response.time)} · ${formatBytes(response.sizeBytes)}`
-        : response.state === 'error'
-          ? `Request failed: ${response.message}. ${response.detail}`
-          : ''
+  const { t } = useT()
+  const locale = useLocale()
+
+  let text = ''
+  if (response.state === 'loading') {
+    text = t('response.pill.sending')
+  } else if (response.state === 'success') {
+    // The status line keeps its raw parts: the code and the RFC reason phrase are
+    // protocol, and the units are symbols.
+    text = `${response.status} ${response.statusText} · ${formatDuration(response.time, locale)} · ${formatBytes(response.sizeBytes, locale)}`
+  } else if (response.state === 'error') {
+    const failure = errorCopy(t, response.code, response.detail)
+    text = t('response.announce.error', { title: failure.title, detail: failure.detail })
+  }
+
   return (
     <p className="sr-only" role="status" aria-live="polite">
       {text}
@@ -73,6 +85,8 @@ function Metric({ label, value }: { label: string; value: string }) {
 /** Each variant carries a distinct glyph *and* literal text, so nothing here is
  * conveyed by colour alone. */
 function StatusPill({ response }: { response: ResponseSnapshot }) {
+  const { t } = useT()
+
   if (response.state === 'success') {
     const bucket = statusBucket(response.status)
     const Icon = BUCKET_ICON[bucket]
@@ -80,6 +94,9 @@ function StatusPill({ response }: { response: ResponseSnapshot }) {
       <p className="status-pill" data-bucket={bucket}>
         <Icon size={13} className="status-glyph" aria-hidden="true" />
         <span className="status-code">{response.status}</span>
+        {/* `statusText` is `http.StatusText` from Go — an RFC reason phrase sitting
+            beside its own numeric code, so it stays in English like every other
+            protocol token in this app. */}
         <span className="status-text">{response.statusText}</span>
       </p>
     )
@@ -88,7 +105,7 @@ function StatusPill({ response }: { response: ResponseSnapshot }) {
     return (
       <p className="status-pill" data-bucket="pending">
         <LoaderCircle size={13} className="status-glyph" aria-hidden="true" />
-        <span className="status-text">Sending…</span>
+        <span className="status-text">{t('response.pill.sending')}</span>
       </p>
     )
   }
@@ -96,15 +113,17 @@ function StatusPill({ response }: { response: ResponseSnapshot }) {
     return (
       <p className="status-pill" data-bucket="failed">
         <Ban size={13} className="status-glyph" aria-hidden="true" />
-        <span className="status-code">Failed</span>
-        <span className="status-text">{response.message}</span>
+        <span className="status-code">{t('response.pill.failed')}</span>
+        {/* The headline only — the pill is narrow, and the diagnostic belongs to the
+            placeholder below it. */}
+        <span className="status-text">{errorCopy(t, response.code).title}</span>
       </p>
     )
   }
   return (
     <p className="status-pill" data-bucket="idle">
       <CircleDashed size={13} className="status-glyph" aria-hidden="true" />
-      <span className="status-text">No response yet</span>
+      <span className="status-text">{t('response.pill.idle')}</span>
     </p>
   )
 }

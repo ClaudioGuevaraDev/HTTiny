@@ -84,7 +84,13 @@ export interface BodyView {
  * `sizeBytes` is a number rather than a pre-baked `'1.2 KB'` string: formatting is
  * the view's job, and a real network executor hands back a byte count. `startedAt`
  * lets the loading state render a live elapsed counter without a second source of
- * truth, and `code` keeps the raw failure code so the UI can special-case it.
+ * truth, and `code` keeps the raw failure code so the UI can special-case it — and,
+ * since the copy is resolved from it at render, so that switching language retranslates
+ * a failure that is already on screen.
+ *
+ * On failure, `detail` is the executor's own diagnostic verbatim — Winsock or x509 text
+ * produced in Go — or empty. It is deliberately not the curated advice: a system
+ * message is not copy and is not translated. See `errors.ts`.
  *
  * On success, `body` is empty when `format` is `binary`: the bytes are deliberately
  * never shipped across the binding, so the viewer renders from the metadata alone.
@@ -94,7 +100,7 @@ export interface BodyView {
 export type ResponseSnapshot =
   | { state: 'idle' }
   | { state: 'loading'; startedAt: number }
-  | { state: 'error'; code: string; message: string; detail: string }
+  | { state: 'error'; code: string; detail: string }
   | {
       state: 'success'
       status: number
@@ -120,6 +126,16 @@ export type SplitOrientation = 'rows' | 'columns'
  * app that ignores the OS setting is making a decision it was not asked to make.
  */
 export type ThemePreference = 'system' | 'light' | 'dark'
+
+/**
+ * The locales with a catalogue. There is no `system` member on purpose: unlike a theme,
+ * which the OS publishes and can change under a running window, the interface language
+ * is a deliberate choice, and the app opens in English until one is made.
+ *
+ * `i18n/index.ts` types its catalogue map as `Record<Locale, Catalog>`, so adding a
+ * member here is a compile error until the catalogue for it exists.
+ */
+export type Locale = 'en' | 'es'
 
 export type MethodToken = Lowercase<HttpMethod>
 export const methodToken = (method: HttpMethod): MethodToken => method.toLowerCase() as MethodToken

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Boxes, ChevronDown, ChevronRight, Folder, Search } from 'lucide-react'
+import { useT } from '../language'
 import type { VisibleRow } from '../store'
 import { collectionsIn, useAppStore } from '../store'
 import type { CollectionNode } from '../types'
@@ -18,6 +19,7 @@ import { TreeRowActions } from './TreeRowActions'
  * has stopped working is worse than no autosave at all.
  */
 function SaveStatus() {
+  const { t } = useT()
   const persistenceState = useAppStore(s => s.persistenceState)
   const saveState = useAppStore(s => s.saveState)
   const secretsAvailable = useAppStore(s => s.secretsAvailable)
@@ -25,27 +27,28 @@ function SaveStatus() {
 
   const [tone, label] =
     persistenceState === 'unavailable'
-      ? (['warn', 'Not saved — browser preview'] as const)
+      ? (['warn', 'sidebar.save.browser'] as const)
       : persistenceState === 'newer-version'
-        ? (['error', 'Newer workspace — not saving'] as const)
+        ? (['error', 'sidebar.save.newer'] as const)
         : saveState === 'error'
-          ? (['error', 'Save failed'] as const)
+          ? (['error', 'sidebar.save.failed'] as const)
           : saveState === 'saving' || saveState === 'pending'
-            ? (['pending', 'Saving…'] as const)
+            ? (['pending', 'sidebar.save.saving'] as const)
             : !secretsAvailable
-              ? (['warn', 'Saved · no keychain'] as const)
-              : (['ok', 'Saved'] as const)
+              ? (['warn', 'sidebar.save.noKeychain'] as const)
+              : (['ok', 'sidebar.save.saved'] as const)
 
   return (
     <footer className="sidebar-footer" data-tone={tone} title={dataDir || undefined}>
       <span className="status-dot" aria-hidden="true" />
-      {label}
+      {t(label)}
       <span className="ml-auto">{__APP_VERSION__}</span>
     </footer>
   )
 }
 
 function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean; onFocusRow: (id: string) => void }) {
+  const { t } = useT()
   const { node, depth, position, siblings } = row
   const selectedNodeId = useAppStore(s => s.selectedNodeId)
   const openRequest = useAppStore(s => s.openRequest)
@@ -108,7 +111,7 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
         <input
           autoFocus
           className="tree-rename"
-          aria-label={`Rename ${node.name}`}
+          aria-label={t('sidebar.renameInput', { name: node.name })}
           defaultValue={node.name}
           autoComplete="off"
           spellCheck={false}
@@ -149,6 +152,7 @@ function TreeRow({ row, active, onFocusRow }: { row: VisibleRow; active: boolean
  * to hand-roll two of those four buttons beside a menu that repeated them.
  */
 function CollectionHeading({ collection }: { collection: CollectionNode }) {
+  const { t } = useT()
   const renameNode = useAppStore(s => s.renameNode)
   const [renaming, setRenaming] = useState(false)
 
@@ -158,7 +162,7 @@ function CollectionHeading({ collection }: { collection: CollectionNode }) {
         <input
           autoFocus
           className="tree-rename"
-          aria-label={`Rename ${collection.name}`}
+          aria-label={t('sidebar.renameInput', { name: collection.name })}
           defaultValue={collection.name}
           autoComplete="off"
           spellCheck={false}
@@ -182,6 +186,7 @@ function CollectionHeading({ collection }: { collection: CollectionNode }) {
 }
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const { t } = useT()
   const addNode = useAppStore(s => s.addNode)
   const openPalette = useAppStore(s => s.openPalette)
   const tree = useAppStore(s => s.tree)
@@ -198,7 +203,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
     /* One `<nav>` holding both the rail and the panel, so the landmark, the id and
        the `aria-controls` on the workspace toggle all keep pointing at a live
        element whether or not the panel is showing. */
-    <nav className="sidebar" id="sidebar" aria-label="Collections">
+    <nav className="sidebar" id="sidebar" aria-label={t('sidebar.nav')}>
       <h1 className="sr-only">HTTiny</h1>
       <CollectionRail collapsed={collapsed} onToggle={onToggle} />
       {!collapsed && (
@@ -218,7 +223,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           */}
           <button type="button" className="search-trigger" onClick={() => openPalette('')}>
             <Search size={13} aria-hidden="true" />
-            <span>Search requests</span>
+            <span>{t('sidebar.search')}</span>
             <Shortcut keys={shortcuts.palette} />
           </button>
           {/* Two empty states, not one: with the tree scoped to a collection, "no
@@ -226,22 +231,18 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
               collection is empty, which needs a different way out. */}
           {!collection ? (
             <div className="tree-scroll">
-              <Placeholder icon={<Boxes size={20} />} title="No collections yet" description="Collections group your requests. Create one to get started.">
-                <PlaceholderAction onClick={() => addNode('collection')}>New collection</PlaceholderAction>
+              <Placeholder icon={<Boxes size={20} />} title={t('sidebar.noCollections.title')} description={t('sidebar.noCollections.desc')}>
+                <PlaceholderAction onClick={() => addNode('collection')}>{t('sidebar.noCollections.action')}</PlaceholderAction>
               </Placeholder>
             </div>
           ) : rows.length === 0 ? (
             <div className="tree-scroll">
-              <Placeholder
-                icon={<Boxes size={20} />}
-                title="Nothing here yet"
-                description={`“${collection.name}” has no requests. Add one to send your first call.`}
-              >
+              <Placeholder icon={<Boxes size={20} />} title={t('sidebar.empty.title')} description={t('sidebar.empty.desc', { name: collection.name })}>
                 <PlaceholderAction shortcut={shortcuts.newRequest} onClick={() => addNode('request')}>
-                  New request
+                  {t('sidebar.empty.newRequest')}
                 </PlaceholderAction>
                 <PlaceholderAction variant="secondary" onClick={() => addNode('folder')}>
-                  New folder
+                  {t('sidebar.empty.newFolder')}
                 </PlaceholderAction>
               </Placeholder>
             </div>
