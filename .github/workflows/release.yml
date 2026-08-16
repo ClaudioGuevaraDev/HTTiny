@@ -189,9 +189,12 @@ jobs:
         if: matrix.name == 'macos'
         # A universal .app so one .dmg covers Intel and Apple Silicon. There is no
         # package:universal:dmg task, so the bundle and the dmg are two steps.
+        # The zip is the self-update payload: the updater swaps a bundle and cannot
+        # mount a .dmg, so the disk image stays the thing people download by hand.
         run: |
           wails3 task darwin:package:universal
           wails3 task darwin:create:dmg
+          wails3 task darwin:package:zip
 
       - name: Package for Linux
         if: matrix.name == 'linux'
@@ -244,6 +247,7 @@ jobs:
               ;;
             macos)
               take '*.dmg' "httiny-${VERSION}-macos-universal.dmg"
+              take '*.app.zip' "httiny-${VERSION}-macos-universal.zip"
               ;;
             linux)
               take '*.AppImage' "httiny-${VERSION}-linux-amd64.AppImage"
@@ -270,9 +274,96 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
 
-  # 4. Everything landed — flip the draft to a published release.
+  # 4. Sign the update manifest. Installed copies poll this file, so it is what turns
+  #    a release into an update rather than just a download.
+  manifest:
+    needs: [verify, package]
+    permissions:
+      contents: write # required to upload the manifest to the release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install the Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS3_VERSION }}
+
+      - name: Collect the packaged artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: httiny-*
+          path: artifacts
+          merge-multiple: true
+
+      # Exactly one artifact per platform, not all six. The manifest maps a platform to
+      # the single file that platform updates with, and a second darwin entry would make
+      # the choice ambiguous.
+      #
+      # Windows gets the NSIS installer because we run it ourselves rather than swapping
+      # the binary, which is what keeps Add/Remove Programs honest. macOS gets the zipped
+      # bundle, the only form the updater can swap. Linux gets the AppImage purely so the
+      # check can report a version — nothing on Linux ever downloads it.
+      - name: Select the update payloads
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p payloads
+          cp "artifacts/httiny-${VERSION}-windows-amd64-installer.exe" payloads/
+          cp "artifacts/httiny-${VERSION}-macos-universal.zip" payloads/
+          cp "artifacts/httiny-${VERSION}-linux-amd64.AppImage" payloads/
+          ls -lh payloads
+
+      # Written beside the payloads, not at the repo root: `updater verify` resolves
+      # each artifact next to the manifest, so splitting them makes it fail to find
+      # the very files it is meant to check.
+      - name: Build and sign the manifest
+        working-directory: payloads
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${UPDATER_PRIVATE_KEY}" ]; then
+            echo "::error::UPDATER_PRIVATE_KEY is not set — the manifest would be unsigned and every client would reject it"
+            exit 1
+          fi
+          printf '%s' "${UPDATER_PRIVATE_KEY}" > updater.key
+
+          # The URLs point at this same release, which is what makes a published
+          # release and the update it advertises the same artifacts.
+          wails3 updater manifest \
+            -version "${VERSION}" \
+            -key updater.key \
+            -url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}" \
+            -output manifest.json \
+            .
+
+          rm -f updater.key
+          cat manifest.json
+
+      # Proves the signatures verify against the key the app actually ships, before the
+      # release goes out rather than via a user whose update silently failed. Exits
+      # non-zero on any mismatch, so this is a real gate.
+      - name: Verify the manifest against the shipped public key
+        working-directory: payloads
+        run: wails3 updater verify -manifest manifest.json -publickey ../build/updater.key.pub
+
+      - name: Attach the manifest to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" payloads/manifest.json --clobber
+
+  # 5. Everything landed — flip the draft to a published release.
   publish-release:
-    needs: [create-release, package]
+    needs: [create-release, package, manifest]
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write # required to update the GitHub Release

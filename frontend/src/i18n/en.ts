@@ -438,6 +438,23 @@ export const en = {
   'settings.language.label': 'Language',
   'settings.language.desc': 'Choose the interface language.',
 
+  // ── Updates ──────────────────────────────────────────────────────────────────
+  // The version is always a `{version}` parameter and never part of the message,
+  // for the same reason the dev command is in `errors.ts`: a translator cannot
+  // mistype a number they never see.
+  'update.dialog': 'Update',
+  'update.ready.title': 'Ready to install',
+  'update.ready.body': 'HTTiny {version} has been downloaded and verified. Installing takes a moment and reopens the app.',
+  'update.ready.action': 'Install and restart',
+  'update.manual.title': 'Update available',
+  'update.manual.body': 'HTTiny {version} is out. This installation cannot update itself, so download the new version and install it the way you installed this one.',
+  'update.manual.action': 'Download',
+  'update.error.title': 'Could not update',
+  'update.error.body': 'HTTiny {version} is out, but downloading it failed. You can get it from the releases page instead.',
+  'update.notes': 'What changed',
+  'update.later': 'Later',
+  'update.skip': 'Skip this version',
+
   // ── Default names for new nodes ──────────────────────────────────────────────
   // Written into workspace.json as user data: switching language later does not
   // rename what already exists, because by then it is content and not copy.

@@ -17,3 +17,8 @@ build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 build/linux/*.desktop
 build/linux/appimage/
 wails_windows_*.syso
+
+# The updater signing key. build/updater.key.pub is committed and is the trust root;
+# the private half never is — it lives in the UPDATER_PRIVATE_KEY secret.
+updater.key
+*.key

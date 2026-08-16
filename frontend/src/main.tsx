@@ -6,6 +6,7 @@ import { initLanguage } from './language'
 import { hydrate } from './persistence'
 import { installBodyRelease } from './requestRunner'
 import { initTheme } from './theme'
+import { checkForUpdate } from './updates'
 import { initZoom } from './zoom'
 // Self-hosted: the app is an offline desktop binary and cannot fetch webfonts at
 // runtime. Imported here rather than through a CSS @import so Vite resolves the
@@ -46,4 +47,9 @@ void hydrate().then(() => {
       <App />
     </StrictMode>,
   )
+  // Deliberately after the render and deliberately not awaited: the check is a
+  // network round trip to GitHub, and nothing about the first paint depends on it.
+  // It stays silent unless it finds something, so in the common case the user never
+  // learns it happened. `checkForUpdate` swallows its own failures.
+  void checkForUpdate()
 })

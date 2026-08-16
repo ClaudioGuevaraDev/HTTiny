@@ -2741,8 +2741,127 @@
   }
 
   .command-palette::backdrop,
-  .settings-dialog::backdrop {
+  .settings-dialog::backdrop,
+  .update-dialog::backdrop {
     background: var(--color-scrim);
+  }
+
+  /* Same plate as the other two modals — border, radius, surface, shadow — because
+   * the app has one modal language, not three. Height follows the content here: the
+   * body is a paragraph and maybe some release notes, and the dialog appears once in
+   * a while rather than being navigated, so nothing resizes under the pointer. */
+  .update-dialog {
+    width: min(460px, calc(92vw / var(--zoom, 1)));
+    max-height: calc(80vh / var(--zoom, 1));
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-xl);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    box-shadow: var(--shadow-menu);
+    overflow: hidden;
+  }
+
+  .update-shell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem;
+    max-height: inherit;
+  }
+
+  .update-head {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    /* Room for the close button, which is absolutely positioned in the corner. */
+    padding-right: 1.5rem;
+  }
+
+  .update-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-md);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .update-shell h2 {
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-strong);
+  }
+
+  .update-body {
+    margin-top: 0.25rem;
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+
+  .update-notes {
+    min-height: 0;
+    overflow: auto;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-3);
+  }
+
+  .update-notes h3 {
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-subtle);
+  }
+
+  /* Verbatim text from the release manifest, so it keeps its own line breaks and is
+   * never reflowed into prose it was not written as. */
+  .update-notes pre {
+    margin-top: 0.375rem;
+    font-family: inherit;
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    color: var(--color-text-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .update-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Pushes the two decisions to the right and leaves "skip" on the far left, where a
+   * choice you rarely want is harder to hit by reflex. */
+  .update-actions-gap {
+    flex: 1;
+  }
+
+  .update-later {
+    height: var(--h-control-md);
+    padding-inline: 0.75rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    font-size: var(--text-xs);
+  }
+
+  .update-later:hover {
+    background: var(--color-surface-4);
+  }
+
+  .update-close {
+    position: absolute;
+    top: 0.625rem;
+    right: 0.625rem;
   }
 
   .palette-shell {

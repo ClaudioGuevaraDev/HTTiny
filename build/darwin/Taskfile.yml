@@ -127,6 +127,18 @@ tasks:
     cmds:
       - task: create:app:bundle
 
+  package:zip:
+    summary: Zips the `.app` bundle as the self-update payload
+    platforms: [darwin]
+    # The updater swaps a bundle, so the update artifact cannot be the .dmg — nothing
+    # in it mounts a disk image. It has to be an archive with exactly one top-level
+    # entry, which is the bundle itself.
+    #
+    # `ditto` rather than `zip`: it preserves the symlinks and extended attributes
+    # inside a .app that a plain zip flattens, and a flattened bundle will not launch.
+    cmds:
+      - ditto -c -k --keepParent "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app" "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app.zip"
+
   package:dmg:
     summary: Packages the application into a styled `.dmg`
     deps:

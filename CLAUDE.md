@@ -222,6 +222,35 @@ the string fields blank, because winres writes the block name lowercase (`040904
 `VerQueryValue` compares case-sensitively — upstream, and not fixable from this repo. The icon and
 the fixed version block are unaffected.
 
+### Updates
+
+`internal/updates` wraps Wails' runtime updater, and the split is the point: Wails fetches
+the manifest, compares semver, streams the download and verifies the Ed25519 signature —
+and this package decides what *apply* means, because **that updater only ever replaces an
+executable or a bundle and never runs an installer** (its own GitHub provider skips assets
+named `-installer.`). So Windows runs the NSIS installer we already publish, which keeps
+Add/Remove Programs and the uninstaller honest where a binary swap would leave them
+describing the old version forever; macOS gets the bundle swap; Linux never downloads.
+
+`apply_windows.go` / `apply_other.go` split on build tags like `httpexec`'s failure files.
+The Windows one spawns a **detached PowerShell that waits on our PID** before running the
+installer — Windows will not let NSIS overwrite a running executable, and this process
+cannot both launch it and already be gone.
+
+`Updater.Init` is lazy (`sync.Once` in `updaterFor`) because the updater hangs off the
+application, which does not exist when the service is constructed. `Window: updater.WindowNone`
+is load-bearing: without it the updater opens a second window of its own instead of using
+the app's modal.
+
+The current version comes from `//go:embed frontend/package.json` — the same file Vite
+reads for `__APP_VERSION__` — so Go and the UI cannot disagree about what is running.
+
+**`build/windows/info.json`'s neighbour trap:** `build/updater.key.pub` is the *only* trust
+anchor, compiled in. `wails3 updater manifest` infers platform and arch from filenames, and
+our names are what make that work — `macos` resolves to `darwin`, `universal` to every arch.
+Passing the `.dmg` as well would create a second darwin entry and the choice would be
+ambiguous, so the release workflow hands it a curated set, not the whole `dist`.
+
 CI is two workflows. `ci.yml` runs `pnpm run lint`, `gofmt -l`, and a build on all three platforms
 that then checks `git diff --exit-code frontend/bindings` — the bindings are generated but
 committed, so drift against a changed Go signature is a real failure nothing else catches.

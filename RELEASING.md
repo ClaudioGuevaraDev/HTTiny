@@ -69,6 +69,35 @@ Run the workflow manually from the Actions tab (`workflow_dispatch`). It runs th
 creates no release: the installers land in the run's own artifact list. Use this instead of
 pushing throwaway tags.
 
+## Updates
+
+Installed copies check `manifest.json` on the latest release at startup, so publishing a
+release publishes the update. The `manifest` job builds and signs it, and refuses to
+continue if `UPDATER_PRIVATE_KEY` is missing — an unsigned manifest is rejected by every
+client, so failing loudly beats shipping one.
+
+The manifest lists **one artifact per platform**, and which one differs by how each
+platform applies an update:
+
+| Platform | Payload | How it applies |
+| --- | --- | --- |
+| Windows | the NSIS installer | run silently with `/S`, so Add/Remove Programs, the shortcut and the uninstaller all stay correct |
+| macOS | `httiny-<version>-macos-universal.zip` | the updater swaps the `.app` bundle and relaunches |
+| Linux | the AppImage | **detection only** — nothing on Linux ever downloads it |
+
+Linux always sends people here, to the releases page: a `.deb` or `.rpm` belongs to the
+package manager and lives in root-owned paths.
+
+**The signing key is the whole trust model.** `build/updater.key.pub` is committed and
+compiled into the binary; it is the only key an installed copy will accept. The private
+half exists solely in the `UPDATER_PRIVATE_KEY` secret. Losing it means no future release
+can be verified by anything already installed — the fix would be shipping a new public
+key, which only reaches people who update manually first. Back it up like a code-signing
+certificate.
+
+Rotating the key is a two-release process for the same reason: ship the new public key
+first, then start signing with the new private key only once that release is widespread.
+
 ## Code signing
 
 There is none. The installers are unsigned, so:

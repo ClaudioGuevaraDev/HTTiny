@@ -57,7 +57,9 @@ export function useGlobalShortcuts(): void {
       // that is the dialog element's own behaviour, not this handler's. Zoom is above
       // this line with the palette and the settings: it has to answer while the panel
       // that offers it is open.
-      if (state.paletteOpen || state.settingsOpen) return
+      // The update modal counts too, or Ctrl+Enter would fire a request behind a
+      // dialog asking whether to restart the app.
+      if (state.paletteOpen || state.settingsOpen || state.update.state !== 'idle') return
 
       const id = state.activeId
 

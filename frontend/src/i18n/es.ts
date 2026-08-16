@@ -399,6 +399,21 @@ export const es: Catalog = {
   'settings.language.label': 'Idioma',
   'settings.language.desc': 'Elige el idioma de la interfaz.',
 
+  // ── Updates ──────────────────────────────────────────────────────────────────
+  'update.dialog': 'Actualización',
+  'update.ready.title': 'Lista para instalar',
+  'update.ready.body': 'HTTiny {version} se ha descargado y verificado. Instalarla lleva un momento y vuelve a abrir la aplicación.',
+  'update.ready.action': 'Instalar y reiniciar',
+  'update.manual.title': 'Hay una versión nueva',
+  'update.manual.body':
+    'Ya está disponible HTTiny {version}. Esta instalación no puede actualizarse sola, así que descarga la versión nueva e instálala como instalaste esta.',
+  'update.manual.action': 'Descargar',
+  'update.error.title': 'No se pudo actualizar',
+  'update.error.body': 'Ya está disponible HTTiny {version}, pero la descarga falló. Puedes obtenerla desde la página de versiones.',
+  'update.notes': 'Novedades',
+  'update.later': 'Más tarde',
+  'update.skip': 'Omitir esta versión',
+
   // ── Default names for new nodes ──────────────────────────────────────────────
   'data.newRequest': 'Nueva solicitud',
   'data.newCollection': 'Nueva colección',

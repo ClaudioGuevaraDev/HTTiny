@@ -216,6 +216,9 @@ export async function hydrate(): Promise<void> {
       zoom: layout.zoom,
       codeFontSize: layout.codeFontSize,
       defaultBodyLanguage: layout.defaultBodyLanguage,
+      // Same trap as `language` above: forget this line and skipping a version would
+      // write correctly and load into nothing, offering it again on every launch.
+      skippedVersion: layout.skippedVersion,
       persistenceState: 'ready',
       secretsAvailable,
       quarantinedPath: workspace.quarantined || null,

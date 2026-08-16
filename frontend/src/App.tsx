@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { CommandPalette } from './components/CommandPalette'
 import { SettingsModal } from './components/SettingsModal'
+import { UpdateModal } from './components/UpdateModal'
 import { RequestEditor } from './components/RequestEditor'
 import { RequestTabs } from './components/RequestTabs'
 import { ResponseViewer } from './components/ResponseViewer'
@@ -113,6 +114,7 @@ export function App() {
       </main>
       <CommandPalette />
       <SettingsModal />
+      <UpdateModal />
     </div>
   )
 }

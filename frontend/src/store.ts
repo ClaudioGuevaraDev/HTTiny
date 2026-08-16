@@ -14,6 +14,7 @@ import type {
   SplitOrientation,
   ThemePreference,
   TreeNode,
+  UpdateState,
 } from './types'
 
 /** Closed, with nothing typed and both toggles off — the state Ctrl+F opens into. */
@@ -164,6 +165,22 @@ interface AppState {
    */
   responseSearch: ResponseSearch
 
+  /**
+   * The update flow. Transient like `responseSearch` and for the same reason: two
+   * places drive it — the startup check and the modal's own buttons — and neither
+   * can reach a `useState` inside a component that is not mounted yet.
+   */
+  update: UpdateState
+
+  /**
+   * A version the user chose not to be reminded about. Persisted in `ui.json`, unlike
+   * `update` itself: the point of skipping is that it survives the next launch.
+   *
+   * Empty means nothing is skipped. Not part of `SETTINGS_DEFAULTS` — it is a decision
+   * about one release, not a preference the Settings panel owns or resets.
+   */
+  skippedVersion: string
+
   openRequest: (id: string) => void
   closeRequest: (id: string) => void
   setActive: (id: string) => void
@@ -199,6 +216,9 @@ interface AppState {
   closePalette: () => void
   /** A patch, like `setBodyView`: callers change one field and leave the rest alone. */
   setResponseSearch: (patch: Partial<ResponseSearch>) => void
+  setUpdate: (update: UpdateState) => void
+  dismissUpdate: () => void
+  skipUpdate: () => void
   openSettings: () => void
   closeSettings: () => void
 }
@@ -368,6 +388,8 @@ export const useAppStore = create<AppState>(set => ({
   // Not one of them: hiding the sidebar is a workspace gesture, not a setting.
   sidebarCollapsed: false,
   responseSearch: DEFAULT_RESPONSE_SEARCH,
+  update: { state: 'idle' },
+  skippedVersion: '',
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
@@ -606,6 +628,15 @@ export const useAppStore = create<AppState>(set => ({
   // what you were looking for — which is what every editor does and what makes the
   // shortcut worth pressing twice.
   setResponseSearch: patch => set(s => ({ responseSearch: { ...s.responseSearch, ...patch } })),
+  setUpdate: update => set({ update }),
+  /** Closes the modal for this session; the same version is offered again next launch. */
+  dismissUpdate: () => set({ update: { state: 'idle' } }),
+  /**
+   * Closes it for good. Reads the version off the current state rather than taking an
+   * argument, so a caller cannot skip a version that is not the one on screen.
+   */
+  skipUpdate: () =>
+    set(s => ('version' in s.update ? { skippedVersion: s.update.version, update: { state: 'idle' } } : { update: { state: 'idle' } })),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
 }))

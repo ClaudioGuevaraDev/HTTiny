@@ -224,6 +224,26 @@ export type MethodToken = Lowercase<HttpMethod>
 export const methodToken = (method: HttpMethod): MethodToken => method.toLowerCase() as MethodToken
 
 /**
+ * Where the update flow currently is. A discriminated union for the same reason
+ * `ResponseSnapshot` is one: the modal branches on it exhaustively, so a state added
+ * without a branch fails to compile rather than rendering nothing.
+ *
+ * `idle`, `checking` and `downloading` are silent — the modal only shows for the three
+ * states that need an answer. That is what "tell me before restarting" means here: the
+ * download happens without interrupting, and the question comes when it is ready.
+ */
+export type UpdateState =
+  | { state: 'idle' }
+  | { state: 'checking' }
+  | { state: 'downloading'; version: string }
+  /** Staged and verified; one click away from installing. */
+  | { state: 'ready'; version: string; notes: string }
+  /** A new version exists but this install cannot replace itself — Linux, always. */
+  | { state: 'manual'; version: string; notes: string }
+  /** Checking or downloading failed after an update was known to exist. */
+  | { state: 'error'; version: string; code: string; detail: string }
+
+/**
  * Labels for the filled chips — the sidebar tree, the tab strip and the command palette.
  * The method picker does not use these: it is choosing a method and names it in full.
  *

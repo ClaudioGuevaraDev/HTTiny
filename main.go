@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/ClaudioGuevaraDev/httiny/internal/httpexec"
+	"github.com/ClaudioGuevaraDev/httiny/internal/updates"
 	"github.com/ClaudioGuevaraDev/httiny/internal/workspace"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -19,6 +20,20 @@ var assets embed.FS
 //
 //go:embed build/appicon.png
 var appIcon []byte
+
+// The trust root for updates. Signatures are checked against this key and only
+// this key, so a compromised release feed cannot substitute its own — which is
+// the entire reason it is pinned at build time rather than fetched.
+//
+//go:embed build/updater.key.pub
+var updaterPublicKey []byte
+
+// The frontend manifest, embedded for its `version` field alone. It is the same
+// file Vite reads to define __APP_VERSION__, so the version Go compares against
+// the update manifest and the version on screen cannot disagree.
+//
+//go:embed frontend/package.json
+var frontendPackage []byte
 
 func main() {
 	// Held in a variable rather than constructed inline: the same instance has to be
@@ -37,6 +52,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(exec),
 			application.NewService(workspace.New()),
+			application.NewService(updates.New(frontendPackage, updaterPublicKey)),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
