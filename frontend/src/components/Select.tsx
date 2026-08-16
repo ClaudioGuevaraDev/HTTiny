@@ -178,9 +178,19 @@ export function Select<T extends string>({ value, options, onChange, variant = '
     const onResize = () => place()
     // Anything that scrolls under an open menu moves the trigger out from under it. Native
     // selects close too; repositioning on every scroll frame would be the fussier answer.
-    const onScroll = () => {
+    //
+    // Capture, because scroll does not bubble and the thing that moved is usually a panel
+    // rather than the window — which is also why the menu's *own* scrolling arrives here.
+    // That has to be let through: a menu long enough to scroll is exactly the one you need
+    // to scroll to read, and closing it on the first wheel notch makes its lower half
+    // unreachable. It closed on `scrollIntoView` too, so opening the picker on a response
+    // whose language sat below the fold dismissed it before the user touched anything.
+    const onScroll = (event: Event) => {
       const popover = popoverRef.current
-      if (popover?.matches(':popover-open')) popover.hidePopover()
+      if (!popover?.matches(':popover-open')) return
+      const target = event.target
+      if (target instanceof Node && popover.contains(target)) return
+      popover.hidePopover()
     }
     window.addEventListener('resize', onResize)
     window.addEventListener('scroll', onScroll, true)
