@@ -144,16 +144,21 @@ export type MethodToken = Lowercase<HttpMethod>
 export const methodToken = (method: HttpMethod): MethodToken => method.toLowerCase() as MethodToken
 
 /**
- * Abbreviated labels for narrow contexts. The tab strip used to show only the first
- * letter of the method, which made POST, PUT and PATCH all render as "P" with colour
- * as the only difference between them.
+ * Labels for the filled chips — the sidebar tree, the tab strip and the command palette.
+ * The method picker does not use these: it is choosing a method and names it in full.
+ *
+ * Only OPTIONS is shortened. At seven characters it is the one method wide enough to be
+ * worth it, and "OPTS" is not another word. DELETE used to be "DEL" in the tab strip,
+ * which made a tab and its own tree row disagree about what the request was; it spells
+ * itself out now and drops to 10px where the column is tight (see
+ * `.method-chip-chip.method-delete`).
  */
 export const methodLabel: Record<HttpMethod, string> = {
   GET: 'GET',
   POST: 'POST',
   PUT: 'PUT',
   PATCH: 'PATCH',
-  DELETE: 'DEL',
+  DELETE: 'DELETE',
   HEAD: 'HEAD',
   OPTIONS: 'OPTS',
 }

@@ -708,12 +708,18 @@
     min-width: 34px;
   }
 
-  /* DELETE and OPTIONS are 6–7 characters against GET's 3. Shrinking those two is
-   * cheaper than widening the column for every row and eating into the name. This
-   * is the one deliberate exception to the 11px floor: they are all-caps mono
-   * abbreviations, where cap-height at 10px is about x-height at 12px sans. */
+  /* DELETE is six characters against GET's three, and shrinking it is cheaper than
+   * widening the column for every row and eating into the name. This is the one
+   * deliberate exception to the 11px floor: it is an all-caps mono word, where
+   * cap-height at 10px is about x-height at 12px sans.
+   *
+   * It is the only method left here. DELETE used to be "DEL" in the tab strip, so a tab
+   * disagreed with its own tree row about the request; spelling it out costs a tab about
+   * 12px of name, and a truncated name is recoverable where a renamed method is not.
+   * OPTIONS was in this rule until `methodLabel` started shortening it for the filled
+   * chips as well as the narrow ones — "OPTS" is four characters and fits at 11px. */
   .method-chip-chip.method-delete,
-  .method-chip-chip.method-options {
+  .method-chip-compact.method-delete {
     font-size: 10px;
   }
 
