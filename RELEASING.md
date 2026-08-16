@@ -5,11 +5,26 @@ is the whole process; nothing is uploaded by hand.
 
 ## Publishing a release
 
-1. Bump the version in **both** places, keeping them byte-for-byte identical:
+1. Bump the version in the two source manifests, keeping them byte-for-byte identical:
    - `frontend/package.json` → `"version"`
    - `build/config.yml` → `info.version`
-2. Commit the bump.
-3. Tag the commit with `v` + the same number and push it:
+2. Propagate it into the packaging metadata, which carries the version too — it is what
+   the installers, the `.deb` and the `.app` bundle actually report:
+
+   ```bash
+   wails3 update build-assets -dir build -config build/config.yml -name HTTiny -binaryname httiny
+   rm -rf build/ios   # recreated every time; this project is desktop-only
+   ```
+
+   Then **reapply the two deliberate local edits it discards** (see the last section), and
+   check nothing was missed:
+
+   ```bash
+   grep -rn "<old version>" build frontend/package.json   # must return nothing
+   ```
+
+3. Commit the bump.
+4. Tag the commit with `v` + the same number and push it:
 
    ```bash
    git tag v0.20.2
