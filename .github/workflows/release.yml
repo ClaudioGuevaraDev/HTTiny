@@ -134,12 +134,30 @@ jobs:
             build-essential \
             pkg-config
 
-      # NSIS ships with the windows runner image, but create:nsis:installer has no
-      # precondition on it and fails opaquely when it is missing.
+      # create:nsis:installer has no precondition on makensis and fails with a bare
+      # "executable file not found" when it is missing.
       - name: Ensure NSIS is available
         if: matrix.name == 'windows'
         shell: bash
-        run: command -v makensis || choco install nsis -y --no-progress
+        run: |
+          set -euo pipefail
+          if ! command -v makensis >/dev/null 2>&1; then
+            choco install nsis -y --no-progress
+            # choco edits the machine PATH, but that change does not reach later
+            # steps in this job. GITHUB_PATH does — and it has to hold a Windows
+            # path, because the packaging step runs under PowerShell.
+            if [ -x "/c/Program Files (x86)/NSIS/makensis.exe" ]; then
+              echo 'C:\Program Files (x86)\NSIS' >> "$GITHUB_PATH"
+              export PATH="/c/Program Files (x86)/NSIS:$PATH"
+            elif [ -x "/c/Program Files/NSIS/makensis.exe" ]; then
+              echo 'C:\Program Files\NSIS' >> "$GITHUB_PATH"
+              export PATH="/c/Program Files/NSIS:$PATH"
+            else
+              echo "::error::NSIS installed but makensis.exe was not where expected"
+              exit 1
+            fi
+          fi
+          command -v makensis
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -204,14 +222,18 @@ jobs:
           # Matched by glob rather than by exact name: the packaging tasks derive
           # their filenames from several different variables. Exactly one match is
           # required, so a rename never silently picks up the wrong file.
+          #
+          # Plain globbing and positional parameters, no arrays and no mapfile:
+          # macOS runners still ship bash 3.2, where those are unavailable.
           take() {
-            local pattern="$1" target="$2"
-            local matches=(); mapfile -t matches < <(find bin -maxdepth 1 -name "$pattern" | sort)
-            if [ "${#matches[@]}" -ne 1 ]; then
-              echo "::error::expected exactly one bin/$pattern, found ${#matches[@]}: ${matches[*]-none}"
+            pattern="$1"
+            target="$2"
+            set -- bin/$pattern
+            if [ "$#" -ne 1 ] || [ ! -e "$1" ]; then
+              echo "::error::expected exactly one bin/$pattern, found: $*"
               exit 1
             fi
-            cp "${matches[0]}" "dist/$target"
+            cp "$1" "dist/$target"
           }
 
           case "${{ matrix.name }}" in
