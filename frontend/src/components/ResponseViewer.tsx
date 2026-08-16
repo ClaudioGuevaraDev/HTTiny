@@ -161,22 +161,20 @@ function FormatChip({ format, contentType }: { format: ResponseFormat; contentTy
  * that was the chip's whole job — and the media type the server actually sent survives
  * as the title, where the chip kept it too.
  *
- * `frozen` greys the whole group out without removing it. That happens while the hex
- * view is on: it overrides the rendering entirely, so re-indenting or reinterpreting the
- * body would change nothing on screen. This used to unmount the group instead, which
- * meant pressing one button made five others vanish.
+ * Knows nothing about the hex view, deliberately. These controls stay live while it is on
+ * and dismiss it when used; that is the caller's business, and it happens inside the
+ * `onChange` it already passes. A `frozen` prop used to grey the whole group out here,
+ * which left the only way out of the hex view being the button that got you into it.
  */
 function BodyControls({
   mode,
   language,
   contentType,
-  frozen,
   onChange,
 }: {
   mode: BodyMode
   language: BodyLanguage
   contentType: string
-  frozen: boolean
   onChange: (patch: Partial<BodyView>) => void
 }) {
   const { t } = useT()
@@ -184,11 +182,12 @@ function BodyControls({
 
   // Both segments stay visible and go disabled rather than disappearing: a control that
   // comes and goes with the Content-Type reads as a bug. `rich` is unavailable for a
-  // format with no viewer of its own, and `pretty` for one nothing can re-indent.
+  // format with no viewer of its own, and `pretty` for one nothing can re-indent. Those
+  // are the only two reasons left — neither depends on what the panel is showing now.
   const enabled: Record<BodyMode, boolean> = {
-    rich: !frozen && hasRichView(language),
-    pretty: !frozen && canFormat(language),
-    raw: !frozen,
+    rich: hasRichView(language),
+    pretty: canFormat(language),
+    raw: true,
   }
   const label: Record<BodyMode, string> = {
     rich: richLabel(t, language),
@@ -229,7 +228,6 @@ function BodyControls({
         ariaLabel={t('response.interpretAs')}
         title={contentType || undefined}
         value={language}
-        disabled={frozen}
         options={BODY_LANGUAGES.map(option => ({ value: option, label: bodyLanguageLabel(t, option) }))}
         onChange={next => onChange({ language: next })}
       />
@@ -262,6 +260,17 @@ export function ResponseViewer() {
   // A view preference rather than a per-request one, like the theme: whether long lines
   // wrap is about the width of the panel you are looking at, not about the endpoint.
   const [wrap, setWrap] = useState(true)
+  // Bumped to ask for the search panel, rather than opening it from the click handler.
+  // Pressing find from the hex view leaves it first, and the editor `focusBodySearch`
+  // reaches for does not exist until that render has committed — so the call has to wait
+  // for the effect below. Opening it inline worked only when the editor happened to
+  // already be on screen, which is not the case this button exists for.
+  const [searchTick, setSearchTick] = useState(0)
+
+  useEffect(() => {
+    if (searchTick === 0) return
+    focusBodySearch()
+  }, [searchTick])
 
   // Hooks cannot sit inside the success branch, so the inputs are read defensively and
   // the memo runs against an empty body the rest of the time — which costs nothing.
@@ -289,9 +298,22 @@ export function ResponseViewer() {
   const byteBacked = response.state === 'success' && isByteFormat(response.format)
   const textual = response.state === 'success' && !byteBacked && response.body !== ''
   const hasPayload = response.state === 'success' && (response.body !== '' || response.bodyUrl !== '')
-  // Find and wrap act on the CodeMirror instance, so they mean something only when one is
-  // actually on screen: not under the hex dump, and not under a tree, table or preview.
-  const editorShowing = textual && !hex && mode !== 'rich'
+  // *Reachable*, not showing. Find and wrap act on a CodeMirror instance, and pressing
+  // either now leaves the hex view to get to one — so the hex view is not a reason to grey
+  // them out. A rich view is: there the way back is a labelled segment sitting right
+  // beside it, which is exactly what the hex toggle never had.
+  const editorReachable = textual && mode !== 'rich'
+
+  // Every body control dismisses the hex view. It is an overlay on the body rather than a
+  // mode of it, and it used to be exitable only through the button that opened it, with
+  // the whole rest of the row greyed out behind it — a dead end that gave no clue it was
+  // one. Each control still does its own job; leaving hex is what makes that job visible.
+  const leaveHex = () => setHexFor(null)
+
+  // Whether lines are actually wrapping, which is not the same as whether the preference
+  // is set: a hex dump has fixed-width rows and wraps nothing. The distinction is what
+  // keeps the wrap toggle and the hex toggle from being lit at the same time.
+  const wrapping = wrap && !hex
 
   return (
     <section className="response-viewer" aria-label={t('response.region')}>
@@ -408,8 +430,10 @@ export function ResponseViewer() {
                     mode={mode}
                     language={language}
                     contentType={response.contentType}
-                    frozen={hex}
-                    onChange={patch => activeId && setBodyView(activeId, patch)}
+                    onChange={patch => {
+                      leaveHex()
+                      if (activeId) setBodyView(activeId, patch)
+                    }}
                   />
                 ) : (
                   <FormatChip format={response.format} contentType={response.contentType} />
@@ -420,21 +444,40 @@ export function ResponseViewer() {
                 <button
                   type="button"
                   className="icon-btn xs"
-                  disabled={!editorShowing}
+                  disabled={!editorReachable}
                   aria-label={t('response.find.aria')}
-                  title={editorShowing ? t('response.find.title') : t('response.find.unavailable')}
-                  onClick={focusBodySearch}
+                  title={editorReachable ? t('response.find.title') : t('response.find.unavailable')}
+                  onClick={() => {
+                    leaveHex()
+                    setSearchTick(tick => tick + 1)
+                  }}
                 >
                   <Search size={13} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
-                  className={wrap && editorShowing ? 'icon-btn xs active' : 'icon-btn xs'}
-                  disabled={!editorShowing}
-                  aria-pressed={wrap}
+                  /* Reads "are the lines wrapping", not "is the setting stored". Nothing
+                     wraps in a hex dump, so this draws unpressed there — otherwise it and
+                     the hex toggle are both lit at once and the row looks like two views
+                     are on, `active` meaning "this setting is applied" on one button and
+                     "this view is showing" on the next. */
+                  className={wrapping ? 'icon-btn xs active' : 'icon-btn xs'}
+                  disabled={!editorReachable}
+                  aria-pressed={wrapping}
                   aria-label={t('response.wrap.aria')}
-                  title={editorShowing ? t('response.wrap.title') : t('response.wrap.unavailable')}
-                  onClick={() => setWrap(current => !current)}
+                  title={editorReachable ? t('response.wrap.title') : t('response.wrap.unavailable')}
+                  onClick={() => {
+                    // From the hex view this is a request — "show me the text, wrapped" —
+                    // rather than a toggle. Toggling would flip a value the button is not
+                    // currently displaying, so pressing a control that looks off would turn
+                    // wrapping off, which is the opposite of what pressing it asks for.
+                    if (hex) {
+                      leaveHex()
+                      setWrap(true)
+                      return
+                    }
+                    setWrap(current => !current)
+                  }}
                 >
                   <WrapText size={13} aria-hidden="true" />
                 </button>
