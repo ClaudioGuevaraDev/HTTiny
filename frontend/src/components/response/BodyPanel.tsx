@@ -1,6 +1,7 @@
 import { FileX2 } from 'lucide-react'
 import { formatBytes } from '../../format'
 import { useLocale, useT } from '../../language'
+import type { Match } from '../../response/search'
 import type { BodyLanguage, BodyMode, SuccessResponse } from '../../types'
 import { Placeholder } from '../Placeholder'
 import { ArchiveBody } from './ArchiveBody'
@@ -36,6 +37,7 @@ export function BodyPanel({
   formatFailed,
   hex,
   wrap,
+  match,
 }: {
   response: SuccessResponse
   language: BodyLanguage
@@ -44,6 +46,8 @@ export function BodyPanel({
   formatFailed: boolean
   hex: boolean
   wrap: boolean
+  /** The search match to reveal in the editor, or null. Only the text view can show one. */
+  match: Match | null
 }) {
   const { t } = useT()
 
@@ -62,7 +66,7 @@ export function BodyPanel({
   return (
     <>
       <Notices response={response} formatFailed={formatFailed} />
-      {hex ? <HexBody response={response} /> : <Viewer response={response} language={language} mode={mode} text={text} wrap={wrap} />}
+      {hex ? <HexBody response={response} /> : <Viewer response={response} language={language} mode={mode} text={text} wrap={wrap} match={match} />}
     </>
   )
 }
@@ -73,12 +77,14 @@ function Viewer({
   mode,
   text,
   wrap,
+  match,
 }: {
   response: SuccessResponse
   language: BodyLanguage
   mode: BodyMode
   text: string
   wrap: boolean
+  match: Match | null
 }) {
   const { format, bodyUrl, contentType } = response
 
@@ -115,7 +121,7 @@ function Viewer({
       // reinterpreted — a JSON payload served as text/html, which is most of why the
       // picker exists — gets the viewer they asked for and not the one the header
       // claimed. `resolveMode` has already ruled out `rich` for anything without one.
-      return mode === 'rich' ? <RichBody language={language} source={response.body} text={text} /> : <TextBody text={text} language={language} wrap={wrap} />
+      return mode === 'rich' ? <RichBody language={language} source={response.body} text={text} /> : <TextBody text={text} language={language} wrap={wrap} match={match} />
     default: {
       // Not reachable: the switch above covers ResponseFormat. This exists so that
       // adding a member without a branch fails to compile.
@@ -139,7 +145,7 @@ function RichBody({ language, source, text }: { language: BodyLanguage; source: 
     case 'ndjson':
       // Each line is its own document, so there is no single tree to build. The
       // formatter has already indented every record; showing that is the rich view.
-      return <TextBody text={text} language="ndjson" wrap={false} />
+      return <TextBody text={text} language="ndjson" wrap={false} match={null} />
     case 'html':
       return <HtmlPreview source={source} />
     case 'markdown':
@@ -155,7 +161,7 @@ function RichBody({ language, source, text }: { language: BodyLanguage; source: 
       // this is unreachable — but it is a runtime fallback rather than a `never`,
       // because the two tables live in different files and a mismatch should degrade
       // to the editor rather than blank the panel.
-      return <TextBody text={text} language={language} wrap />
+      return <TextBody text={text} language={language} wrap match={null} />
   }
 }
 

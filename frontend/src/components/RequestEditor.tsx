@@ -9,7 +9,7 @@ import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
 import { methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
 import type { KeyValueRow, RequestDocument } from '../types'
-import { requestTabId } from '../domIds'
+import { requestBodyEditorId, requestTabId } from '../domIds'
 import { useRovingFocus } from '../useRovingFocus'
 import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction } from './Placeholder'
@@ -183,6 +183,10 @@ function BodyEditor({ request }: { request: RequestDocument }) {
         <Placeholder icon={<FileX2 size={20} />} title={t('editor.body.emptyTitle')} description={t('editor.body.emptyDesc')} />
       ) : (
         <CodeMirror
+          /* Marks this editor for `useGlobalShortcuts`, which otherwise sends Ctrl+F to
+             the response viewer's find bar. This one keeps CodeMirror's own search
+             panel — searching the body you are editing is its own thing. */
+          id={requestBodyEditorId}
           value={request.body.content}
           height="100%"
           theme={httinyTheme}

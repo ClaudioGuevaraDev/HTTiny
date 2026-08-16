@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Binary,
   Braces,
@@ -14,7 +14,6 @@ import {
   Image,
   Radio,
   RotateCcw,
-  Search,
   Send,
   Shapes,
   Table,
@@ -38,14 +37,16 @@ import {
   resolveMode,
   richLabel,
 } from '../responseBody'
+import { buildPattern, findMatches, segments, stepMatch } from '../response/search'
 import { isByteFormat } from '../types'
-import type { BodyLanguage, BodyMode, BodyView, ResponseFormat } from '../types'
+import type { BodyLanguage, BodyMode, BodyView, KeyValueRow, ResponseFormat } from '../types'
 import { cancelRequest, runRequest } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
 import { useAppStore } from '../store'
 import { useCopy } from '../useCopy'
 import { useRovingFocus } from '../useRovingFocus'
 import { BodyPanel } from './response/BodyPanel'
+import { ResponseSearchBar } from './response/ResponseSearchBar'
 import { Placeholder, PlaceholderAction, SkeletonLines } from './Placeholder'
 import { ResponseStatus } from './ResponseStatus'
 import { Select } from './Select'
@@ -95,20 +96,24 @@ const FORMAT_LABEL: Record<ResponseFormat, string> = {
   binary: 'BINARY',
 }
 
+/** Module scope, so the "no headers yet" case is one stable reference and not a new []. */
+const NO_HEADERS: KeyValueRow[] = []
+
 /**
- * Opens CodeMirror's own search panel, by giving the editor focus and replaying the
- * keystroke its keymap is already listening for.
+ * Renders a cell with the search matches marked.
  *
- * A `dispatch` of the `openSearchPanel` command would be tidier and needs an
- * `EditorView` handle, which means either a ref threaded through `TextBody` or
- * `@codemirror/search` as a declared dependency for the one import. Neither is worth it
- * for a button whose entire job is to reveal a shortcut the user could already type.
+ * `<mark>` elements built from segments rather than a highlighted HTML string: these
+ * are header names and values that came from someone else's server, and building the
+ * markup would mean `dangerouslySetInnerHTML` over them — which is exactly what the
+ * response viewer's original regex highlighter did, and why it was replaced.
  */
-function focusBodySearch(): void {
-  const editor = document.querySelector<HTMLElement>('#response-content .cm-content')
-  if (!editor) return
-  editor.focus()
-  editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, metaKey: true, bubbles: true }))
+function Highlighted({ text, pattern }: { text: string; pattern: RegExp | null }) {
+  if (!pattern) return <code>{text}</code>
+  return (
+    <code>
+      {segments(text, pattern).map((segment, index) => (segment.match ? <mark key={index}>{segment.text}</mark> : <span key={index}>{segment.text}</span>))}
+    </code>
+  )
 }
 
 /**
@@ -246,6 +251,7 @@ export function ResponseViewer() {
   const storedView = useAppStore(s => (s.activeId ? s.bodyViews[s.activeId] : undefined))
   const setBodyView = useAppStore(s => s.setBodyView)
   const defaultBodyLanguage = useAppStore(s => s.defaultBodyLanguage)
+  const search = useAppStore(s => s.responseSearch)
   const response = stored ?? { state: 'idle' as const }
   const elapsed = useElapsed(response.state === 'loading' ? response.startedAt : null)
   const { status: copyStatus, copy } = useCopy()
@@ -260,17 +266,6 @@ export function ResponseViewer() {
   // A view preference rather than a per-request one, like the theme: whether long lines
   // wrap is about the width of the panel you are looking at, not about the endpoint.
   const [wrap, setWrap] = useState(true)
-  // Bumped to ask for the search panel, rather than opening it from the click handler.
-  // Pressing find from the hex view leaves it first, and the editor `focusBodySearch`
-  // reaches for does not exist until that render has committed — so the call has to wait
-  // for the effect below. Opening it inline worked only when the editor happened to
-  // already be on screen, which is not the case this button exists for.
-  const [searchTick, setSearchTick] = useState(0)
-
-  useEffect(() => {
-    if (searchTick === 0) return
-    focusBodySearch()
-  }, [searchTick])
 
   // Hooks cannot sit inside the success branch, so the inputs are read defensively and
   // the memo runs against an empty body the rest of the time — which costs nothing.
@@ -295,6 +290,10 @@ export function ResponseViewer() {
   // used to unmount the whole control group, and switching to a rich view unmounted find
   // and wrap — so pressing one button made others vanish, and the ones that survived slid
   // sideways into the gap.
+  // `response` is `stored ?? {state:'idle'}`, a fresh object on every render, so a memo
+  // that depended on it would recompute constantly. The headers array off the store
+  // snapshot is stable, which is what the header search memo below actually needs.
+  const headers = response.state === 'success' ? response.headers : NO_HEADERS
   const byteBacked = response.state === 'success' && isByteFormat(response.format)
   const textual = response.state === 'success' && !byteBacked && response.body !== ''
   const hasPayload = response.state === 'success' && (response.body !== '' || response.bodyUrl !== '')
@@ -314,6 +313,49 @@ export function ResponseViewer() {
   // is set: a hex dump has fixed-width rows and wraps nothing. The distinction is what
   // keeps the wrap toggle and the hex toggle from being lit at the same time.
   const wrapping = wrap && !hex
+
+  // ── Search ────────────────────────────────────────────────────────────────────
+  //
+  // Matches are found here, over strings this component already holds, rather than asked
+  // of CodeMirror. That is what lets one bar serve the headers tab, which has no editor
+  // at all, and it is why the count is available without a round trip.
+  const onHeaders = responsePanel === 'headers'
+  // Destructured so the memo's dependencies are the three fields the pattern is built
+  // from. Passing `search` whole would rebuild it whenever the bar merely opened.
+  const { query, caseSensitive, regexp } = search
+  const pattern = useMemo(() => buildPattern(query, { caseSensitive, regexp }), [query, caseSensitive, regexp])
+  // Only the plain text view can be traversed. The tree, the table, the hex dump and the
+  // previews draw from their own models, and two of them render a window of rows rather
+  // than the whole document — "scroll to the match" is a different feature there.
+  const searchable = response.state === 'success' && (onHeaders || (textual && !hex && mode !== 'rich'))
+
+  const bodyMatches = useMemo(() => (searchable && !onHeaders ? findMatches(bodyText, pattern) : []), [searchable, onHeaders, bodyText, pattern])
+
+  // One entry per match, holding the row it sits in — that is all stepping needs, since
+  // the highlighting is done per cell by `Highlighted` regardless of which is current.
+  const headerMatches = useMemo(() => {
+    if (!onHeaders || !pattern) return []
+    const rows: number[] = []
+    headers.forEach((header, index) => {
+      const hits = findMatches(header.key, pattern).length + findMatches(header.value, pattern).length
+      for (let hit = 0; hit < hits; hit += 1) rows.push(index)
+    })
+    return rows
+  }, [onHeaders, pattern, headers])
+
+  const total = onHeaders ? headerMatches.length : bodyMatches.length
+  const [activeMatch, setActiveMatch] = useState(0)
+  // Clamped rather than reset: refining a query usually narrows it, and jumping back to
+  // the first hit on every keystroke would undo the stepping just done. The clamp only
+  // bites when the list shrank past where the user was.
+  const current = total === 0 ? 0 : Math.min(activeMatch, total - 1)
+  const step = (delta: number) => setActiveMatch(stepMatch(current, delta, total))
+
+  const headersBody = useRef<HTMLTableSectionElement>(null)
+  useEffect(() => {
+    if (!onHeaders || headerMatches.length === 0) return
+    headersBody.current?.children[headerMatches[current]]?.scrollIntoView({ block: 'nearest' })
+  }, [onHeaders, headerMatches, current])
 
   return (
     <section className="response-viewer" aria-label={t('response.region')}>
@@ -438,22 +480,11 @@ export function ResponseViewer() {
                 ) : (
                   <FormatChip format={response.format} contentType={response.contentType} />
                 )}
-                {/* CodeMirror's search panel has always been reachable with Ctrl+F —
-                    `basicSetup` leaves its keymap on — and nothing anywhere said so. A
-                    feature nobody can find is not a feature. */}
-                <button
-                  type="button"
-                  className="icon-btn xs"
-                  disabled={!editorReachable}
-                  aria-label={t('response.find.aria')}
-                  title={editorReachable ? t('response.find.title') : t('response.find.unavailable')}
-                  onClick={() => {
-                    leaveHex()
-                    setSearchTick(tick => tick + 1)
-                  }}
-                >
-                  <Search size={13} aria-hidden="true" />
-                </button>
+                {/* The magnifying glass that used to sit here is gone. It existed only to
+                    reveal CodeMirror's own Ctrl+F, which it did by synthesising a fake
+                    keyboard event — and that panel could not reach the headers tab and
+                    ignored the theme. `ResponseSearchBar` replaces both, and Ctrl+F now
+                    answers from anywhere in the window. */}
                 <button
                   type="button"
                   /* Reads "are the lines wrapping", not "is the setting stored". Nothing
@@ -498,9 +529,34 @@ export function ResponseViewer() {
               </div>
             )}
           </div>
+          {/* Between the tabs and the panel, so it belongs to whichever tab is showing
+              and does not shift the status bar above it. Keyed on the tab so the input
+              is refocused when you move between body and headers with it open. */}
+          {search.open && (
+            <ResponseSearchBar
+              key={responsePanel}
+              total={total}
+              active={current}
+              searchable={searchable}
+              onStep={step}
+              onShowAsText={() => {
+                leaveHex()
+                if (activeId) setBodyView(activeId, { mode: 'pretty' })
+              }}
+            />
+          )}
           <div className="response-content" id="response-content" role="tabpanel" aria-labelledby={`response-tab-${responsePanel}`} tabIndex={-1}>
             {responsePanel === 'body' ? (
-              <BodyPanel response={response} language={language} mode={mode} text={bodyText} formatFailed={formatFailed} hex={hex} wrap={wrap} />
+              <BodyPanel
+                response={response}
+                language={language}
+                mode={mode}
+                text={bodyText}
+                formatFailed={formatFailed}
+                hex={hex}
+                wrap={wrap}
+                match={search.open && !onHeaders ? (bodyMatches[current] ?? null) : null}
+              />
             ) : (
               /* A real table, not a grid of divs with <b> for column heads. Name/value
                  pairs are tabular data, and a screen reader can only navigate them
@@ -514,14 +570,16 @@ export function ResponseViewer() {
                     <th scope="col">{t('response.headers.value')}</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {response.headers.map(h => (
-                    <tr key={h.id}>
+                <tbody ref={headersBody}>
+                  {response.headers.map((h, index) => (
+                    /* Marked when a match in this row is the current one, so stepping
+                       through a table where several rows match is followable. */
+                    <tr key={h.id} data-current={search.open && headerMatches[current] === index ? 'true' : undefined}>
                       <td>
-                        <code>{h.key}</code>
+                        <Highlighted text={h.key} pattern={search.open ? pattern : null} />
                       </td>
                       <td>
-                        <code>{h.value}</code>
+                        <Highlighted text={h.value} pattern={search.open ? pattern : null} />
                       </td>
                     </tr>
                   ))}

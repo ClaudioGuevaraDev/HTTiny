@@ -28,7 +28,7 @@ export function CsvTable({ source }: { source: string }) {
 
   // One column and one row is not a table, it is a line of text that happens to have
   // arrived under text/csv. Showing it as a grid would be a worse reading of it.
-  if (table.header.length <= 1 && table.rows.length === 0) return <TextBody text={source} language="csv" wrap />
+  if (table.header.length <= 1 && table.rows.length === 0) return <TextBody text={source} language="csv" wrap match={null} />
 
   const rows = table.rows.slice(0, MAX_ROWS)
 

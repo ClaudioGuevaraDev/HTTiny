@@ -78,6 +78,13 @@ export function useCommands(enabled: boolean): Command[] {
 
       const response = store.responses[activeId]
       if (response?.state === 'success') {
+        action(
+          'find-in-response',
+          'command.findInResponse.title',
+          'command.findInResponse.keywords',
+          () => useAppStore.getState().setResponseSearch({ open: true }),
+          shortcuts.find,
+        )
         action('copy-body', 'command.copyBody.title', 'command.copyBody.keywords', () => void navigator.clipboard.writeText(response.body))
         action('clear-response', 'command.clearResponse.title', 'command.clearResponse.keywords', () =>
           useAppStore.getState().setResponse(activeId, { state: 'idle' }),

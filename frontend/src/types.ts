@@ -138,6 +138,20 @@ export interface BodyView {
  * already was UTF-8. `contentEncoding` is the compression found on the response: with
  * a readable body it was undone in Go, with a binary one the algorithm is unsupported.
  */
+/**
+ * The response viewer's search bar.
+ *
+ * `caseSensitive` and `regexp` are the two toggles the bar offers, and they are here
+ * rather than local to it so that closing the bar does not silently reset them — a
+ * regex you spent a minute writing should still be there on the next Ctrl+F.
+ */
+export interface ResponseSearch {
+  open: boolean
+  query: string
+  caseSensitive: boolean
+  regexp: boolean
+}
+
 export interface ArchiveEntry {
   name: string
   size: number

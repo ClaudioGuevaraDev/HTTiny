@@ -164,16 +164,27 @@ export const en = {
   'response.rich.table': 'Table',
   'response.rich.events': 'Events',
   'response.rich.none': 'View',
-  'response.find.aria': 'Find in the response body',
-  'response.find.title': 'Find',
   'response.wrap.aria': 'Wrap long lines',
   'response.wrap.title': 'Wrap lines',
   // Shown on the disabled state of each control. They say *why* it does not apply —
   // a greyed-out button with the same tooltip as the live one explains nothing.
   'response.copyBody.unavailable': 'This body is not text',
-  'response.find.unavailable': 'Only the text view can be searched',
   'response.wrap.unavailable': 'Only the text view wraps',
   'response.hex.toggle.unavailable': 'This response has no body',
+
+  // ── Response · find bar ──────────────────────────────────────────────────────
+  'response.search.aria': 'Find in the response',
+  'response.search.placeholder': 'Find…',
+  'response.search.count': '{index} of {total}',
+  'response.search.none': 'No matches',
+  'response.search.previous': 'Previous match',
+  'response.search.next': 'Next match',
+  'response.search.caseSensitive': 'Match case',
+  'response.search.regexp': 'Regular expression',
+  'response.search.close': 'Close find',
+  'response.search.unsearchable': 'This view cannot be searched.',
+  'response.search.showAsText': 'Show as text',
+  'response.search.capped': 'Stopped counting at {limit} matches.',
   'response.interpretAs': 'Interpret body as',
   // Only the formats whose name is a word rather than a token. The rest uppercase
   // themselves — see BODY_LANGUAGE_LABEL in responseBody.ts.
@@ -315,6 +326,8 @@ export const en = {
   'command.reveal.keywords': 'find locate show tree',
   'command.copyUrl.title': 'Copy request URL',
   'command.copyUrl.keywords': 'clipboard link',
+  'command.findInResponse.title': 'Find in response',
+  'command.findInResponse.keywords': 'search filter locate',
   'command.copyBody.title': 'Copy response body',
   'command.copyBody.keywords': 'clipboard json',
   'command.clearResponse.title': 'Clear response',

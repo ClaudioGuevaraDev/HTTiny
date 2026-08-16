@@ -50,7 +50,7 @@ export function JsonTree({ source }: { source: string }) {
   // A body that does not parse falls back to the editor rather than to an error. The
   // viewer above already says the JSON is invalid, and the text is what you need to
   // find out why.
-  if (parsed === null) return <TextBody text={source} language="json" wrap />
+  if (parsed === null) return <TextBody text={source} language="json" wrap match={null} />
 
   const start = Math.max(0, firstVisible - OVERSCAN)
   const end = Math.min(rows.length, firstVisible + viewportRows + OVERSCAN)

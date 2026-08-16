@@ -5,3 +5,15 @@
  * either of them, since a component file that also exports a helper breaks fast refresh.
  */
 export const requestTabId = (id: string) => `request-tab-${id}`
+
+/**
+ * The request body's CodeMirror wrapper.
+ *
+ * `useGlobalShortcuts` needs it to keep its hands off Ctrl+F while the caret is in
+ * there: that editor keeps its own `searchKeymap`, and the response viewer's find bar
+ * must not steal a keystroke aimed at the body you are editing.
+ *
+ * An id rather than a class check, for the reason `shortcuts.ts` records at the top of
+ * the file — wiring behaviour to a CSS class is how Ctrl+Enter silently broke once.
+ */
+export const requestBodyEditorId = 'request-body-editor'

@@ -9,11 +9,15 @@ import type {
   KeyValueRow,
   Locale,
   RequestDocument,
+  ResponseSearch,
   ResponseSnapshot,
   SplitOrientation,
   ThemePreference,
   TreeNode,
 } from './types'
+
+/** Closed, with nothing typed and both toggles off — the state Ctrl+F opens into. */
+const DEFAULT_RESPONSE_SEARCH: ResponseSearch = { open: false, query: '', caseSensitive: false, regexp: false }
 
 /**
  * Layout bounds, defined here because the store is what clamps them. They used to
@@ -149,6 +153,17 @@ interface AppState {
   /** Not persisted: an open modal is not a preference worth restoring. */
   settingsOpen: boolean
 
+  /**
+   * The response viewer's search bar. Unlike the palette's query, this one lives in the
+   * store rather than in the component: three places open it — the global Ctrl+F, the
+   * command palette and the viewer's own close button — and two of them have no way to
+   * reach a `useState` inside `ResponseViewer`.
+   *
+   * Not persisted either. `toPrefsFile` is an explicit whitelist, so leaving it out of
+   * that function is all it takes; a search bar that reopens on launch would be noise.
+   */
+  responseSearch: ResponseSearch
+
   openRequest: (id: string) => void
   closeRequest: (id: string) => void
   setActive: (id: string) => void
@@ -182,6 +197,8 @@ interface AppState {
   setDefaultBodyLanguage: (language: BodyLanguage | null) => void
   openPalette: (seed?: string) => void
   closePalette: () => void
+  /** A patch, like `setBodyView`: callers change one field and leave the rest alone. */
+  setResponseSearch: (patch: Partial<ResponseSearch>) => void
   openSettings: () => void
   closeSettings: () => void
 }
@@ -350,6 +367,7 @@ export const useAppStore = create<AppState>(set => ({
   ...SETTINGS_DEFAULTS,
   // Not one of them: hiding the sidebar is a workspace gesture, not a setting.
   sidebarCollapsed: false,
+  responseSearch: DEFAULT_RESPONSE_SEARCH,
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
@@ -584,6 +602,10 @@ export const useAppStore = create<AppState>(set => ({
   resetSettings: () => set(SETTINGS_DEFAULTS),
   openPalette: (seed = '') => set({ paletteOpen: true, paletteSeed: seed }),
   closePalette: () => set({ paletteOpen: false, paletteSeed: '' }),
+  // The query and its two options survive a close, so reopening with Ctrl+F puts back
+  // what you were looking for — which is what every editor does and what makes the
+  // shortcut worth pressing twice.
+  setResponseSearch: patch => set(s => ({ responseSearch: { ...s.responseSearch, ...patch } })),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
 }))

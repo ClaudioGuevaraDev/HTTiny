@@ -1419,6 +1419,126 @@
     gap: 6px;
   }
 
+  /* ── Response · find bar ─────────────────────────────────────────────────────
+   *
+   * Floats over the top-right of the panel rather than taking a band across it, the
+   * way an editor's find widget does. A full-width strip cost a whole row of the
+   * response every time it opened, and the field stretched to a width nothing needed —
+   * you are typing a word, not a paragraph.
+   *
+   * Positioned against `.response-viewer` and not `.response-content`, because that one
+   * scrolls: an absolute child of it would slide away with the body. The offset is the
+   * two chrome rows above it, from the same tokens that size them.
+   */
+
+  .response-viewer {
+    position: relative;
+  }
+
+  .response-search {
+    position: absolute;
+    top: calc(var(--h-response-status) + var(--h-panel-tabs) + 6px);
+    right: 12px;
+    z-index: var(--z-sticky);
+    /* Shrinks on a narrow panel — the split can be dragged well below this. */
+    width: min(360px, calc(100% - 24px));
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 5px 6px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-4);
+    box-shadow: var(--shadow-menu);
+  }
+
+  .response-search-field {
+    flex: 1;
+    min-width: 96px;
+    height: var(--h-control-sm);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 7px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-3);
+    color: var(--color-text-subtle);
+  }
+
+  .response-search-field:focus-within {
+    border-color: var(--color-border-control);
+  }
+
+  .response-search-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
+  /* The field already carries a visible focus border, so the ring inside it would be
+   * a second one on the same control. Same call as `.palette-input`. */
+  .response-search-input:focus-visible {
+    outline: none;
+  }
+
+  .response-search-input::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  .response-search-count {
+    margin: 0;
+    flex: none;
+    color: var(--color-text-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Takes the whole second row: it is a sentence, not another control in the strip. */
+  .response-search-notice {
+    flex-basis: 100%;
+    margin: 2px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+  }
+
+  .link-btn {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .link-btn:hover {
+    color: var(--color-accent-hover);
+  }
+
+  /* Search hits in the headers table. `mark` has a UA background of its own that has
+   * nothing to do with this palette, so both halves are set explicitly. */
+  .response-headers mark {
+    border-radius: var(--radius-xs);
+    background: var(--color-selection-match);
+    color: var(--color-text-strong);
+  }
+
+  .response-headers tr[data-current='true'] mark {
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+  }
+
   .media-body {
     height: 100%;
     display: flex;

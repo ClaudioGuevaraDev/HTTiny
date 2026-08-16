@@ -9,6 +9,7 @@ export const shortcuts = {
   send: ['Ctrl', '↵'],
   close: ['Ctrl', 'W'],
   palette: ['Ctrl', 'K'],
+  find: ['Ctrl', 'F'],
   newRequest: ['Ctrl', 'N'],
   toggleSidebar: ['Ctrl', 'B'],
   toggleSplit: ['Ctrl', '\\'],

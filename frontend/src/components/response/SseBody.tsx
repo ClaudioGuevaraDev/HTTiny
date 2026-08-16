@@ -21,7 +21,7 @@ export function SseBody({ source }: { source: string }) {
   const { t, plural } = useT()
   const events = useMemo(() => parseSse(source), [source])
 
-  if (events.length === 0) return <TextBody text={source} language="sse" wrap />
+  if (events.length === 0) return <TextBody text={source} language="sse" wrap match={null} />
 
   return (
     <div className="sse-body">
