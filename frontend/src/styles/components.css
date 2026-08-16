@@ -1389,11 +1389,35 @@
    * that used to sit here — a hand-painted background, because the OS popup inherited
    * nothing from the row — went with it, having never worked on Windows anyway. */
 
+  /* `cursor: text` is the visible half of `user-select: text`. Every viewer in here
+   * opts into selection individually — the hex rows, the tree rows, the CSV cells, the
+   * header table — but they were all still showing an arrow, so nothing said the text
+   * could be taken. Only CodeMirror looked selectable, because it brings its own
+   * I-beam; the rest looked like chrome you could merely look at.
+   *
+   * Set once on the container and walked back below for the two things it is wrong
+   * for: controls, and payloads that are not text at all. */
   .response-content {
     flex: 1;
     min-height: 0;
     overflow: auto;
     user-select: text;
+    cursor: text;
+  }
+
+  /* Buttons anywhere in the panel — the tree's twisties and copy-path, the toolbars of
+   * the tree and the specimen, the actions inside a placeholder. Their disabled rules
+   * carry `cursor: default` and are more specific, so those still win. */
+  .response-content button {
+    cursor: pointer;
+  }
+
+  /* A picture, a video, a PDF or a font specimen is not text to select. The facts row
+   * inside them is, and says so on its own below. */
+  .media-body,
+  .font-specimen,
+  .html-preview {
+    cursor: default;
   }
 
   /* `.placeholder` centres itself with `flex: 1`, which does nothing to a child of a
@@ -1555,6 +1579,9 @@
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
+  /* Dimensions, durations and media types are worth copying out of a bug report, so
+   * this keeps both halves of "selectable" even inside the media viewers, which turn
+   * the I-beam off around it. */
   .media-facts {
     margin: 0 0 0 auto;
     display: flex;
@@ -1564,6 +1591,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
     user-select: text;
+    cursor: text;
   }
 
   .media-type {
@@ -3196,6 +3224,19 @@
   .shortcut {
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  /* Keeps the I-beam in step with the two rules above, for the chrome that lives inside
+   * `.response-content` and therefore inherited it: a placeholder is not selectable, but
+   * its heading and its copy are. */
+  .response-content .placeholder,
+  .response-content .segmented {
+    cursor: default;
+  }
+
+  .response-content .placeholder-title,
+  .response-content .placeholder-body {
+    cursor: text;
   }
 
   .response-headers th,
