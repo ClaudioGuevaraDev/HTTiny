@@ -7,3 +7,13 @@ bin/
 build/bin/
 .task/
 .DS_Store
+
+# Packaging output. build/appicon.png is the source and is committed; everything
+# below is derived from it or downloaded at package time.
+build/windows/icon.ico
+build/darwin/icons.icns
+build/darwin/Assets.car
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+build/linux/*.desktop
+build/linux/appimage/
+wails_windows_*.syso

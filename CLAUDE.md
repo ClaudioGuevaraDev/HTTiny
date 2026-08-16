@@ -158,10 +158,52 @@ Layout and shortcuts live in `App.tsx` and `useGlobalShortcuts.ts`: a CSS-grid s
 
 URL and query params stay bidirectionally synced: editing param rows rewrites the URL through `replaceQuery` (preserving any `#hash`), and blurring the URL input re-derives rows via `parseParams`, reusing existing row ids so React keys and descriptions survive.
 
+### Packaging and CI
+
+`RELEASING.md` covers the release process; this is what only shows up after breaking something.
+
+`build/windows/`, `build/darwin/` and `build/linux/` hold the Wails packaging layer, restored from
+the CLI's own templates. The platform Taskfiles are static — no Go templating — and depend on
+`common:go:mod:tidy` and `common:generate:icons`, which is why `build/Taskfile.yml` defines them.
+The root Taskfile gains `includes` for the three platforms, a `GOOS` var and a `package` task:
+`wails3 package` routes through the **root** task name, not `windows:package`, so without that
+dispatch the CLI just fails.
+
+**The root `build` task deliberately does not dispatch to `{{.GOOS}}:build`,** which is what the
+stock template does. The platform build tasks compile with `-tags production -trimpath
+-ldflags="-w -s"` (plus `-H windowsgui`, which detaches the console). That is right for a shipped
+artifact and wrong for the loop `build/config.yml` drives under `wails3 task dev`. Packaging picks
+up the production build through its own `deps`, so both paths get what they need.
+
+**Never run `wails3 generate build-assets -dir build`.** Its template tree contains `config.yml`
+and `Taskfile.tmpl.yml`, and extraction uses `os.Create`, so it truncates both hand-maintained
+files without a word. Generate into a scratch directory and copy across. `wails3 update
+build-assets` is safe for those two, but it rewrites every templated file — including two
+deliberate local edits, listed in RELEASING.md — and recreates an unused `build/ios/`.
+
+Two things about `build/windows/info.json` are load-bearing. The `info` key is a **language id
+only** (`0409`), not a language+codepage pair: `tc-hib/winres` composes the codepage itself, and
+parses the key with `Sscanf("%X")` into a `uint16`, so `040904B0` overflows and the whole string
+block is **silently dropped**. The template's default `0000` parses but stamps the block
+language-neutral, which Windows will not resolve either. Separately, `fixed.product_version` has
+to be set explicitly or the product version reads `0.0.0.0`. Even correct, Explorer and .NET show
+the string fields blank, because winres writes the block name lowercase (`040904b0`) while
+`VerQueryValue` compares case-sensitively — upstream, and not fixable from this repo. The icon and
+the fixed version block are unaffected.
+
+CI is two workflows. `ci.yml` runs `pnpm run lint`, `gofmt -l`, and a build on all three platforms
+that then checks `git diff --exit-code frontend/bindings` — the bindings are generated but
+committed, so drift against a changed Go signature is a real failure nothing else catches.
+`release.yml` creates one draft release up front, has the matrix upload into it, and flips it to
+published at the end; per-job release creation races on GitHub's API and scatters artifacts across
+duplicate drafts. Linux must be `ubuntu-24.04` (GTK4/WebKitGTK 6.0), the AppImage step needs
+`APPIMAGE_EXTRACT_AND_RUN=1` because the runners have no FUSE, and the `.deb` needs `GOARCH` and
+`GIT_COMMITTER_*` exported because `nfpm.yaml` interpolates them as shell variables.
+
 ## Project rules (from AGENTS.md)
 
 - **Exact dependency versions only** — no `^`, `~`, `>`, `*`. Use `pnpm add pkg@1.2.3`, commit the lockfile, keep `go.mod` pinned and `go.sum` intact.
-- **Version sync** — when the user explicitly asks for the `conventional-commit` skill, bump the app version (`A.B.C`, never `A`) in *both* `frontend/package.json` and `build/config.yml` before staging, plus any future manifest exposing the version. Minor bump (reset patch) for a new user-facing feature or meaningful capability change; patch bump for fixes, docs, styling, refactors, dependency/build work. Never touch Taskfile `version: '3'`.
+- **Version sync** — when the user explicitly asks for the `conventional-commit` skill, bump the app version (`A.B.C`, never `A`) in *both* `frontend/package.json` and `build/config.yml` before staging, plus any future manifest exposing the version. Minor bump (reset patch) for a new user-facing feature or meaningful capability change; patch bump for fixes, docs, styling, refactors, dependency/build work. Never touch Taskfile `version: '3'`. The release tag is `v<version>` and must match both files — `release.yml` verifies it and aborts before building anything.
 - **Indentation** — tabs in Go, two spaces in TS/TSX/JSON/YAML. Format Go with `gofmt`. Strict TypeScript types; avoid `any`.
 - **Naming** — `PascalCase` for React components and exported types, `camelCase` for functions and store actions, descriptive kebab-free filenames (`RequestEditor.tsx`).
 - **Separation of concerns** — keep components focused; shared state, persistence and request-execution logic stay out of presentation components (hence `store.ts`, `persistence.ts`, `goExecutor.ts`).

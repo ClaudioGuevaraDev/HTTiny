@@ -1,0 +1,264 @@
+name: Release
+
+# Builds the installers for Windows, macOS and Linux and publishes them to a
+# GitHub Release. Triggered by pushing a version tag:
+#   git tag v0.20.2 && git push origin v0.20.2
+#
+# The release is created ONCE up front (create-release) so every matrix job
+# uploads into the same draft, and a final job flips that draft to published.
+# Letting each matrix job create its own release races on GitHub's API and
+# scatters the per-OS artifacts across duplicate drafts.
+#
+# workflow_dispatch runs the same matrix but publishes nothing: the artifacts go
+# to the run's own artifact list, which is how you test the packaging pipeline
+# without creating and deleting throwaway tags.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  # Pinned to the wails/v3 version in go.mod. The CLI is a build tool, not a
+  # module dependency, so nothing else in the repo pins it.
+  WAILS3_VERSION: v3.0.0-beta.8
+  GO_VERSION: '1.26'
+  NODE_VERSION: '22'
+
+jobs:
+  # 1. Refuse to build anything if the tag and the manifests disagree.
+  verify:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the version is consistent
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          config_version=$(sed -n 's/^  version: *"\(.*\)"$/\1/p' build/config.yml)
+          package_version=$(node -p "require('./frontend/package.json').version")
+
+          if [ -z "$config_version" ]; then
+            echo "::error::could not read the version out of build/config.yml"
+            exit 1
+          fi
+
+          echo "build/config.yml       $config_version"
+          echo "frontend/package.json  $package_version"
+
+          if [ "$config_version" != "$package_version" ]; then
+            echo "::error::build/config.yml ($config_version) and frontend/package.json ($package_version) disagree"
+            exit 1
+          fi
+
+          # The installers carry the manifest version, not the tag. If the two
+          # differ the release would advertise a number nothing was built with.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            echo "tag                    $tag_version"
+            if [ "$tag_version" != "$config_version" ]; then
+              echo "::error::tag ${GITHUB_REF_NAME} does not match the manifest version $config_version"
+              exit 1
+            fi
+          fi
+
+          echo "version=$config_version" >> "$GITHUB_OUTPUT"
+
+  # 2. Create the draft release once and hand its id to the matrix.
+  create-release:
+    needs: verify
+    permissions:
+      contents: write # required to create the GitHub Release
+    runs-on: ubuntu-24.04
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      # Skipped on workflow_dispatch. The job itself still succeeds, so the
+      # matrix below does not need an `always()` guard to stay reachable.
+      - name: Create draft release
+        id: create
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: context.ref.replace('refs/tags/', ''),
+              name: context.ref.replace('refs/tags/', ''),
+              body: [
+                'Download the installer for your operating system from the assets below.',
+                '',
+                'The binaries are **not code-signed**. Windows SmartScreen will warn on first run',
+                '(More info -> Run anyway), and macOS Gatekeeper needs the app opened with',
+                'right-click -> Open the first time.',
+              ].join('\n'),
+              draft: true,
+              prerelease: false,
+            });
+            return data.id;
+
+  # 3. Build and package every platform, uploading into the shared draft.
+  package:
+    needs: [verify, create-release]
+    permissions:
+      contents: write # required to upload assets to the release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            name: windows
+          - platform: macos-latest
+            name: macos
+          - platform: ubuntu-24.04
+            name: linux
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Wails v3 targets GTK4 + WebKitGTK 6.0, which is why this is 24.04:
+      # Ubuntu 22.04 only ships WebKit2GTK 4.1 and would need the -tags gtk3 opt-in.
+      - name: Install Linux dependencies
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev \
+            build-essential \
+            pkg-config
+
+      # NSIS ships with the windows runner image, but create:nsis:installer has no
+      # precondition on it and fails opaquely when it is missing.
+      - name: Ensure NSIS is available
+        if: matrix.name == 'windows'
+        shell: bash
+        run: command -v makensis || choco install nsis -y --no-progress
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          # packageManager lives in frontend/package.json, not at the repo root,
+          # so the action cannot find the pin on its own.
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install the Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS3_VERSION }}
+
+      - name: Package for Windows
+        if: matrix.name == 'windows'
+        # user scope keeps the installer out of UAC. Asking an unsigned installer
+        # for administrator rights is friction for nothing.
+        run: wails3 task windows:package INSTALL_SCOPE=user
+
+      - name: Package for macOS
+        if: matrix.name == 'macos'
+        # A universal .app so one .dmg covers Intel and Apple Silicon. There is no
+        # package:universal:dmg task, so the bundle and the dmg are two steps.
+        run: |
+          wails3 task darwin:package:universal
+          wails3 task darwin:create:dmg
+
+      - name: Package for Linux
+        if: matrix.name == 'linux'
+        env:
+          # linuxdeploy, which wails3 downloads to build the AppImage, is itself an
+          # AppImage and needs FUSE, which the runners do not have.
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          # nfpm.yaml interpolates these as shell variables; without them the .deb
+          # gets an empty architecture and an empty maintainer.
+          GOARCH: amd64
+          GIT_COMMITTER_NAME: ${{ github.repository_owner }}
+          GIT_COMMITTER_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com
+        # Not `linux:package`, which would also build an .rpm and an Arch package
+        # that nobody here tests.
+        run: |
+          wails3 task linux:create:appimage
+          wails3 task linux:create:deb
+
+      - name: Rename the artifacts
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          echo "packaged:"; ls -l bin
+
+          # Matched by glob rather than by exact name: the packaging tasks derive
+          # their filenames from several different variables. Exactly one match is
+          # required, so a rename never silently picks up the wrong file.
+          take() {
+            local pattern="$1" target="$2"
+            local matches=(); mapfile -t matches < <(find bin -maxdepth 1 -name "$pattern" | sort)
+            if [ "${#matches[@]}" -ne 1 ]; then
+              echo "::error::expected exactly one bin/$pattern, found ${#matches[@]}: ${matches[*]-none}"
+              exit 1
+            fi
+            cp "${matches[0]}" "dist/$target"
+          }
+
+          case "${{ matrix.name }}" in
+            windows)
+              take '*-installer.exe' "HTTiny-${VERSION}-windows-amd64-installer.exe"
+              ;;
+            macos)
+              take '*.dmg' "HTTiny-${VERSION}-macos-universal.dmg"
+              ;;
+            linux)
+              take '*.AppImage' "HTTiny-${VERSION}-linux-amd64.AppImage"
+              take '*.deb' "HTTiny-${VERSION}-linux-amd64.deb"
+              ;;
+          esac
+
+          ls -lh dist
+
+      - name: Upload the run artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: httiny-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attach the artifacts to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+
+  # 4. Everything landed — flip the draft to a published release.
+  publish-release:
+    needs: [create-release, package]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write # required to update the GitHub Release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              draft: false,
+              prerelease: false,
+            });

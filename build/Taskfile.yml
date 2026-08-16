@@ -1,6 +1,29 @@
 version: '3'
 
 tasks:
+  # Required by the platform build tasks in windows/, darwin/ and linux/, which
+  # all declare `common:go:mod:tidy` and `common:generate:icons` as deps.
+  go:mod:tidy:
+    summary: Runs `go mod tidy`
+    internal: true
+    run: once
+    cmds:
+      - go mod tidy
+
+  generate:icons:
+    summary: Generates the Windows `.ico` and macOS `.icns` from build/appicon.png
+    run: once
+    dir: build
+    sources: [appicon.png]
+    generates:
+      - windows/icon.ico
+      - darwin/icons.icns
+    # Deliberately without `-iconcomposerinput` / `-macassetdir`, which the stock
+    # template passes: they need an `appicon.icon` bundle this project does not
+    # keep, and `create:app:bundle` copies Assets.car only when it exists.
+    cmds:
+      - wails3 generate icons -input appicon.png -windowsfilename windows/icon.ico -macfilename darwin/icons.icns
+
   install:frontend:deps:
     summary: Installs frontend dependencies
     dir: frontend

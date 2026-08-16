@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=HTTiny
+Comment=A tiny, focused HTTP client for developers.
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/httiny %u
+Terminal=false
+Type=Application
+Icon=httiny
+Categories=Utility;
+StartupWMClass=httiny
+
+ 

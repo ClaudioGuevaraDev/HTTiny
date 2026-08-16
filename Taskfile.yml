@@ -2,6 +2,9 @@ version: '3'
 
 includes:
   common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
 
 vars:
   # The binary filename, so it matches the repo and the module path. The product
@@ -9,6 +12,9 @@ vars:
   APP_NAME: httiny
   BIN_DIR: bin
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # Which platform Taskfile `package` dispatches to. `wails3 package` sets it
+  # explicitly; everything else falls back to the host.
+  GOOS: '{{.GOOS | default OS}}'
 
 tasks:
   build:
@@ -21,6 +27,19 @@ tasks:
       # go build creates {{.BIN_DIR}} itself; `mkdir -p` is not available in
       # Task's built-in shell on Windows.
       - go build -o {{.BIN_DIR}}/{{.APP_NAME}}{{exeExt}} .
+
+  package:
+    summary: Builds the installer for the host platform
+    # `wails3 package` routes through the *root* task name, not `windows:package`,
+    # so this dispatch is what makes the CLI work at all.
+    #
+    # Note this does not reuse the `build` task above: each platform Taskfile runs
+    # its own production build (`-tags production -trimpath -ldflags="-w -s"`, plus
+    # `-H windowsgui` on Windows) as a dependency of packaging. That is the build a
+    # shipped artifact wants, and keeping it separate leaves `build` — the task
+    # build/config.yml drives under `wails3 task dev` — exactly as it was.
+    cmds:
+      - task: '{{.GOOS}}:package'
 
   run:
     summary: Builds and runs HTTiny

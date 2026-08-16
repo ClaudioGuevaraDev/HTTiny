@@ -56,6 +56,8 @@ Whenever the user explicitly requests the `.agents/skills/conventional-commit` s
 
 Keep every application version reference synchronized, including `frontend/package.json` and `build/config.yml`, plus any future manifests or packaging metadata that expose the app version. Do not change Taskfile schema versions such as `version: '3'`.
 
+Releases are tagged `v<version>` and must match those two files exactly. The release workflow verifies this and fails before building, because the installers carry the manifest version rather than the tag. See `RELEASING.md`.
+
 ## Dependency Version Policy
 
 Declare every direct dependency and development dependency with an exact version. Do not use semver ranges such as `^`, `~`, `>`, or `*`. When adding a package, use an exact version (for example, `pnpm add library@1.2.3`) and commit the updated lockfile. Keep Go modules pinned to explicit versions in `go.mod` and retain `go.sum` integrity data.
