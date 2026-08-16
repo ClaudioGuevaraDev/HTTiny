@@ -35,6 +35,30 @@
     background: var(--color-surface-4);
   }
 
+  /* Controls that draw their own 1px border, focused *on* that border rather than
+   * around it. Pulling the ring in by exactly its own width makes it land on the
+   * border instead of outside it, so the control reads as one green-edged box.
+   *
+   * The base ring's positive offset is right for everything else — it keeps the ring
+   * clear of the border and the text, which is why it exists. But once both are 1px,
+   * a ring one pixel outside a border is two identical hairlines with a gap between
+   * them, and that reads as a single border split down its middle rather than as a
+   * control inside a ring. Only these carry a solid border, so only these need it;
+   * `.icon-btn` and friends are `border: 0` and keep the ring outside.
+   *
+   * Rings drawn some other way are not here and must not be added: `.tree-row` and
+   * `.split-handle` set their own offsets, and the key/value cells swap the outline
+   * for an inset shadow. */
+  .url-input:focus-visible,
+  .save-btn:focus-visible,
+  .add-row:focus-visible,
+  .tree-rename:focus-visible,
+  .auth-editor input:focus-visible,
+  .select-trigger[data-variant='field']:focus-visible,
+  .select-trigger[data-variant='method']:focus-visible {
+    outline-offset: calc(var(--focus-ring-width) * -1);
+  }
+
   .icon-btn.xs {
     width: var(--h-control-xs);
     height: var(--h-control-xs);
@@ -90,6 +114,10 @@
     background: var(--color-surface-2);
   }
 
+  /* The one focusable element left with a square focus ring, and deliberately: zeroing
+   * `.icon-btn`'s `--radius-md` is what lets this fill the tab bar's 40px corner flush.
+   * Rounding the box to round the ring would put a notch back in that corner. At a 1px
+   * ring the rectangle is quiet enough to live with. */
   .panel-toggle {
     width: var(--h-tabbar);
     border-right: 1px solid var(--color-border-subtle);
@@ -108,6 +136,8 @@
    * any easing makes them trail the cursor. */
   .split-handle {
     position: relative;
+    /* Shapes the focus ring below, which is all that is ever drawn round this. */
+    border-radius: var(--radius-full);
     background: var(--color-surface-2);
     z-index: var(--z-resizer);
   }
@@ -502,6 +532,13 @@
     display: flex;
     align-items: center;
     gap: 5px;
+    /* Not `gap` on `.tree-scroll`: that container is deliberately block, which is what
+     * makes the empty-state placeholder need its explicit height (see below). Turning it
+     * into a flex column would quietly change that. A margin does the same job here.
+     *
+     * 2px, so the rows stop touching. It also lets the 4px radius finally read — until
+     * now a selected row's rounded corners met the next row's square edge. */
+    margin-bottom: 2px;
     position: relative;
     border-radius: var(--radius-sm);
     color: var(--color-text-muted);
@@ -514,13 +551,44 @@
     color: var(--color-text);
   }
 
-  /* A 3px rail, not the old 2px one. Selection used to be drawn as a 2px inset
-   * edge, which was indistinguishable from a focus indicator; focus is now a full
-   * 2px perimeter ring, so the two can legibly sit on the same row. */
+  /* Rows are 28px and contiguous — no gap between them — inside a scroller padded
+   * 1px at the top. Even the 1px ring would sit on the neighbours from out here, and
+   * the first row's would be clipped, so this one turns inward. Same move, and the
+   * same reason, as `.split-handle` and the key/value cells below.
+   *
+   * Inward by the ring's own width *plus* the offset, not just the offset. At -1px the
+   * outline edge is 1px in and the stroke is painted outward from it, so the ring lands
+   * exactly on the row's last pixel — inside the box, but flush against the row below.
+   * When that row is the selected one, its green plate and pill start on the very next
+   * pixel and the two greens read as one thick edge. The extra pixel keeps a strip of
+   * row between them. */
+  .tree-row:focus-visible {
+    outline-offset: calc((var(--focus-ring-width) + var(--focus-ring-offset)) * -1);
+  }
+
+  /* A short rounded rail rather than the full-height `inset 3px 0` this used to be.
+   * An inset shadow has square corners, so the old rail broke out of the row's own
+   * 4px radius at both ends. This is `.collection-square`'s selected marker rebuilt
+   * at tree scale — 16px on a 28px row is the 20px-on-34px it uses.
+   *
+   * 2px, where it was 3px to stay clear of a 2px focus ring. The ring is 1px now and
+   * a perimeter rather than an edge, so the two no longer need width to tell them
+   * apart. */
   .tree-row.selected {
     background: var(--color-surface-accent);
     color: var(--color-text-strong);
-    box-shadow: inset 3px 0 var(--color-accent);
+  }
+
+  .tree-row.selected::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    translate: 0 -50%;
+    width: 2px;
+    height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
   }
 
   /* Four 24px buttons are 96px, and `opacity: 0` still occupies its space — reserved
@@ -552,17 +620,23 @@
     opacity: 1;
   }
 
+  /* `--color-border-control`, not `--color-accent`: the green belongs to the ring below,
+   * and having both was two identical hairlines a pixel apart — one border split down
+   * the middle. This is the neutral every other field in the app carries. */
   .tree-rename {
     flex: 1;
     min-width: 0;
     height: var(--h-control-xs);
-    border: 1px solid var(--color-accent);
+    border: 1px solid var(--color-border-control);
     border-radius: var(--radius-xs);
     background: var(--color-surface-3);
     color: var(--color-text);
     font-size: var(--text-2xs);
     padding: 0 4px;
   }
+
+  /* Its focus ring lands on that border rather than outside it — see the shared rule
+   * under `── Shared primitives ──`. */
 
   /* ── HTTP methods ──────────────────────────────────────────────────────── */
   /* Each class carries a single custom property, so the chip recipe below is
@@ -692,6 +766,8 @@
     gap: 7px;
     padding: 0;
     border: 0;
+    /* Shapes the focus ring; the tab itself paints no box. */
+    border-radius: var(--radius-sm);
     background: none;
     color: inherit;
     font: inherit;
@@ -840,6 +916,10 @@
     padding: 0 9px;
     border: 0;
     border-bottom: 2px solid transparent;
+    /* Shapes the focus ring, and rounds the ends of the underline below with it — 4px on
+     * a 2px rule is a bevel, not a curve, and it keeps the indicator from being the one
+     * hard-cornered green left in the app. */
+    border-radius: var(--radius-sm);
     background: none;
     color: var(--color-text-subtle);
     font-size: var(--text-xs);
@@ -944,6 +1024,9 @@
     padding: 0 9px;
     border: 0;
     outline: 0;
+    /* Curves the inset focus ring below. The cell paints no box of its own, so this is
+     * only ever visible while focused. */
+    border-radius: var(--radius-xs);
     background: transparent;
     color: var(--color-text);
     font-family: var(--font-mono);
@@ -981,6 +1064,10 @@
     display: grid;
     place-items: center;
     border: 0;
+    /* The 24px hit area is invisible; the 16px box drawn by `::before` is what is seen,
+     * and it is `--radius-xs`. Matching it here stops the focus ring from being a square
+     * around a rounded box. */
+    border-radius: var(--radius-xs);
     background: none;
     cursor: pointer;
   }
@@ -1063,6 +1150,8 @@
   .text-action {
     margin-left: auto;
     border: 0;
+    /* Shapes the focus ring; this is a bare word otherwise. */
+    border-radius: var(--radius-xs);
     background: none;
     color: var(--color-accent-hover);
     font-size: var(--text-2xs);
@@ -1100,7 +1189,6 @@
     border-radius: var(--radius-sm);
     background: var(--color-surface-3);
     color: var(--color-text);
-    outline: 0;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
   }
@@ -1666,6 +1754,24 @@
     color: var(--color-text-muted);
   }
 
+  /* Nothing on focus, by explicit decision — hover is the only state this button lights
+   * up for. It opens the command palette, the palette is a `<dialog>` and `showModal()`
+   * restores focus here when it closes, and closing with Escape is a keyboard interaction,
+   * so `:focus-visible` matched: dismissing the palette left this sitting lit in the
+   * sidebar every time. A ring outside the border, a ring painted onto it and a border
+   * recolour were each tried and each read as the control still being active.
+   *
+   * The cost, stated plainly so nobody has to rediscover it: this is a focusable button
+   * with no focus indicator, which fails SC 2.4.7 (AA) for this one control. What makes it
+   * survivable rather than merely broken is that it is a shortcut, not a destination — it
+   * only opens the palette, and the palette has its own binding that works from anywhere,
+   * so no keyboard path depends on stopping here. Restoring focus without the marker would
+   * be the real fix; `focus({ focusVisible: false })` is the API for it and Chromium, which
+   * is what WebView2 is, does not implement it. Revisit when it does. */
+  .search-trigger:focus-visible {
+    outline: none;
+  }
+
   .search-trigger .shortcut {
     margin-left: auto;
   }
@@ -1890,6 +1996,8 @@
     display: flex;
     align-items: center;
     gap: 9px;
+    /* For the rail below, which is absolutely positioned. */
+    position: relative;
     border-radius: var(--radius-sm);
     color: var(--color-text-muted);
     font-size: var(--text-xs);
@@ -1900,11 +2008,24 @@
    * and would read as a dent, and not the flat grey the OS popup used to paint. This is
    * `.tree-row.selected`'s pair, and it means the same thing there and here — "this is
    * the row in question". The accent rail survives at a glance where a tint alone does
-   * not, which matters because this highlight also has to serve as the keyboard cursor. */
+   * not, which matters because this highlight also has to serve as the keyboard cursor —
+   * and in the method menu, where no option carries a fill any more, it is the only mark
+   * on screen. It is the same 2px rounded rail as the tree's, for the same reason. */
   .select-option[data-active='true'] {
     background: var(--color-surface-accent);
     color: var(--color-text-strong);
-    box-shadow: inset 3px 0 var(--color-accent);
+  }
+
+  .select-option[data-active='true']::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    translate: 0 -50%;
+    width: 2px;
+    height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
   }
 
   .select-option-value {
@@ -1989,9 +2110,27 @@
     min-width: 0;
     background: none;
     border: 0;
-    outline: 0;
     color: var(--color-text);
     font-size: var(--text-sm);
+  }
+
+  /* The one `outline: 0` in this file that is not the bug the two warnings elsewhere
+   * describe, and it needs the argument spelled out because it looks identical to one.
+   *
+   * A ring here has nothing to sit on: the input is a bare box with no border and no
+   * radius inside the 48px field, so it drew a rectangle around the text in the middle
+   * of the dialog. Tinting the field's underline instead put a green line across the
+   * whole palette that was lit the entire time it was open, which is no better.
+   *
+   * What makes the absence acceptable is that there is nothing to disambiguate. The
+   * palette is modal, this input is its only focusable element, it is focused from the
+   * moment the dialog opens until it closes, and the result rows are
+   * `aria-activedescendant` and never take focus. A focus indicator answers "which of
+   * these has it" and here there is only ever one candidate — with a text caret already
+   * blinking in it. Adding a control that can lose focus to this dialog invalidates all
+   * of that, and the ring has to come back. */
+  .palette-input:focus-visible {
+    outline: none;
   }
 
   .palette-input::placeholder {
@@ -2145,6 +2284,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    /* For the active rail, which is absolutely positioned. */
+    position: relative;
     border: 0;
     border-radius: var(--radius-sm);
     background: none;
@@ -2188,10 +2329,23 @@
     color: var(--color-text);
   }
 
+  /* The tree's rail again, so the three "this is the row in question" marks in the app
+   * are one object. */
   .settings-sections button.active {
     background: var(--color-surface-accent);
     color: var(--color-text-strong);
-    box-shadow: inset 2px 0 var(--color-accent);
+  }
+
+  .settings-sections button.active::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    translate: 0 -50%;
+    width: 2px;
+    height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
   }
 
   /* The top padding clears `.settings-close`, which is absolutely positioned at 10px and
@@ -2272,6 +2426,8 @@
     /* Matches `.settings-row .select-trigger`'s `min-width`, so every control in the
      * panel lines up on the same edge. */
     width: 132px;
+    /* Shapes the focus ring to the track it draws. */
+    border-radius: var(--radius-full);
     accent-color: var(--color-accent);
     cursor: pointer;
     /* No `outline: 0` — the base.css focus ring is zero-specificity and a class rule in
@@ -2340,6 +2496,9 @@
     display: grid;
     place-items: center;
     border: 0;
+    /* The track and the knob are both `--radius-full`; without this the focus ring was a
+     * rectangle around a pill, the loudest shape mismatch in the app. */
+    border-radius: var(--radius-full);
     background: none;
     cursor: pointer;
   }

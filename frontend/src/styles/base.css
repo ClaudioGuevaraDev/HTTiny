@@ -68,10 +68,21 @@
   }
 
   /* `:where()` gives this zero specificity, so any component can override it
-   * without an `!important` arms race. The old ring was 1px drawn *inside* the
-   * control (`outline-offset: -1px`), where it collided with the border and the
-   * text; 2px with a positive offset clears both. --color-focus measures between
-   * 7.3:1 and 8.7:1 depending on the surface, well past the 3:1 in SC 1.4.11. */
+   * without an `!important` arms race. 1px, which is what every other border in
+   * this sheet is, drawn *outside* the control: the original 1px ring sat inside
+   * (`outline-offset: -1px`) and collided with the border and the text, and the
+   * 2px-at-2px ring that replaced it cleared both by reaching 4px past the box —
+   * far enough to land on whatever sat next to it. A positive offset is what
+   * separates the ring from the border; the width was never the part doing that.
+   *
+   * The ring's shape is the element's own `border-radius` plus the offset, which
+   * is why a focusable element with no radius gets a rectangle. Anything that can
+   * take focus should carry one.
+   *
+   * --color-focus measures between 7.3:1 and 8.7:1 depending on the surface, well
+   * past the 3:1 in SC 1.4.11 — that is this app's bar and it is unaffected by the
+   * width. SC 2.4.13 Focus Appearance wants a 2px-thick perimeter; it is AAA in
+   * WCAG 2.2 and deliberately not claimed here. */
   :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
     outline: var(--focus-ring-width) solid var(--color-focus);
     outline-offset: var(--focus-ring-offset);

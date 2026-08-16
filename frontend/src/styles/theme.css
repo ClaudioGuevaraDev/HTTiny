@@ -238,8 +238,11 @@
   --h-kv-header: 28px;
 
   /* Geometry */
-  --focus-ring-width: 2px;
-  --focus-ring-offset: 2px;
+  /* A hairline, like every other border in this sheet. At 2px and offset 2px the ring
+   * reached 4px past its box on every side, which on the 28px contiguous tree rows landed
+   * on the neighbours. 1px and 1px halves that; `.tree-row` takes it inward on top. */
+  --focus-ring-width: 1px;
+  --focus-ring-offset: 1px;
   --resizer-track: 4px;
   --resizer-slop: 10px; /* pseudo-element hit expansion, reaching 24px total     */
   --scrollbar-size: 10px;
