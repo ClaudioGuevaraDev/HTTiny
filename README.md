@@ -4,7 +4,7 @@ HTTiny is a compact desktop HTTP client built with Wails v3, Go, React and Tailw
 
 ## Development
 
-Requirements: Go 1.26+ (as pinned in `go.mod`), Node.js, pnpm, the Wails v3 CLI, and the native GTK/WebKit dependencies for your platform.
+Requirements: Go 1.26+ (as pinned in `go.mod`), Node.js 22+ and pnpm 11 (pinned in `frontend/package.json` through `packageManager`, so pnpm fetches the right version itself), the Wails v3 CLI, and the native GTK/WebKit dependencies for your platform.
 
 ```bash
 cd frontend

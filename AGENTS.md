@@ -18,7 +18,7 @@ Generated directories such as `frontend/dist/`, `frontend/node_modules/`, and `b
 
 ## Build and Development Commands
 
-Run frontend commands from `frontend/`:
+Run frontend commands from `frontend/`. The package manager is pinned to pnpm 11 in `package.json` through the `packageManager` field, which pnpm honours by fetching that exact version; pnpm 11 requires Node.js 22 or newer.
 
 - `pnpm install` installs locked dependencies.
 - `pnpm run dev` starts the browser-based Vite development server.
