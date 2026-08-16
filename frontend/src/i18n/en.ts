@@ -168,6 +168,12 @@ export const en = {
   'response.find.title': 'Find',
   'response.wrap.aria': 'Wrap long lines',
   'response.wrap.title': 'Wrap lines',
+  // Shown on the disabled state of each control. They say *why* it does not apply —
+  // a greyed-out button with the same tooltip as the live one explains nothing.
+  'response.copyBody.unavailable': 'This body is not text',
+  'response.find.unavailable': 'Only the text view can be searched',
+  'response.wrap.unavailable': 'Only the text view wraps',
+  'response.hex.toggle.unavailable': 'This response has no body',
   'response.interpretAs': 'Interpret body as',
   // Only the formats whose name is a word rather than a token. The rest uppercase
   // themselves — see BODY_LANGUAGE_LABEL in responseBody.ts.

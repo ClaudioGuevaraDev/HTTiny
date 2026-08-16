@@ -160,16 +160,23 @@ function FormatChip({ format, contentType }: { format: ResponseFormat; contentTy
  * The picker sits on the resolved language, so the format stays readable at a glance —
  * that was the chip's whole job — and the media type the server actually sent survives
  * as the title, where the chip kept it too.
+ *
+ * `frozen` greys the whole group out without removing it. That happens while the hex
+ * view is on: it overrides the rendering entirely, so re-indenting or reinterpreting the
+ * body would change nothing on screen. This used to unmount the group instead, which
+ * meant pressing one button made five others vanish.
  */
 function BodyControls({
   mode,
   language,
   contentType,
+  frozen,
   onChange,
 }: {
   mode: BodyMode
   language: BodyLanguage
   contentType: string
+  frozen: boolean
   onChange: (patch: Partial<BodyView>) => void
 }) {
   const { t } = useT()
@@ -179,9 +186,9 @@ function BodyControls({
   // comes and goes with the Content-Type reads as a bug. `rich` is unavailable for a
   // format with no viewer of its own, and `pretty` for one nothing can re-indent.
   const enabled: Record<BodyMode, boolean> = {
-    rich: hasRichView(language),
-    pretty: canFormat(language),
-    raw: true,
+    rich: !frozen && hasRichView(language),
+    pretty: !frozen && canFormat(language),
+    raw: !frozen,
   }
   const label: Record<BodyMode, string> = {
     rich: richLabel(t, language),
@@ -222,6 +229,7 @@ function BodyControls({
         ariaLabel={t('response.interpretAs')}
         title={contentType || undefined}
         value={language}
+        disabled={frozen}
         options={BODY_LANGUAGES.map(option => ({ value: option, label: bodyLanguageLabel(t, option) }))}
         onChange={next => onChange({ language: next })}
       />
@@ -268,21 +276,36 @@ export function ResponseViewer() {
   // plain expression and no hook sits inside a conditional.
   const failure = response.state === 'error' ? errorCopy(t, response.code, response.detail) : null
 
-  // A body-language picker over a payload that never crossed the binding has nothing
-  // to interpret, and the pretty/raw toggle nothing to re-indent.
+  // A body-language picker over a payload that never crossed the binding has nothing to
+  // interpret, and the pretty/raw toggle nothing to re-indent — so a byte-backed response
+  // shows the format chip instead of the group. That swap follows the *response*, not a
+  // button: pressing something in this toolbar never changes which controls exist.
+  //
+  // Everything below is a `disabled` flag rather than a render condition, which is the
+  // rule the mode segments already followed and the rest of the row did not. Toggling hex
+  // used to unmount the whole control group, and switching to a rich view unmounted find
+  // and wrap — so pressing one button made others vanish, and the ones that survived slid
+  // sideways into the gap.
   const byteBacked = response.state === 'success' && isByteFormat(response.format)
-  const editable = response.state === 'success' && !byteBacked && response.body !== '' && !hex
+  const textual = response.state === 'success' && !byteBacked && response.body !== ''
   const hasPayload = response.state === 'success' && (response.body !== '' || response.bodyUrl !== '')
+  // Find and wrap act on the CodeMirror instance, so they mean something only when one is
+  // actually on screen: not under the hex dump, and not under a tree, table or preview.
+  const editorShowing = textual && !hex && mode !== 'rich'
 
   return (
     <section className="response-viewer" aria-label={t('response.region')}>
       <ResponseStatus response={response} elapsed={elapsed}>
-        {response.state === 'success' && !byteBacked && (
+        {response.state === 'success' && (
           <button
             type="button"
             className="icon-btn xs"
+            /* Disabled rather than absent for a byte-backed body, which has no text to
+               put on the clipboard. The status bar keeps a constant shape for the same
+               reason it renders in all four states. */
+            disabled={!textual}
             aria-label={copyStatus === 'copied' ? t('response.copiedBody.aria') : t('response.copyBody.aria')}
-            title={copyStatus === 'copied' ? t('response.copied.title') : t('response.copyBody.title')}
+            title={textual ? (copyStatus === 'copied' ? t('response.copied.title') : t('response.copyBody.title')) : t('response.copyBody.unavailable')}
             /* What is on screen, not what arrived: pasting the indented body is the
                point of having indented it. */
             onClick={() => copy(bodyText)}
@@ -380,46 +403,55 @@ export function ResponseViewer() {
             </div>
             {responsePanel === 'body' && (
               <div className="body-toolbar">
-                {editable ? (
-                  <BodyControls mode={mode} language={language} contentType={response.contentType} onChange={patch => activeId && setBodyView(activeId, patch)} />
+                {textual ? (
+                  <BodyControls
+                    mode={mode}
+                    language={language}
+                    contentType={response.contentType}
+                    frozen={hex}
+                    onChange={patch => activeId && setBodyView(activeId, patch)}
+                  />
                 ) : (
                   <FormatChip format={response.format} contentType={response.contentType} />
                 )}
                 {/* CodeMirror's search panel has always been reachable with Ctrl+F —
                     `basicSetup` leaves its keymap on — and nothing anywhere said so. A
                     feature nobody can find is not a feature. */}
-                {editable && mode !== 'rich' && (
-                  <button type="button" className="icon-btn xs" aria-label={t('response.find.aria')} title={t('response.find.title')} onClick={focusBodySearch}>
-                    <Search size={13} aria-hidden="true" />
-                  </button>
-                )}
-                {editable && mode !== 'rich' && (
-                  <button
-                    type="button"
-                    className={wrap ? 'icon-btn xs active' : 'icon-btn xs'}
-                    aria-pressed={wrap}
-                    aria-label={t('response.wrap.aria')}
-                    title={t('response.wrap.title')}
-                    onClick={() => setWrap(current => !current)}
-                  >
-                    <WrapText size={13} aria-hidden="true" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="icon-btn xs"
+                  disabled={!editorShowing}
+                  aria-label={t('response.find.aria')}
+                  title={editorShowing ? t('response.find.title') : t('response.find.unavailable')}
+                  onClick={focusBodySearch}
+                >
+                  <Search size={13} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={wrap && editorShowing ? 'icon-btn xs active' : 'icon-btn xs'}
+                  disabled={!editorShowing}
+                  aria-pressed={wrap}
+                  aria-label={t('response.wrap.aria')}
+                  title={editorShowing ? t('response.wrap.title') : t('response.wrap.unavailable')}
+                  onClick={() => setWrap(current => !current)}
+                >
+                  <WrapText size={13} aria-hidden="true" />
+                </button>
                 {/* Offered for every payload, not just the ones nothing else can show:
                     "what are the first sixteen bytes" is a fair question of a JSON body
                     that will not parse, and of a PNG that renders as nothing. */}
-                {hasPayload && (
-                  <button
-                    type="button"
-                    className={hex ? 'icon-btn xs active' : 'icon-btn xs'}
-                    aria-pressed={hex}
-                    aria-label={t('response.hex.toggle.aria')}
-                    title={t('response.hex.toggle.title')}
-                    onClick={() => setHexFor(hex ? null : activeId)}
-                  >
-                    <Binary size={13} aria-hidden="true" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className={hex ? 'icon-btn xs active' : 'icon-btn xs'}
+                  disabled={!hasPayload}
+                  aria-pressed={hex}
+                  aria-label={t('response.hex.toggle.aria')}
+                  title={hasPayload ? t('response.hex.toggle.title') : t('response.hex.toggle.unavailable')}
+                  onClick={() => setHexFor(hex ? null : activeId)}
+                >
+                  <Binary size={13} aria-hidden="true" />
+                </button>
               </div>
             )}
           </div>

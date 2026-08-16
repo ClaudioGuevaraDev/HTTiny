@@ -2399,6 +2399,18 @@
     color: var(--color-text);
   }
 
+  /* Same treatment and same reasoning as `.icon-btn:disabled`: the control stays in
+   * place and stops responding rather than vanishing and making the row jump. The hover
+   * rules above are overridden explicitly — `:hover` still matches a disabled button. */
+  .select-trigger:disabled,
+  .select-trigger:disabled:hover {
+    opacity: 0.45;
+    cursor: default;
+    border-color: var(--color-border);
+    background: transparent;
+    color: var(--color-text-subtle);
+  }
+
   .select-popover {
     /* The UA stylesheet gives every [popover] `inset: 0` and `margin: auto`, which
      * would centre the menu on the window. Both have to be undone before the inline

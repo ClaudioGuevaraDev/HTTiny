@@ -27,6 +27,12 @@ type SelectProps<T extends string> = {
   labelledBy?: string
   describedBy?: string
   title?: string
+  /**
+   * Greys the trigger out and stops it opening, rather than the caller unmounting it.
+   * A control that vanishes when it stops applying reads as a bug — the same rule the
+   * segmented pickers beside this one already follow.
+   */
+  disabled?: boolean
 }
 
 /** Gap between the trigger and the menu, and the margin the menu keeps off a viewport edge. */
@@ -70,7 +76,18 @@ const TYPE_AHEAD_RESET = 500
  * `find` over the option list every one of these call sites used to need to avoid
  * asserting `event.target.value`.
  */
-export function Select<T extends string>({ value, options, onChange, variant = 'field', id, ariaLabel, labelledBy, describedBy, title }: SelectProps<T>) {
+export function Select<T extends string>({
+  value,
+  options,
+  onChange,
+  variant = 'field',
+  id,
+  ariaLabel,
+  labelledBy,
+  describedBy,
+  title,
+  disabled = false,
+}: SelectProps<T>) {
   const base = useId()
   const triggerId = id ?? `${base}-trigger`
   const popoverId = `${base}-popover`
@@ -352,13 +369,16 @@ export function Select<T extends string>({ value, options, onChange, variant = '
         aria-labelledby={labelledBy}
         aria-describedby={describedBy}
         title={title}
+        disabled={disabled}
         /* Declarative rather than an `onClick` of our own: light dismiss fires on
            pointerdown outside the menu — the trigger counts as outside — so a handler would
            reopen what the dismissal had just closed. The invoker relationship also gives
-           focus somewhere to return to. */
-        popoverTarget={popoverId}
+           focus somewhere to return to.
+           Dropped while disabled: a disabled button fires no click, but the invoker
+           relationship is declarative and the keyboard path below has to be stopped too. */
+        popoverTarget={disabled ? undefined : popoverId}
         popoverTargetAction="toggle"
-        onKeyDown={onKeyDown}
+        onKeyDown={disabled ? undefined : onKeyDown}
       >
         <span className="select-value">{selected?.glyph ?? selected?.label}</span>
         <ChevronDown size={12} aria-hidden="true" className="select-caret" />
