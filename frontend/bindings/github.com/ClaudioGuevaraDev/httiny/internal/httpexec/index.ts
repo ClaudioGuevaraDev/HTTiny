@@ -7,6 +7,7 @@ export {
 };
 
 export type {
+    ArchiveEntry,
     Auth,
     KeyValue,
     Request,

@@ -1402,30 +1402,521 @@
     height: 100%;
   }
 
-  .response-code {
-    margin: 0;
-    padding: 12px 17px 30px;
-    color: var(--color-text);
-    font-family: var(--font-mono);
-    font-size: var(--text-code);
-    line-height: var(--text-code--line-height);
-    tab-size: 2;
+  /* ── Response · media viewers ───────────────────────────────────────────────
+   *
+   * `.response-code` and the four `.json-*` colour rules used to live here: dead
+   * leftovers from the regex highlighter that was replaced by CodeMirror, with no
+   * reference left in any TSX. The syntax colours are `--color-syntax-*`, read from
+   * JS by editorTheme.ts.
+   */
+
+  /* Holds the format chip or the body controls, plus the hex toggle. Separate from
+   * `.body-controls` because that group is itself one of this row's children. */
+  .body-toolbar {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
-  .json-key {
+  .media-body {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .media-toolbar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .media-facts {
+    margin: 0 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    user-select: text;
+  }
+
+  .media-type {
+    overflow-wrap: anywhere;
+  }
+
+  .media-stage {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    overflow: auto;
+  }
+
+  /* Without this a transparent PNG on a dark panel is indistinguishable from one with
+   * a black background — which is exactly what you open an image response to check.
+   * Painted in the surface colours rather than the usual grey so it reads as part of
+   * the app in both themes. */
+  .media-stage[data-checkered='true'] {
+    background-color: var(--color-surface-1);
+    background-image:
+      linear-gradient(45deg, var(--color-surface-3) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--color-surface-3) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--color-surface-3) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--color-surface-3) 75%);
+    background-size: 16px 16px;
+    background-position:
+      0 0,
+      0 8px,
+      8px -8px,
+      -8px 0;
+  }
+
+  .media-image[data-fit='fit'] {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  /* 1:1 means 1:1 — the stage scrolls rather than the image shrinking, which is the
+   * only way to judge whether a sprite sheet or an icon is pixel-exact. */
+  .media-image[data-fit='actual'] {
+    max-width: none;
+    max-height: none;
+    image-rendering: pixelated;
+  }
+
+  .media-audio {
+    width: min(100%, 480px);
+  }
+
+  .media-video {
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .media-pdf {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    border: 0;
+  }
+
+  /* ── Response · font specimen ────────────────────────────────────────────────*/
+
+  .font-specimen {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .font-sample-label {
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .font-sample-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .font-rows {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px 20px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    user-select: text;
+  }
+
+  .font-row {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    color: var(--color-text-strong);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  /* Deliberately not set in the font being judged: a caption typeset in a broken font
+   * cannot tell you which size is broken. */
+  .font-size-label {
+    flex: none;
+    width: 28px;
+    color: var(--color-text-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-align: right;
+  }
+
+  /* ── Response · hex viewer ───────────────────────────────────────────────────
+   *
+   * `--hex-row-height` is written by the component, because the windowing maths in
+   * HexBody.tsx depends on the exact row height. JS is the source of truth here and
+   * these rules read it back, so the two cannot drift into a scroll that jitters.
+   */
+
+  .hex-viewer {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .hex-summary {
+    flex: none;
+    margin: 0;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    user-select: text;
+  }
+
+  .hex-scroller {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px 0;
+  }
+
+  .hex-spacer {
+    position: relative;
+  }
+
+  .hex-rows {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    will-change: transform;
+  }
+
+  .hex-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: var(--hex-row-height);
+    padding-inline: 12px;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: var(--hex-row-height);
+    white-space: pre;
+    user-select: text;
+  }
+
+  .hex-offset {
+    flex: none;
+    color: var(--color-text-faint);
+  }
+
+  .hex-cells {
+    flex: none;
+    display: flex;
+  }
+
+  .hex-cell {
+    width: 21px;
+    color: var(--color-text);
+    text-align: center;
+  }
+
+  /* The eight-byte gutter is what makes a column countable without reading the
+   * offset — the same reason every other dump has one. */
+  .hex-cell[data-gap='true'] {
+    margin-left: 10px;
+  }
+
+  /* A run of zeros is the most recognisable shape in a dump: padding, a sparse
+   * header, the tail of a fixed-size record. Dimming them is what makes it visible. */
+  .hex-cell[data-zero='true'] {
+    color: var(--color-text-faint);
+    opacity: 0.6;
+  }
+
+  .hex-ascii {
+    flex: none;
+    padding-left: 6px;
+    border-left: 1px solid var(--color-border-subtle);
+    color: var(--color-text-muted);
+  }
+
+  /* ── Response · JSON tree ────────────────────────────────────────────────────
+   *
+   * `--json-row-height` is written by JsonTree.tsx for the same reason the hex
+   * viewer writes its own: the windowing maths depends on the exact row height, so
+   * JS owns the number and these rules read it back.
+   */
+
+  .json-tree {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .json-scroller {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 6px 0 20px;
+  }
+
+  .json-spacer {
+    position: relative;
+  }
+
+  .json-rows {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    will-change: transform;
+  }
+
+  .json-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--json-row-height);
+    padding-right: 12px;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    white-space: pre;
+    user-select: text;
+  }
+
+  .json-row:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .json-twisty {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    color: var(--color-text-subtle);
+    cursor: pointer;
+  }
+
+  button.json-twisty:hover {
+    background: var(--color-surface-press);
+    color: var(--color-text);
+  }
+
+  .json-label {
     color: var(--color-syntax-key);
   }
 
-  .json-string {
+  .json-label::after {
+    content: ':';
+    color: var(--color-syntax-punctuation);
+  }
+
+  .json-summary {
+    color: var(--color-syntax-punctuation);
+  }
+
+  .json-value[data-kind='string'] {
     color: var(--color-syntax-string);
   }
 
-  .json-literal {
+  /* Drawn rather than baked into the text, so selecting a value copies the value and
+   * not its punctuation. */
+  .json-value[data-kind='string']::before,
+  .json-value[data-kind='string']::after {
+    content: '"';
+    color: var(--color-syntax-punctuation);
+  }
+
+  .json-value[data-kind='number'] {
+    color: var(--color-syntax-number);
+  }
+
+  .json-value[data-kind='boolean'],
+  .json-value[data-kind='null'] {
     color: var(--color-syntax-literal);
   }
 
-  .json-number {
-    color: var(--color-syntax-number);
+  /* Present for every row so the layout never shifts, revealed on hover or focus. A
+   * button that appears on hover and cannot be reached by keyboard is not a button. */
+  .json-copy-path {
+    margin-left: 6px;
+    opacity: 0;
+  }
+
+  .json-row:hover .json-copy-path,
+  .json-copy-path:focus-visible {
+    opacity: 1;
+  }
+
+  /* ── Response · CSV table ────────────────────────────────────────────────────*/
+
+  .csv-table,
+  .archive-body,
+  .sse-body {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .csv-scroller,
+  .archive-scroller {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    user-select: text;
+  }
+
+  .csv-grid,
+  .archive-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  .csv-grid th,
+  .csv-grid td,
+  .archive-grid th,
+  .archive-grid td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    text-align: left;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .csv-grid thead th,
+  .archive-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .csv-grid tbody th,
+  .csv-grid tbody td {
+    color: var(--color-text);
+  }
+
+  /* The line number is chrome, not data: it stays put while the columns scroll under
+   * it, which is the only way to keep a wide export readable. */
+  .csv-gutter {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--color-surface-1);
+    color: var(--color-text-faint) !important;
+    text-align: right !important;
+  }
+
+  .csv-grid thead .csv-gutter {
+    z-index: 3;
+    background: var(--color-surface-2);
+  }
+
+  .archive-name code {
+    color: var(--color-text);
+  }
+
+  .archive-grid tbody th {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--color-text-subtle);
+  }
+
+  .archive-grid tbody td {
+    color: var(--color-text-muted);
+  }
+
+  /* ── Response · server-sent events ───────────────────────────────────────────*/
+
+  .sse-list {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    margin: 0;
+    padding: 0 0 20px;
+    list-style: none;
+    user-select: text;
+  }
+
+  .sse-event {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .sse-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--color-text-faint);
+  }
+
+  .sse-index {
+    color: var(--color-text-faint);
+  }
+
+  .sse-type {
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    color: var(--color-text-muted);
+  }
+
+  .sse-data {
+    margin: 5px 0 0;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* ── Response · sandboxed previews ───────────────────────────────────────────*/
+
+  .html-preview {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* White rather than the panel colour: a page with no background of its own is
+   * written for a white one, and rendering it on near-black leaves dark body text
+   * invisible. The Markdown frame paints its own and follows the OS instead. */
+  .html-frame {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    border: 0;
+    background: #ffffff;
   }
 
   /* A real `<table>` now, and left on native table layout rather than re-styled onto a

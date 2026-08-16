@@ -192,9 +192,12 @@ const readBodyViews = (value: unknown, documents: Record<string, RequestDocument
   for (const [id, view] of Object.entries(value)) {
     if (!documents[id] || !isRecord(view)) continue
     out[id] = {
-      mode: oneOf(view.mode, BODY_MODES, DEFAULT_BODY_VIEW.mode),
-      // Not `oneOf`: the fallback here is `null` — no language chosen — which is not
-      // one of the allowed values.
+      // Neither uses `oneOf`: the fallback for both is `null` — nothing chosen — which
+      // is not one of the allowed values. A file written by an older build carries
+      // `'pretty'` or `'raw'`, both of which are still members and survive; anything
+      // else, including a mode a future build invents, falls back to the per-format
+      // default rather than into a panel with no renderer.
+      mode: BODY_MODES.find(candidate => candidate === view.mode) ?? null,
       language: BODY_LANGUAGES.find(candidate => candidate === view.language) ?? null,
     }
   }

@@ -66,3 +66,36 @@ export function toggleRequest(id: string): void {
   if (controllers.has(id)) cancelRequest(id)
   else void runRequest(id)
 }
+
+/**
+ * Tells Go it can stop holding the bytes of a response the UI has thrown away.
+ *
+ * A subscriber rather than a call at each discard site, for the reason the autosave
+ * subscriber exists: there are four ways to clear a response and two to delete a
+ * request, and one of them will be added later without this being remembered.
+ *
+ * Deliberately *not* triggered by closing a tab. The store's own comment is explicit
+ * that a closed tab keeps its response — finding it still there when you reopen the
+ * tab is a feature — and releasing the bytes would leave that reopened tab showing a
+ * broken image beside an intact status line. Only a response that has genuinely been
+ * discarded is released here; the store's 64 MiB ceiling handles everything else.
+ *
+ * Installed from `main.tsx` rather than on import, so the module stays side-effect
+ * free and the subscription's lifetime is visible where the rest of the boot is.
+ */
+export function installBodyRelease(): void {
+  useAppStore.subscribe((state, prev) => {
+    if (state.responses === prev.responses) return
+    for (const [id, before] of Object.entries(prev.responses)) {
+      // Only byte-backed responses ever held anything; releasing an id Go has nothing
+      // for is harmless, but checking keeps the IPC quiet on ordinary JSON traffic.
+      if (before.state !== 'success' || !before.bodyUrl) continue
+      const after = state.responses[id]
+      if (after === before) continue
+      // A fresh success for the same request replaces the bytes in Go on its own —
+      // `put` evicts the previous entry — so only a discard needs saying.
+      if (after?.state === 'success') continue
+      void executor.release?.(id)
+    }
+  })
+}

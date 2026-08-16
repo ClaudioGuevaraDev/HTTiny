@@ -56,8 +56,29 @@ export interface RequestDocument {
  * How the response body should be labelled and rendered. Decided in Go from the
  * Content-Type — and overridden to `binary` when a payload that claims to be text
  * turns out not to be valid UTF-8 — so the viewer never has to re-sniff it.
+ *
+ * The split matters more than the individual members. `TEXT_FORMATS` arrive as a
+ * string in `body` and are read by an editor; `BYTE_FORMATS` arrive as nothing at all
+ * and carry a `bodyUrl` the webview fetches instead, which is the only way an `<img>`
+ * or a `<video>` can render a response. `binary` is the catch-all of the second group
+ * and now means "show the bytes in the hex viewer" rather than "show nothing".
+ *
+ * `svg` sits in the textual group on purpose even though it renders as a picture: it
+ * is XML, its source is worth reading, and keeping a scriptable document off the byte
+ * route is what stops it being served from the app's own origin. Mirrors the constants
+ * in `internal/httpexec/classify.go`.
  */
-export type ResponseFormat = 'json' | 'html' | 'xml' | 'text' | 'binary'
+export const TEXT_FORMATS = ['json', 'ndjson', 'xml', 'html', 'svg', 'csv', 'markdown', 'yaml', 'javascript', 'css', 'sse', 'text'] as const
+export const BYTE_FORMATS = ['image', 'audio', 'video', 'pdf', 'font', 'archive', 'binary'] as const
+
+export type TextFormat = (typeof TEXT_FORMATS)[number]
+export type ByteFormat = (typeof BYTE_FORMATS)[number]
+export type ResponseFormat = TextFormat | ByteFormat
+
+const BYTE_FORMAT_SET: ReadonlySet<string> = new Set(BYTE_FORMATS)
+
+/** Narrows to the group that has no `body` and must be rendered from `bodyUrl`. */
+export const isByteFormat = (format: ResponseFormat): format is ByteFormat => BYTE_FORMAT_SET.has(format)
 
 /**
  * How the viewer is showing a response body, remembered per request.
@@ -74,12 +95,24 @@ export type ResponseFormat = 'json' | 'html' | 'xml' | 'text' | 'binary'
  * — that is the point of choosing, and it is why a per-request pick outranks the
  * preference rather than the other way round.
  *
- * `mode` is what the request editor's "Format JSON" button does, minus the writing
- * back: `pretty` re-indents, `raw` is exactly what the server sent.
+ * `mode` picks how far from the raw bytes the presentation goes. `pretty` is what the
+ * request editor's "Format JSON" button does minus the writing back, `raw` is exactly
+ * what the server sent, and `rich` is the format's own viewer — the collapsible tree
+ * for JSON, the rendered page for HTML and Markdown, the table for CSV, the event list
+ * for an SSE transcript, the picture for SVG.
+ *
+ * One name for all of those rather than five, because they are one choice: how much
+ * interpretation do you want. Naming them separately would put five members in a
+ * persisted enum to express a single axis, and would make "the same view as last time"
+ * meaningless across a request whose Content-Type changed.
+ *
+ * `null` is "nothing chosen", as it is for `language`, and it resolves to whatever
+ * suits the format: source for JSON, the render for a page. See `resolveMode`.
  */
-export type BodyLanguage = 'json' | 'html' | 'xml' | 'text'
+export type BodyLanguage = TextFormat
+export type BodyMode = 'rich' | 'pretty' | 'raw'
 export interface BodyView {
-  mode: 'pretty' | 'raw'
+  mode: BodyMode | null
   language: BodyLanguage | null
 }
 
@@ -95,11 +128,25 @@ export interface BodyView {
  * produced in Go — or empty. It is deliberately not the curated advice: a system
  * message is not copy and is not translated. See `errors.ts`.
  *
- * On success, `body` is empty when `format` is `binary`: the bytes are deliberately
- * never shipped across the binding, so the viewer renders from the metadata alone.
- * `truncated` says the body was capped, in which case `sizeBytes` is the full size
- * reported by the server rather than the length of what is on screen.
+ * On success, `body` is empty for every format in `BYTE_FORMATS`: those bytes are
+ * still deliberately not shipped across the binding — base64 would inflate them by a
+ * third, hold them twice and give up Range requests — and are fetched from `bodyUrl`
+ * instead. `truncated` says the body was capped, in which case `sizeBytes` is the full
+ * size reported by the server rather than the length of what is on screen.
+ *
+ * `encoding` names the charset the payload was transcoded *from*, empty when it
+ * already was UTF-8. `contentEncoding` is the compression found on the response: with
+ * a readable body it was undone in Go, with a binary one the algorithm is unsupported.
  */
+export interface ArchiveEntry {
+  name: string
+  size: number
+  compressedSize: number
+  /** RFC 3339, or empty when the entry carried no usable timestamp. */
+  modified: string
+  directory: boolean
+}
+
 export type ResponseSnapshot =
   | { state: 'idle' }
   | { state: 'loading'; startedAt: number }
@@ -111,14 +158,33 @@ export type ResponseSnapshot =
       time: number
       sizeBytes: number
       body: string
+      bodyUrl: string
       headers: KeyValueRow[]
       contentType: string
+      encoding: string
+      contentEncoding: string
+      finalUrl: string
+      /** Populated for a zip response only; empty for everything else. */
+      archive: ArchiveEntry[]
       format: ResponseFormat
       truncated: boolean
     }
 
+/**
+ * The one variant every body viewer takes. Named rather than re-`Extract`ed at each
+ * call site, because a dozen components needing the same narrowing is exactly what a
+ * type alias is for.
+ */
+export type SuccessResponse = Extract<ResponseSnapshot, { state: 'success' }>
+
 export interface RequestExecutor {
-  execute(request: RequestDocument, signal: AbortSignal): Promise<Extract<ResponseSnapshot, { state: 'success' }>>
+  execute(request: RequestDocument, signal: AbortSignal): Promise<SuccessResponse>
+  /**
+   * Lets the executor drop whatever it retained for a response the UI has discarded.
+   * Optional because it is a property of *how* an executor ships a payload: only one
+   * that keeps bytes out of the response object has anything to release.
+   */
+  release?(id: string): Promise<void>
 }
 
 export type SplitOrientation = 'rows' | 'columns'

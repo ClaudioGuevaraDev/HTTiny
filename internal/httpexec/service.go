@@ -7,7 +7,6 @@
 package httpexec
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -15,14 +14,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 // Failure codes shared with the frontend. Every one of these has copy in
@@ -40,9 +37,17 @@ const (
 )
 
 const (
-	// Bodies above this are truncated rather than shipped across the binding and
-	// into a CodeMirror document. The response viewer reports the truncation.
-	maxBodyBytes = 5 << 20 // 5 MiB
+	// How much of a response is read at all. Media has to clear a far higher bar than
+	// text — a 12 MB PNG is an ordinary thing for an endpoint to return, and capping
+	// it at the editor's limit would have shown two thirds of a picture.
+	//
+	// The cap has to apply before the format is known, because a server that sends no
+	// Content-Type is classified by sniffing the bytes we already read. So everything
+	// is read to this ceiling and the textual path trims itself afterwards.
+	maxBodyBytes = 32 << 20 // 32 MiB
+	// Text above this is truncated rather than shipped across the binding and into a
+	// CodeMirror document. The response viewer reports the truncation.
+	maxTextBytes = 5 << 20 // 5 MiB
 	maxRedirects = 10
 	// Only used when the request does not carry its own timeout.
 	defaultTimeout = 30 * time.Second
@@ -73,6 +78,10 @@ type Auth struct {
 // not care about. `params` is deliberately absent: store.replaceQuery keeps the
 // query string inside `url`, so sending the rows as well would double-encode them.
 type Request struct {
+	// Identifies the request whose bytes are being held, so a byte-backed response
+	// can be found again on the asset route. It is the frontend's request id, and it
+	// is only ever used as a map key — see bodystore.go.
+	ID       string     `json:"id"`
 	Method   string     `json:"method"`
 	URL      string     `json:"url"`
 	Headers  []KeyValue `json:"headers"`
@@ -83,28 +92,35 @@ type Request struct {
 	TimeoutMs int `json:"timeoutMs"`
 }
 
-// Body formats the viewer knows how to label and render, so it never has to
-// re-parse the Content-Type. "binary" means Body is empty by design.
-const (
-	formatJSON   = "json"
-	formatHTML   = "html"
-	formatXML    = "xml"
-	formatText   = "text"
-	formatBinary = "binary"
-)
-
 type Response struct {
 	Status     int        `json:"status"`
 	StatusText string     `json:"statusText"`
 	TimeMs     int        `json:"timeMs"`
 	SizeBytes  int        `json:"sizeBytes"`
 	Headers    []KeyValue `json:"headers"`
-	// Empty when Format is "binary".
+	// The payload, for textual formats only. Empty for every byte-backed format,
+	// which carries BodyURL instead.
 	Body string `json:"body"`
+	// Where the webview can fetch a byte-backed payload. Empty for textual formats
+	// and for a response with no body at all. The URL changes on every send, so an
+	// <img> or <video> pointed at it always shows the current response.
+	BodyURL string `json:"bodyUrl"`
 	// Bare media type, lowercased, parameters stripped.
 	ContentType string `json:"contentType"`
-	Format      string `json:"format"` // json | html | xml | text | binary
-	Truncated   bool   `json:"truncated"`
+	// The charset the payload was transcoded *from*, when it was not already UTF-8.
+	// Empty means no transcoding happened.
+	Encoding string `json:"encoding"`
+	// The Content-Encoding found on the response, whether or not it could be undone.
+	// Non-empty with a readable body means it was decompressed here; non-empty with a
+	// binary one means the algorithm is not supported.
+	ContentEncoding string `json:"contentEncoding"`
+	// Where the request ended up after redirects, which are otherwise invisible.
+	FinalURL string `json:"finalUrl"`
+	// The entries of a zip response. Empty for every other format, and for an archive
+	// whose index could not be read.
+	Archive   []ArchiveEntry `json:"archive"`
+	Format    string         `json:"format"` // see classify.go
+	Truncated bool           `json:"truncated"`
 }
 
 // Result is an explicit success/failure union rather than a Go `error` return.
@@ -123,9 +139,11 @@ type Result struct {
 
 type HTTPService struct {
 	transport http.RoundTripper
+	// Byte-backed response payloads, held in memory for the asset route to serve.
+	bodies *bodyStore
 }
 
-func New() *HTTPService { return &HTTPService{transport: newTransport()} }
+func New() *HTTPService { return &HTTPService{transport: newTransport(), bodies: newBodyStore()} }
 
 func (s *HTTPService) ServiceName() string { return "HTTPExec" }
 
@@ -206,37 +224,74 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 	}
 	elapsed := time.Since(started)
 
-	media := mediaTypeOf(resp.Header.Get("Content-Type"), raw)
+	// Before anything looks at the bytes: net/http negotiates and unwraps gzip on its
+	// own, and strips the header when it does, so a Content-Encoding still present
+	// here means the user set Accept-Encoding by hand and the payload is compressed.
+	raw, contentEncoding, decoded := decompress(raw, resp.Header.Get("Content-Encoding"))
+
+	media, charset := mediaTypeOf(resp.Header.Get("Content-Type"), raw)
 	format := classifyFormat(media)
-	if format != formatBinary && !isTextual(raw) {
-		format = formatBinary
-	}
 
 	size := len(raw)
 	// Content-Length is the honest total when we stopped early; without it the byte
-	// count is what we actually read, which `truncated` qualifies.
-	if truncated && resp.ContentLength > 0 {
+	// count is what we actually read, which `truncated` qualifies. It is no use once
+	// we have decompressed, when it describes the compressed stream instead.
+	if truncated && !decoded && resp.ContentLength > 0 {
 		size = int(resp.ContentLength)
 	}
 
 	out := Response{
-		Status:      resp.StatusCode,
-		StatusText:  statusText(resp),
-		TimeMs:      int(elapsed.Milliseconds()),
-		SizeBytes:   size,
-		Headers:     flattenHeaders(resp.Header),
-		ContentType: media,
-		Format:      format,
-		Truncated:   truncated,
-	}
-	// Binary payloads are deliberately not shipped, and deliberately not base64'd
-	// either: a 4 MB image becomes 5.3 MB of string that CodeMirror would then try
-	// to lay out. The viewer renders a dedicated state from the metadata instead.
-	if format != formatBinary {
-		out.Body = string(raw)
+		Status:          resp.StatusCode,
+		StatusText:      statusText(resp),
+		TimeMs:          int(elapsed.Milliseconds()),
+		SizeBytes:       size,
+		Headers:         flattenHeaders(resp.Header),
+		ContentType:     media,
+		ContentEncoding: contentEncoding,
+		FinalURL:        finalURL(resp, target),
+		Truncated:       truncated,
 	}
 
+	// A textual payload that turns out not to be text at all falls through to the
+	// byte-backed branch below, where the hex viewer can still show it. That is the
+	// whole reason the veto and the storage decision are sequenced this way.
+	if !isByteBacked(format) {
+		if text := textBody(raw, charset, truncated); text.ok {
+			out.Body = text.text
+			out.Encoding = text.encoding
+			out.Truncated = out.Truncated || text.capped
+		} else {
+			format = formatBinary
+		}
+	}
+
+	if isByteBacked(format) {
+		// Still not base64 across the binding: that would inflate a 4 MB image to
+		// 5.3 MB of JSON string, hold it twice, and give up the Range requests that
+		// let a video seek. The bytes stay here and the webview fetches them.
+		out.BodyURL = s.bodies.put(req.ID, raw, servedContentType(format, media))
+		// Read here, while the bytes are in hand, rather than over the asset route: the
+		// index is metadata and belongs with the rest of it.
+		if format == formatArchive {
+			out.Archive = listArchive(raw, media)
+		}
+	} else {
+		// This request answered with text this time. Whatever picture it returned
+		// before is now unreachable from the UI and has no business being held.
+		s.bodies.release(req.ID)
+	}
+
+	out.Format = format
 	return Result{OK: true, Response: out}
+}
+
+// finalURL reports where the request actually ended up. net/http points resp.Request
+// at the last hop of a redirect chain, which is otherwise followed in total silence.
+func finalURL(resp *http.Response, target *url.URL) string {
+	if resp.Request != nil && resp.Request.URL != nil {
+		return resp.Request.URL.String()
+	}
+	return target.String()
 }
 
 func failure(code, text string) Result {
@@ -360,54 +415,6 @@ func flattenHeaders(header http.Header) []KeyValue {
 		}
 	}
 	return rows
-}
-
-// mediaTypeOf returns the bare, lowercased media type. When the server sends no
-// Content-Type it sniffs the payload instead of guessing — http.DetectContentType
-// only inspects the first 512 bytes, per its contract, which is enough to tell
-// text from an image.
-func mediaTypeOf(header string, body []byte) string {
-	if strings.TrimSpace(header) == "" {
-		header = http.DetectContentType(body)
-	}
-	if parsed, _, err := mime.ParseMediaType(header); err == nil {
-		return strings.ToLower(parsed)
-	}
-	base, _, _ := strings.Cut(header, ";")
-	return strings.ToLower(strings.TrimSpace(base))
-}
-
-// classifyFormat maps a media type onto a render format. It is intentionally a
-// whitelist: anything unrecognised is binary, so a new media type errs towards the
-// safe "do not dump this into a text editor" branch.
-func classifyFormat(media string) string {
-	switch {
-	case media == "application/json" || strings.HasSuffix(media, "+json"),
-		media == "application/x-ndjson":
-		return formatJSON
-	case media == "text/html" || media == "application/xhtml+xml":
-		return formatHTML
-	case media == "application/xml" || media == "text/xml" || strings.HasSuffix(media, "+xml"):
-		return formatXML
-	case strings.HasPrefix(media, "text/"),
-		media == "application/javascript", media == "application/x-www-form-urlencoded",
-		media == "application/graphql":
-		return formatText
-	default:
-		return formatBinary
-	}
-}
-
-// isTextual is the veto over classifyFormat: a payload that *claims* to be text but
-// is not valid UTF-8, or contains a NUL, would reach the viewer as a wall of
-// replacement characters. A NUL byte cannot occur in text worth displaying, and
-// letting invalid UTF-8 through would have Go's string conversion silently
-// substitute U+FFFD for every bad byte.
-func isTextual(body []byte) bool {
-	if !utf8.Valid(body) {
-		return false
-	}
-	return !bytes.ContainsRune(body, 0)
 }
 
 // classify maps a transport failure onto the frontend's error codes.

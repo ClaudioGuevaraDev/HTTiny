@@ -10,6 +10,15 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * Release lets the frontend drop a retained body when its tab closes or its response
+ * is cleared. Nothing breaks if it is never called — the store has its own ceiling —
+ * but a user who has just closed a tab has no reason to still be holding 30 MB of it.
+ */
+export function Release(id: string): $CancellablePromise<void> {
+    return $Call.ByID(4284804684, id);
+}
+
+/**
  * Send performs one request and reports the outcome.
  * 
  * ctx is the first parameter so that Wails marks the method as context-aware:

@@ -2,6 +2,7 @@ import { Call, CancelError } from '@wailsio/runtime'
 import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import type { KeyValue } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import { RequestFailure } from './errors'
+import { BYTE_FORMATS, TEXT_FORMATS } from './types'
 import type { KeyValueRow, RequestExecutor, ResponseFormat } from './types'
 
 /**
@@ -19,8 +20,17 @@ const toPairs = (rows: readonly KeyValueRow[]): KeyValue[] =>
 const toRows = (pairs: readonly KeyValue[]): KeyValueRow[] =>
   pairs.map((pair, index) => ({ id: `${index}:${pair.key}`, enabled: true, key: pair.key, value: pair.value, description: '' }))
 
-const FORMATS: readonly ResponseFormat[] = ['json', 'html', 'xml', 'text', 'binary']
-const toFormat = (value: string): ResponseFormat => (FORMATS as readonly string[]).includes(value) ? (value as ResponseFormat) : 'text'
+/**
+ * Go's `format` is a bare string on the wire, so it is re-narrowed here rather than
+ * asserted. The fallback is `'text'` and that is the safe direction: a format this
+ * build does not know about is at worst shown as plain text, whereas trusting the
+ * string would put an unhandled value into an exhaustive switch.
+ *
+ * Built from the two exported tuples so a format added to `types.ts` cannot be
+ * forgotten here — which used to be a real hazard while the list was hand-written.
+ */
+const FORMATS: ReadonlySet<string> = new Set<string>([...TEXT_FORMATS, ...BYTE_FORMATS])
+const toFormat = (value: string): ResponseFormat => (FORMATS.has(value) ? (value as ResponseFormat) : 'text')
 
 /**
  * Executes requests in the Go process over the Wails binding.
@@ -43,6 +53,10 @@ export const goExecutor: RequestExecutor = {
       // which cancels the Go context, which aborts the socket. Aborting here is a
       // real network cancellation, not just the UI looking away.
       result = await HTTPService.Send({
+        // Keys the bytes Go retains for a byte-backed response, so `bodyUrl` can
+        // point back at them. It is the document id, which is what `responses` and
+        // `bodyViews` are keyed by too — not the tree node id.
+        id: request.id,
         method: request.method,
         url: request.url,
         headers: toPairs(request.headers),
@@ -74,12 +88,32 @@ export const goExecutor: RequestExecutor = {
       time: response.timeMs,
       sizeBytes: response.sizeBytes,
       body: response.body,
+      bodyUrl: response.bodyUrl,
       // Go slices cross the binding as `T[] | null`, so an empty header map
       // arrives as null rather than [].
       headers: toRows(response.headers ?? []),
       contentType: response.contentType,
+      encoding: response.encoding,
+      contentEncoding: response.contentEncoding,
+      finalUrl: response.finalUrl,
+      // Null for every format but zip, and for a zip whose directory would not read.
+      archive: response.archive ?? [],
       format: toFormat(response.format),
       truncated: response.truncated,
+    }
+  },
+
+  /**
+   * Best effort by design. The bytes are held under a ceiling that evicts on its own,
+   * so a failed release costs a little memory until the next large response pushes it
+   * out — never correctness. Which is why this swallows rather than propagating into a
+   * store subscriber, where there is nothing sensible to do with a rejection.
+   */
+  async release(id) {
+    try {
+      await HTTPService.Release(id)
+    } catch (error) {
+      console.warn('Could not release the retained response body', error)
     }
   },
 }

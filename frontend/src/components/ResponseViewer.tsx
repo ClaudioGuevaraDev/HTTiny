@@ -1,18 +1,51 @@
 import { useEffect, useMemo, useState } from 'react'
-import CodeMirror, { EditorView } from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { Binary, Braces, Check, Code, Copy, FileJson2, FileText, FileX2, RotateCcw, Send, TriangleAlert, X } from 'lucide-react'
-import { httinyTheme } from '../editorTheme'
+import {
+  Binary,
+  Braces,
+  Check,
+  Code,
+  Copy,
+  FileArchive,
+  FileAudio,
+  FileJson2,
+  FileText,
+  FileType,
+  FileVideo,
+  Image,
+  Radio,
+  RotateCcw,
+  Search,
+  Send,
+  Shapes,
+  Table,
+  TriangleAlert,
+  Type,
+  WrapText,
+  X,
+} from 'lucide-react'
 import { errorCopy } from '../errors'
-import { formatBytes, formatDuration } from '../format'
+import { formatDuration } from '../format'
 import { useLocale, useT } from '../language'
-import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW, bodyLanguageLabel, formatBody, resolveLanguage } from '../responseBody'
-import type { BodyLanguage, BodyView, ResponseFormat } from '../types'
+import {
+  BODY_LANGUAGES,
+  BODY_MODES,
+  DEFAULT_BODY_VIEW,
+  bodyLanguageLabel,
+  canFormat,
+  formatBody,
+  hasRichView,
+  resolveLanguage,
+  resolveMode,
+  richLabel,
+} from '../responseBody'
+import { isByteFormat } from '../types'
+import type { BodyLanguage, BodyMode, BodyView, ResponseFormat } from '../types'
 import { cancelRequest, runRequest } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
 import { useAppStore } from '../store'
 import { useCopy } from '../useCopy'
 import { useRovingFocus } from '../useRovingFocus'
+import { BodyPanel } from './response/BodyPanel'
 import { Placeholder, PlaceholderAction, SkeletonLines } from './Placeholder'
 import { ResponseStatus } from './ResponseStatus'
 import { Select } from './Select'
@@ -36,22 +69,73 @@ function useElapsed(startedAt: number | null): number {
 }
 
 /**
- * Module-level so the arrays are referentially stable: a fresh `extensions` array
- * on every render makes CodeMirror reconfigure itself for nothing.
- *
- * Only JSON gets a language extension. HTML and XML render as wrapped plain text
- * rather than pulling in `@codemirror/lang-html` and `lang-xml` — two more exact-
- * pinned dependencies for syntax colour on formats an HTTP client inspects far less
- * often than JSON.
+ * Labels for the chip. Protocol tokens, so they are not translated — but `binary` is
+ * now the *last* resort rather than the answer for every media type the classifier
+ * did not recognise, and the chip finally says which of them it is.
  */
-const JSON_EXTENSIONS = [json(), EditorView.lineWrapping]
-const PLAIN_EXTENSIONS = [EditorView.lineWrapping]
+const FORMAT_LABEL: Record<ResponseFormat, string> = {
+  json: 'JSON',
+  ndjson: 'NDJSON',
+  xml: 'XML',
+  html: 'HTML',
+  svg: 'SVG',
+  csv: 'CSV',
+  markdown: 'MD',
+  yaml: 'YAML',
+  javascript: 'JS',
+  css: 'CSS',
+  sse: 'SSE',
+  text: 'TEXT',
+  image: 'IMAGE',
+  audio: 'AUDIO',
+  video: 'VIDEO',
+  pdf: 'PDF',
+  font: 'FONT',
+  archive: 'ZIP',
+  binary: 'BINARY',
+}
 
-const FORMAT_LABEL: Record<ResponseFormat, string> = { json: 'JSON', html: 'HTML', xml: 'XML', text: 'TEXT', binary: 'BINARY' }
-const FORMAT_ICON: Record<ResponseFormat, typeof Braces> = { json: Braces, html: Code, xml: Code, text: FileText, binary: Binary }
+/**
+ * Opens CodeMirror's own search panel, by giving the editor focus and replaying the
+ * keystroke its keymap is already listening for.
+ *
+ * A `dispatch` of the `openSearchPanel` command would be tidier and needs an
+ * `EditorView` handle, which means either a ref threaded through `TextBody` or
+ * `@codemirror/search` as a declared dependency for the one import. Neither is worth it
+ * for a button whose entire job is to reveal a shortcut the user could already type.
+ */
+function focusBodySearch(): void {
+  const editor = document.querySelector<HTMLElement>('#response-content .cm-content')
+  if (!editor) return
+  editor.focus()
+  editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, metaKey: true, bubbles: true }))
+}
 
-/** Mirrors maxBodyBytes in internal/httpexec — only ever used to word the notice. */
-const BODY_LIMIT = 5 * 1024 * 1024
+/**
+ * One glyph per family rather than per format: the label already carries the exact
+ * name, and nineteen distinguishable 13px icons is not a thing that exists.
+ */
+const FORMAT_ICON: Record<ResponseFormat, typeof Braces> = {
+  json: Braces,
+  ndjson: Braces,
+  xml: Code,
+  html: Code,
+  svg: Shapes,
+  csv: Table,
+  markdown: FileText,
+  yaml: FileText,
+  javascript: Code,
+  css: Code,
+  sse: Radio,
+  text: FileText,
+  image: Image,
+  audio: FileAudio,
+  video: FileVideo,
+  pdf: FileType,
+  font: Type,
+  archive: FileArchive,
+  binary: Binary,
+}
 
 /**
  * Was a hardcoded "JSON" label that lied about every HTML page and PNG the client
@@ -61,7 +145,7 @@ const BODY_LIMIT = 5 * 1024 * 1024
 function FormatChip({ format, contentType }: { format: ResponseFormat; contentType: string }) {
   const Icon = FORMAT_ICON[format]
   return (
-    <div className="ml-auto response-format" role="presentation" title={contentType || undefined}>
+    <div className="response-format" role="presentation" title={contentType || undefined}>
       <Icon size={13} aria-hidden="true" />
       {FORMAT_LABEL[format]}
     </div>
@@ -78,46 +162,51 @@ function FormatChip({ format, contentType }: { format: ResponseFormat; contentTy
  * as the title, where the chip kept it too.
  */
 function BodyControls({
-  view,
+  mode,
   language,
   contentType,
   onChange,
 }: {
-  view: BodyView
+  mode: BodyMode
   language: BodyLanguage
   contentType: string
   onChange: (patch: Partial<BodyView>) => void
 }) {
   const { t } = useT()
   const onSegmentKeyDown = useRovingFocus('[role="radio"]')
-  // Nothing else can be re-indented without pulling in a formatter per language. The
-  // control stays visible and disabled rather than disappearing: a control that comes
-  // and goes with the Content-Type reads as a bug.
-  const canFormat = language === 'json'
+
+  // Both segments stay visible and go disabled rather than disappearing: a control that
+  // comes and goes with the Content-Type reads as a bug. `rich` is unavailable for a
+  // format with no viewer of its own, and `pretty` for one nothing can re-indent.
+  const enabled: Record<BodyMode, boolean> = {
+    rich: hasRichView(language),
+    pretty: canFormat(language),
+    raw: true,
+  }
+  const label: Record<BodyMode, string> = {
+    rich: richLabel(t, language),
+    pretty: t('response.mode.pretty'),
+    raw: t('response.mode.raw'),
+  }
 
   return (
-    <div className="ml-auto body-controls">
+    <div className="body-controls">
       {/* A radiogroup rather than a tablist, like the request body's type picker: these
           pick how one panel renders, they do not switch between panels. */}
-      <div
-        className="segmented"
-        role="radiogroup"
-        aria-label={t('response.formatting')}
-        title={canFormat ? undefined : t('response.formatting.onlyJson')}
-        onKeyDown={onSegmentKeyDown}
-      >
-        {BODY_MODES.map(mode => (
+      <div className="segmented" role="radiogroup" aria-label={t('response.formatting')} onKeyDown={onSegmentKeyDown}>
+        {BODY_MODES.map(option => (
           <button
             type="button"
-            key={mode}
+            key={option}
             role="radio"
-            aria-checked={view.mode === mode}
-            disabled={!canFormat}
-            tabIndex={view.mode === mode ? 0 : -1}
-            className={view.mode === mode ? 'active' : ''}
-            onClick={() => onChange({ mode })}
+            aria-checked={mode === option}
+            disabled={!enabled[option]}
+            tabIndex={mode === option ? 0 : -1}
+            className={mode === option ? 'active' : ''}
+            title={enabled[option] ? undefined : t(`response.mode.${option}.unavailable`)}
+            onClick={() => onChange({ mode: option })}
           >
-            {mode === 'pretty' ? t('response.mode.pretty') : t('response.mode.raw')}
+            {label[option]}
           </button>
         ))}
       </div>
@@ -155,23 +244,40 @@ export function ResponseViewer() {
   const elapsed = useElapsed(response.state === 'loading' ? response.startedAt : null)
   const { status: copyStatus, copy } = useCopy()
   const onTabsKeyDown = useRovingFocus('[role="tab"]')
+  // Which request the hex escape hatch is open for, rather than a bare boolean: the
+  // viewer does not remount when tabs change, so a boolean would leak the choice from
+  // one request onto the next. Storing the id makes switching away close it, and
+  // switching back is a fresh decision — which is right, since it is a way of looking
+  // at *this* payload, not a preference.
+  const [hexFor, setHexFor] = useState<string | null>(null)
+  const hex = hexFor !== null && hexFor === activeId
+  // A view preference rather than a per-request one, like the theme: whether long lines
+  // wrap is about the width of the panel you are looking at, not about the endpoint.
+  const [wrap, setWrap] = useState(true)
 
   // Hooks cannot sit inside the success branch, so the inputs are read defensively and
   // the memo runs against an empty body the rest of the time — which costs nothing.
   const view = storedView ?? DEFAULT_BODY_VIEW
   const rawBody = response.state === 'success' ? response.body : ''
   const language = resolveLanguage(view, response.state === 'success' ? response.format : 'text', defaultBodyLanguage, rawBody)
+  const mode = resolveMode(view, language)
   // Reparsing several MB of JSON on every render — and this component re-renders ten
   // times a second while a *later* request is in flight — is not affordable.
-  const { text: bodyText, failed: formatFailed } = useMemo(() => formatBody(rawBody, language, view.mode), [rawBody, language, view.mode])
+  const { text: bodyText, failed: formatFailed } = useMemo(() => formatBody(rawBody, language, mode), [rawBody, language, mode])
   // Hoisted above the JSX rather than resolved inline, so the error branch stays a
   // plain expression and no hook sits inside a conditional.
   const failure = response.state === 'error' ? errorCopy(t, response.code, response.detail) : null
 
+  // A body-language picker over a payload that never crossed the binding has nothing
+  // to interpret, and the pretty/raw toggle nothing to re-indent.
+  const byteBacked = response.state === 'success' && isByteFormat(response.format)
+  const editable = response.state === 'success' && !byteBacked && response.body !== '' && !hex
+  const hasPayload = response.state === 'success' && (response.body !== '' || response.bodyUrl !== '')
+
   return (
     <section className="response-viewer" aria-label={t('response.region')}>
       <ResponseStatus response={response} elapsed={elapsed}>
-        {response.state === 'success' && (
+        {response.state === 'success' && !byteBacked && (
           <button
             type="button"
             className="icon-btn xs"
@@ -272,64 +378,54 @@ export function ResponseViewer() {
                 <span className="sr-only">{plural('response.tab.returned', response.headers.length)}</span>
               </button>
             </div>
-            {responsePanel === 'body' && response.format !== 'binary' && response.body ? (
-              <BodyControls view={view} language={language} contentType={response.contentType} onChange={patch => activeId && setBodyView(activeId, patch)} />
-            ) : (
-              <FormatChip format={response.format} contentType={response.contentType} />
+            {responsePanel === 'body' && (
+              <div className="body-toolbar">
+                {editable ? (
+                  <BodyControls mode={mode} language={language} contentType={response.contentType} onChange={patch => activeId && setBodyView(activeId, patch)} />
+                ) : (
+                  <FormatChip format={response.format} contentType={response.contentType} />
+                )}
+                {/* CodeMirror's search panel has always been reachable with Ctrl+F —
+                    `basicSetup` leaves its keymap on — and nothing anywhere said so. A
+                    feature nobody can find is not a feature. */}
+                {editable && mode !== 'rich' && (
+                  <button type="button" className="icon-btn xs" aria-label={t('response.find.aria')} title={t('response.find.title')} onClick={focusBodySearch}>
+                    <Search size={13} aria-hidden="true" />
+                  </button>
+                )}
+                {editable && mode !== 'rich' && (
+                  <button
+                    type="button"
+                    className={wrap ? 'icon-btn xs active' : 'icon-btn xs'}
+                    aria-pressed={wrap}
+                    aria-label={t('response.wrap.aria')}
+                    title={t('response.wrap.title')}
+                    onClick={() => setWrap(current => !current)}
+                  >
+                    <WrapText size={13} aria-hidden="true" />
+                  </button>
+                )}
+                {/* Offered for every payload, not just the ones nothing else can show:
+                    "what are the first sixteen bytes" is a fair question of a JSON body
+                    that will not parse, and of a PNG that renders as nothing. */}
+                {hasPayload && (
+                  <button
+                    type="button"
+                    className={hex ? 'icon-btn xs active' : 'icon-btn xs'}
+                    aria-pressed={hex}
+                    aria-label={t('response.hex.toggle.aria')}
+                    title={t('response.hex.toggle.title')}
+                    onClick={() => setHexFor(hex ? null : activeId)}
+                  >
+                    <Binary size={13} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
           <div className="response-content" id="response-content" role="tabpanel" aria-labelledby={`response-tab-${responsePanel}`} tabIndex={-1}>
             {responsePanel === 'body' ? (
-              response.format === 'binary' ? (
-                /* The bytes are deliberately never sent across the binding — a 4 MB
-                   image would become 5.3 MB of string for CodeMirror to lay out, to
-                   display nothing legible. Everything worth knowing is metadata. */
-                <Placeholder
-                  icon={<Binary size={20} />}
-                  title={t('response.binary.title')}
-                  /* Two whole messages rather than an optional clause spliced into one:
-                     where the media type lands in the sentence is the translation's
-                     business, not this component's. */
-                  description={
-                    response.contentType
-                      ? t('response.binary.descWithType', { size: formatBytes(response.sizeBytes, locale), type: response.contentType })
-                      : t('response.binary.desc', { size: formatBytes(response.sizeBytes, locale) })
-                  }
-                />
-              ) : response.body ? (
-                /*
-                  Read-only CodeMirror, replacing a regex highlighter that piped
-                  server content through dangerouslySetInnerHTML. That highlighter
-                  only coloured strings preceded by a colon, so array elements came
-                  out plain and the response disagreed with the request editor about
-                  what JSON looks like. Sharing httinyTheme makes them match by
-                  construction, and CodeMirror renders only the visible lines rather
-                  than building one enormous <pre>.
-                */
-                <>
-                  {response.truncated && (
-                    <p className="response-notice">
-                      {t('response.truncated', { limit: formatBytes(BODY_LIMIT, locale), size: formatBytes(response.sizeBytes, locale) })}
-                    </p>
-                  )}
-                  {/* Silent when the body was truncated: a cut-off body cannot parse by
-                      construction, and the notice above already says why. */}
-                  {formatFailed && !response.truncated && <p className="response-notice">{t('response.invalidJson')}</p>}
-                  <CodeMirror
-                    value={bodyText}
-                    theme={httinyTheme}
-                    extensions={language === 'json' ? JSON_EXTENSIONS : PLAIN_EXTENSIONS}
-                    editable={false}
-                    basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: false }}
-                  />
-                </>
-              ) : (
-                <Placeholder
-                  icon={<FileX2 size={20} />}
-                  title={response.status === 204 ? t('response.noContent.title') : t('response.emptyBody.title')}
-                  description={response.status === 204 ? t('response.noContent.desc') : t('response.emptyBody.desc')}
-                />
-              )
+              <BodyPanel response={response} language={language} mode={mode} text={bodyText} formatFailed={formatFailed} hex={hex} wrap={wrap} />
             ) : (
               /* A real table, not a grid of divs with <b> for column heads. Name/value
                  pairs are tabular data, and a screen reader can only navigate them

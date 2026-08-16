@@ -4,6 +4,7 @@ import { App } from './App'
 import { initCodeFontSize } from './codeFont'
 import { initLanguage } from './language'
 import { hydrate } from './persistence'
+import { installBodyRelease } from './requestRunner'
 import { initTheme } from './theme'
 import { initZoom } from './zoom'
 // Self-hosted: the app is an offline desktop binary and cannot fetch webfonts at
@@ -36,6 +37,10 @@ void hydrate().then(() => {
   initLanguage()
   initZoom()
   initCodeFontSize()
+  // Unlike the four above, this one has nothing to do with the first paint: it is a
+  // store subscriber, and it goes here rather than at module scope so that importing
+  // `requestRunner` stays free of side effects.
+  installBodyRelease()
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />
