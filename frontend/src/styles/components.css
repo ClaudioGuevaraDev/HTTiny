@@ -1771,12 +1771,12 @@
    * this is gone: the chip is the trigger's own content now. */
   .select-trigger[data-variant='method'] {
     flex: 0 0 auto;
-    /* Set by the widest *value*, not by the widest row. OPTIONS as a filled chip is seven
-     * mono characters at 10px plus 12px of padding and border, ~54px, and what is left
-     * for it here is this width less the borders, the padding, the 3px gap and the 12px
-     * caret — so anything under ~85px clips it, which is what 82px was doing. 92px leaves
-     * the chip a few px of slack and the menu rows, sized from this same rect, plenty.
-     * The URL input is `flex: 1` and absorbs whatever this takes. */
+    /* Set by the widest *value*, not by the widest row. OPTIONS is seven characters of
+     * JetBrains Mono at the 13px below, ~54px, and what is left for it here is this width
+     * less the borders, the padding, the 3px gap and the 12px caret — 61px. The figure
+     * survived the value losing its fill by coincidence worth writing down: it used to be
+     * seven glyphs at 10px, 42px, plus 12px of padding and border, which lands in the same
+     * place. The URL input is `flex: 1` and absorbs whatever this takes. */
     width: 92px;
     height: var(--h-control-lg);
     gap: 3px;
@@ -1850,24 +1850,30 @@
    * carries the width and the word carries the colour.
    *
    * The inset is here rather than on `.method-chip-ghost`, which is `padding: 0` for the
-   * request bar's borderless slot. It is on every row, not just the chosen one, so that
-   * the pill below can appear without shifting a single label sideways. */
+   * request bar's borderless slot. It used to be what kept the chosen row's pill from
+   * shifting a label sideways as it appeared; that pill is gone and the inset stays on its
+   * own merit, giving these rows 14px from the popover edge against the 8px every other
+   * menu takes — mono all-caps needs the extra air. */
   .select-popover[data-variant='method'] .method-chip {
     padding: 2px 6px;
     border-radius: var(--radius-xs);
   }
 
-  /* The trigger goes the other way, because it is the opposite situation: one chip, no
-   * column to line up with. Filling here stretched a three-letter label's fill into a
-   * coloured band, so it hugs its word instead — `min-width: 0` drops the 46px floor that
-   * exists for the sidebar's method column — and centres in what the caret leaves over. */
+  /* The trigger draws the same `ghost` node as the rows, and centres it in what the caret
+   * leaves over. Nothing has to undo a width floor here any more: 46px comes from
+   * `.method-chip-chip`, which the bar stopped using when its fill went. */
   .select-trigger[data-variant='method'] .select-value {
     display: flex;
     justify-content: center;
   }
 
+  /* The one thing separating the bar's copy from the menu's. The method is the first thing
+   * read off a request, and with the fill gone size is what is left to say so — two steps up
+   * from the chip's 11px. It is also why DELETE and OPTIONS no longer shrink to 10px here:
+   * that rule is `.method-chip-chip`'s, for the sidebar's narrow column, and the bar has the
+   * room. Widest case measured against `width` above. */
   .select-trigger[data-variant='method'] .method-chip {
-    min-width: 0;
+    font-size: var(--text-sm);
   }
 
   /* One step up the control scale, and only here. These rows are mono all-caps with a
@@ -1926,19 +1932,13 @@
     font-weight: var(--font-weight-semibold);
   }
 
-  /* The one label the rule above cannot reach: a method option is a `.method-chip`, which
-   * paints its own `--method` colour and is already bold. So the mark runs the other way
-   * round from everywhere else — in a list of plain words, the chosen one is the only one
-   * wearing a box, which makes it the only badge on screen.
-   *
-   * Same 16%/30% `color-mix` as `.method-chip-chip` (see the HTTP methods section), so
-   * this badge and the sidebar's are the same object. `box-shadow` rather than `border`
-   * because `.method-chip-ghost` sets `border: 0` and a real one would move the word by
-   * a pixel as the selection changed. */
-  .select-option[aria-selected='true'] .method-chip {
-    background: color-mix(in oklab, var(--method) 16%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--method) 30%, transparent);
-  }
+  /* No companion rule for method rows, deliberately — do not add one back. The rule above
+   * cannot reach them (a `.method-chip` paints its own `--method` colour and ghost is
+   * already bold), and what used to cover the gap was a filled badge on the chosen row,
+   * the same 16%/30% mix the sidebar chips wear. Every fill is out of this picker now, so
+   * the chosen method is marked on the request bar instead, at 13px. Inside an open menu
+   * that leaves only `data-active`'s accent rail, which starts on the chosen row and moves
+   * off it with the cursor. That is the accepted cost of a list of plain coloured words. */
 
   /* ── Command palette ───────────────────────────────────────────────────── */
   /* Built on <dialog> + showModal(), which supplies the focus trap, top-layer

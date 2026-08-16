@@ -358,15 +358,18 @@ export function RequestEditor() {
     <section className="request-editor" id="request-editor-panel" role="tabpanel" aria-labelledby={requestTabId(activeId)}>
       <div className="request-bar">
         {/*
-          Two variants of the same chip, because the two surfaces are not the same problem.
-          On the bar there is one method and the filled pill is the point. In the menu there
-          are seven labels between three and seven characters long, and a filled pill can
-          either be the same width as its neighbours or fit its word, never both — equal
-          width leaves GET as three letters adrift in a colour band. `ghost` drops the fill,
-          so the row carries the width and the word carries the colour.
+          One `ghost` chip for both surfaces. A filled pill can either match its neighbours'
+          width or fit its word, never both, and equal width left GET as three letters adrift
+          in a colour band — so the menu never had a fill. The bar has now dropped its own:
+          the method is the word in its colour, and the control's border is what says there
+          is a control there. `.select-trigger[data-variant='method']` sizes the bar's copy
+          up to 13px, which is the only thing separating the two.
 
-          Both stay `decorative`: the option row already names the method, and without that
-          it would be announced twice.
+          Hence no `valueGlyph` — it existed to make the bar differ from the menu, and it
+          no longer does. `Select` falls back to `glyph` for the value.
+
+          `decorative` because the option row already names the method; without it the method
+          would be announced twice.
         */}
         <Select
           variant="method"
@@ -376,7 +379,6 @@ export function RequestEditor() {
             value: method,
             label: method,
             glyph: <MethodChip method={method} variant="ghost" decorative />,
-            valueGlyph: <MethodChip method={method} variant="chip" decorative />,
           }))}
           onChange={method => updateDocument(activeId, { method })}
         />

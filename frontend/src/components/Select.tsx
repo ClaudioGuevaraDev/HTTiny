@@ -7,14 +7,14 @@ export type SelectOption<T extends string> = {
   value: T
   /** The accessible name and the type-ahead key. Always a string, even when `glyph` draws it. */
   label: string
-  /** Drawn *instead of* the label in the list. The label still names the option. */
-  glyph?: ReactNode
   /**
-   * Drawn instead of `glyph` in the trigger, for the one case where the chosen value wants
-   * a different treatment from the row it came from: the method picker's list is plain
-   * coloured words, but the value on the bar is a filled chip. Falls back to `glyph`.
+   * Drawn *instead of* the label, in the list and in the trigger alike. The label still
+   * names the option. A `valueGlyph` used to sit beside this so the chosen value could be
+   * drawn differently from the row it came from; the method picker was its only caller and
+   * no longer wants the distinction, so the two surfaces share one node and part company in
+   * CSS — see `.select-trigger[data-variant='method']`.
    */
-  valueGlyph?: ReactNode
+  glyph?: ReactNode
 }
 
 type SelectProps<T extends string> = {
@@ -350,7 +350,7 @@ export function Select<T extends string>({ value, options, onChange, variant = '
         popoverTargetAction="toggle"
         onKeyDown={onKeyDown}
       >
-        <span className="select-value">{selected?.valueGlyph ?? selected?.glyph ?? selected?.label}</span>
+        <span className="select-value">{selected?.glyph ?? selected?.label}</span>
         <ChevronDown size={12} aria-hidden="true" className="select-caret" />
       </button>
 
