@@ -1,6 +1,6 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
-import { Check, ChevronDown, FileX2, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
+import { Check, FileX2, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import type { MessageKey } from '../i18n'
 import { useT } from '../language'
@@ -8,11 +8,12 @@ import { flushNow } from '../persistence'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
 import { methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
-import { methodToken, type HttpMethod, type KeyValueRow, type RequestDocument } from '../types'
+import type { KeyValueRow, RequestDocument } from '../types'
 import { requestTabId } from '../domIds'
 import { useRovingFocus } from '../useRovingFocus'
 import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction } from './Placeholder'
+import { Select } from './Select'
 
 const freshRow = (): KeyValueRow => ({ id: crypto.randomUUID(), enabled: true, key: '', value: '', description: '' })
 
@@ -35,6 +36,22 @@ const PLACEHOLDER = {
   value: 'editor.kv.valuePlaceholder',
   description: 'editor.kv.descriptionPlaceholder',
 } as const satisfies Record<Field, MessageKey>
+
+type AuthType = RequestDocument['auth']['type']
+
+/**
+ * Walked out of a table rather than written as three `<option>`s, the same way `THEMES`
+ * and `LANGUAGES` feed the pickers in Settings: the order and the labels live in one
+ * place, and `Select` is generic over the union so `onChange` hands back an `AuthType`
+ * with nothing asserted.
+ */
+const AUTH_TYPES = ['none', 'bearer', 'basic'] as const satisfies readonly AuthType[]
+
+const AUTH_TYPE_LABEL = {
+  none: 'editor.auth.none',
+  bearer: 'editor.auth.bearer',
+  basic: 'editor.auth.basic',
+} as const satisfies Record<AuthType, MessageKey>
 
 type Panel = 'params' | 'headers' | 'body' | 'auth'
 
@@ -101,7 +118,12 @@ function KeyValueEditor({ request, field }: { request: RequestDocument; field: '
               onChange={e => commit(rows.map(r => (r.id === row.id ? { ...r, [key]: e.target.value } : r)))}
             />
           ))}
-          <button type="button" className="icon-btn xs row-delete" aria-label={t('editor.kv.deleteRow')} onClick={() => commit(rows.filter(r => r.id !== row.id))}>
+          <button
+            type="button"
+            className="icon-btn xs row-delete"
+            aria-label={t('editor.kv.deleteRow')}
+            onClick={() => commit(rows.filter(r => r.id !== row.id))}
+          >
             <Trash2 size={13} aria-hidden="true" />
           </button>
         </div>
@@ -180,14 +202,18 @@ function AuthEditor({ request }: { request: RequestDocument }) {
   const setAuth = (patch: Partial<RequestDocument['auth']>) => updateDocument(request.id, { auth: { ...request.auth, ...patch } })
   return (
     <div className="auth-editor">
-      <label>
-        {t('editor.auth.type')}
-        <select value={request.auth.type} onChange={e => setAuth({ type: e.target.value as RequestDocument['auth']['type'] })}>
-          <option value="none">{t('editor.auth.none')}</option>
-          <option value="bearer">{t('editor.auth.bearer')}</option>
-          <option value="basic">{t('editor.auth.basic')}</option>
-        </select>
-      </label>
+      {/* A <span>, not a <label>: the picker's trigger is a <button role="combobox">, and
+          only labelable elements answer to `htmlFor`. `labelledBy` carries the accessible
+          name across intact; what it does not carry is click-the-text-to-focus. */}
+      <div className="auth-row">
+        <span id="auth-type-label">{t('editor.auth.type')}</span>
+        <Select
+          labelledBy="auth-type-label"
+          value={request.auth.type}
+          options={AUTH_TYPES.map(type => ({ value: type, label: t(AUTH_TYPE_LABEL[type]) }))}
+          onChange={type => setAuth({ type })}
+        />
+      </div>
       {request.auth.type === 'none' && <p>{t('editor.auth.noneNote')}</p>}
       {/*
         These are credentials for the *target API*, not for HTTiny, so every one of them
@@ -332,26 +358,28 @@ export function RequestEditor() {
     <section className="request-editor" id="request-editor-panel" role="tabpanel" aria-labelledby={requestTabId(activeId)}>
       <div className="request-bar">
         {/*
-          The native select is kept for keyboard and screen-reader behaviour and
-          rendered transparently over the chip. The chip is aria-hidden because the
-          select already exposes the value — without that it is announced twice.
+          Two variants of the same chip, because the two surfaces are not the same problem.
+          On the bar there is one method and the filled pill is the point. In the menu there
+          are seven labels between three and seven characters long, and a filled pill can
+          either be the same width as its neighbours or fit its word, never both — equal
+          width leaves GET as three letters adrift in a colour band. `ghost` drops the fill,
+          so the row carries the width and the word carries the colour.
+
+          Both stay `decorative`: the option row already names the method, and without that
+          it would be announced twice.
         */}
-        <div className={`method-field method-${methodToken(request.method)}`} data-method={methodToken(request.method)}>
-          <MethodChip method={request.method} variant="ghost" decorative />
-          <ChevronDown size={12} aria-hidden="true" />
-          <select
-            className="method-native"
-            aria-label={t('editor.method')}
-            value={request.method}
-            onChange={e => updateDocument(activeId, { method: e.target.value as HttpMethod })}
-          >
-            {methodOptions.map(m => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          variant="method"
+          ariaLabel={t('editor.method')}
+          value={request.method}
+          options={methodOptions.map(method => ({
+            value: method,
+            label: method,
+            glyph: <MethodChip method={method} variant="ghost" decorative />,
+            valueGlyph: <MethodChip method={method} variant="chip" decorative />,
+          }))}
+          onChange={method => updateDocument(activeId, { method })}
+        />
         {/* A stable id, so the INVALID_URL placeholder can focus this field without
             reaching for a class selector the way Ctrl+Enter used to.
 
@@ -395,9 +423,7 @@ export function RequestEditor() {
         <button
           type="button"
           className={`send-btn ${sending ? 'cancel' : ''}`}
-          title={
-            sending ? t('editor.cancel.title', { keys: shortcutHint('cancel') }) : t('editor.send.title', { keys: shortcutHint('send') })
-          }
+          title={sending ? t('editor.cancel.title', { keys: shortcutHint('cancel') }) : t('editor.send.title', { keys: shortcutHint('send') })}
           onClick={() => toggleRequest(activeId)}
         >
           {sending ? <Square size={13} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} {sending ? t('editor.cancel') : t('editor.send')}

@@ -9,6 +9,7 @@ import { shortcuts } from '../shortcuts'
 import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, useAppStore } from '../store'
 import { useRovingFocus } from '../useRovingFocus'
 import { Placeholder, Shortcut } from './Placeholder'
+import { Select } from './Select'
 
 /**
  * The tablist is the table of contents, so the split is by what a row *is* and every
@@ -35,9 +36,10 @@ const SECTIONS = [
 type Section = (typeof SECTIONS)[number]['id']
 
 /**
- * No icons: an `<option>` is drawn by the OS and cannot carry one. Nothing is lost that
- * the words were not already carrying — "System" / "Light" / "Dark" name the choice
- * without leaning on a glyph.
+ * Still no icons, but no longer because it is impossible — `Select` draws its own menu
+ * and every option can carry a glyph, which is what the method picker uses. Nothing is
+ * lost that the words were not already carrying: "System" / "Light" / "Dark" name the
+ * choice without leaning on one.
  */
 const THEMES = [
   { id: 'system', label: 'settings.theme.system' },
@@ -223,10 +225,12 @@ function ThemeRow() {
   return (
     <div className="settings-row">
       <div className="settings-label">
-        {/* A real label, now that there is a single control to point at — which also
-            makes the text clickable to focus the select. It used to be a span because
-            a radiogroup can only be named through `aria-labelledby`. */}
-        <label htmlFor="settings-theme">{t('settings.theme.label')}</label>
+        {/* A span, not a label. This was a label for a while — the comment here used to
+            celebrate that, now that there was a single control to point at — but the
+            control is a <button role="combobox"> again and `htmlFor` only binds to
+            labelable elements. `labelledBy` keeps the accessible name; what it cannot
+            keep is clicking the text to focus the control. */}
+        <span id="settings-theme-label">{t('settings.theme.label')}</span>
         {/* "System" on its own says nothing about what is on screen. */}
         <p id="settings-theme-desc">
           {theme === 'system'
@@ -234,25 +238,17 @@ function ThemeRow() {
             : t('settings.theme.desc.always', { theme: t(THEME_INLINE[theme]) })}
         </p>
       </div>
-      <select
+      {/* The `find` over the source of truth is gone along with the native select:
+          `Select` is generic over its options, so `next` is already a `ThemePreference`
+          and there is still nothing to assert. */}
+      <Select
         id="settings-theme"
-        className="settings-select"
-        aria-describedby="settings-theme-desc"
+        labelledBy="settings-theme-label"
+        describedBy="settings-theme-desc"
         value={theme}
-        onChange={event => {
-          // `find` over the source of truth instead of asserting what came out of the
-          // DOM, the same way the response body's language picker does it: the option
-          // list and the union cannot drift apart, and nothing needs `as`.
-          const next = THEMES.find(option => option.id === event.target.value)
-          if (next) setTheme(next.id)
-        }}
-      >
-        {THEMES.map(({ id, label }) => (
-          <option key={id} value={id}>
-            {t(label)}
-          </option>
-        ))}
-      </select>
+        options={THEMES.map(({ id, label }) => ({ value: id, label: t(label) }))}
+        onChange={setTheme}
+      />
     </div>
   )
 }
@@ -419,11 +415,13 @@ function SplitOrientationRow() {
 /**
  * The shared shape behind both layout rows.
  *
- * Native rather than reimplemented, for the same reasons as the `<select>` above: the
- * platform draws a slider that already follows the theme through `accent-color`, and it
- * supplies the arrow keys, Home/End and Page keys for nothing. `SplitHandle` had to
- * hand-roll all of that because a resizer is a `role="separator"` on a 4px track, which
- * has no native equivalent.
+ * Native rather than reimplemented — which is what the selects above used to say too,
+ * before WebView2 was caught drawing their popups from the system theme. A range has no
+ * popup to get wrong: the platform draws a slider that already follows the theme through
+ * `accent-color`, and it supplies the arrow keys, Home/End and Page keys for nothing.
+ * That trade still holds here, and `Select.tsx` explains where it stopped holding.
+ * `SplitHandle` had to hand-roll all of that because a resizer is a `role="separator"`
+ * on a 4px track, which has no native equivalent.
  *
  * The description and the readout arrive already translated, which is what lets `label`
  * be a `PlainMessageKey` — a key carried as a value would otherwise widen to the whole
@@ -548,25 +546,24 @@ function BodyLanguageRow() {
   return (
     <div className="settings-row">
       <div className="settings-label">
-        <label htmlFor="settings-body-language">{t('settings.response.format.label')}</label>
+        {/* A span rather than a label, for the reason spelled out in `ThemeRow`. */}
+        <span id="settings-body-language-label">{t('settings.response.format.label')}</span>
         <p id="settings-body-language-desc">{t('settings.response.format.desc')}</p>
       </div>
-      <select
+      <Select
         id="settings-body-language"
-        className="settings-select"
-        aria-describedby="settings-body-language-desc"
-        // The empty string stands in for "automatic": no format can be named that, so the
-        // `find` on the way back misses and lands on `null` with no case of its own.
+        labelledBy="settings-body-language-label"
+        describedBy="settings-body-language-desc"
+        // The empty string stands in for "automatic": no format can be named that, so it
+        // needs no case of its own on the way out either — anything that is not a format
+        // is `null`.
         value={defaultBodyLanguage ?? ''}
-        onChange={event => setDefaultBodyLanguage(BODY_LANGUAGES.find(candidate => candidate === event.target.value) ?? null)}
-      >
-        <option value="">{t('settings.response.format.auto')}</option>
-        {BODY_LANGUAGES.map(option => (
-          <option key={option} value={option}>
-            {bodyLanguageLabel(t, option)}
-          </option>
-        ))}
-      </select>
+        options={[
+          { value: '', label: t('settings.response.format.auto') },
+          ...BODY_LANGUAGES.map(option => ({ value: option, label: bodyLanguageLabel(t, option) })),
+        ]}
+        onChange={next => setDefaultBodyLanguage(next === '' ? null : next)}
+      />
     </div>
   )
 }
@@ -587,25 +584,18 @@ function LanguageRow() {
   return (
     <div className="settings-row">
       <div className="settings-label">
-        <label htmlFor="settings-language">{t('settings.language.label')}</label>
+        {/* A span rather than a label, for the reason spelled out in `ThemeRow`. */}
+        <span id="settings-language-label">{t('settings.language.label')}</span>
         <p id="settings-language-desc">{t('settings.language.desc')}</p>
       </div>
-      <select
+      <Select
         id="settings-language"
-        className="settings-select"
-        aria-describedby="settings-language-desc"
+        labelledBy="settings-language-label"
+        describedBy="settings-language-desc"
         value={language}
-        onChange={event => {
-          const next = LANGUAGES.find(option => option.id === event.target.value)
-          if (next) setLanguage(next.id)
-        }}
-      >
-        {LANGUAGES.map(({ id, label }) => (
-          <option key={id} value={id}>
-            {label}
-          </option>
-        ))}
-      </select>
+        options={LANGUAGES.map(({ id, label }) => ({ value: id, label }))}
+        onChange={setLanguage}
+      />
     </div>
   )
 }

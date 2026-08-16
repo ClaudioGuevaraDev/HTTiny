@@ -15,6 +15,7 @@ import { useCopy } from '../useCopy'
 import { useRovingFocus } from '../useRovingFocus'
 import { Placeholder, PlaceholderAction, SkeletonLines } from './Placeholder'
 import { ResponseStatus } from './ResponseStatus'
+import { Select } from './Select'
 
 /**
  * Live elapsed time for the loading state — the only genuinely new information while
@@ -124,24 +125,17 @@ function BodyControls({
           what its body actually is — and picking one pins it from then on. There is no
           entry for "nothing chosen": the default lives in Settings, and this control is
           only for overriding it. */}
-      <select
-        className="body-language"
-        aria-label={t('response.interpretAs')}
+      {/* The `find` that used to sit in `onChange` is gone: `Select` is generic over the
+          option list, so `language` arrives already narrowed to a `BodyLanguage` and
+          there is still nothing to assert. */}
+      <Select
+        variant="inline"
+        ariaLabel={t('response.interpretAs')}
         title={contentType || undefined}
         value={language}
-        onChange={event => {
-          // `find` over the source of truth instead of asserting the value: the option
-          // list and the union cannot drift apart, and nothing needs `as`.
-          const next = BODY_LANGUAGES.find(candidate => candidate === event.target.value)
-          if (next) onChange({ language: next })
-        }}
-      >
-        {BODY_LANGUAGES.map(option => (
-          <option key={option} value={option}>
-            {bodyLanguageLabel(t, option)}
-          </option>
-        ))}
-      </select>
+        options={BODY_LANGUAGES.map(option => ({ value: option, label: bodyLanguageLabel(t, option) }))}
+        onChange={next => onChange({ language: next })}
+      />
     </div>
   )
 }

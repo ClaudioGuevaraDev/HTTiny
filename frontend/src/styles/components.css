@@ -650,43 +650,11 @@
     font-weight: var(--font-weight-bold);
   }
 
-  /* The native select is kept for keyboard and screen-reader behaviour but rendered
-   * transparently over the chip — the only way to fully style a select short of
-   * reimplementing the listbox. */
-  .method-field {
-    position: relative;
-    flex: 0 0 auto;
-    width: 96px;
-    height: var(--h-control-lg);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 8px 0 10px;
-    background: var(--color-surface-3);
-    border: 1px solid var(--color-border-control);
-    border-radius: var(--radius-md);
-  }
-
-  .method-field svg {
-    margin-left: auto;
-    color: var(--color-text-subtle);
-    pointer-events: none;
-  }
-
-  .method-native {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    border: 0;
-    cursor: pointer;
-  }
-
-  .method-field:focus-within {
-    outline: var(--focus-ring-width) solid var(--color-focus);
-    outline-offset: var(--focus-ring-offset);
-  }
+  /* The method picker's own rules used to live here: a native select stretched
+   * transparently over a chip, which was the only way to fully style one short of
+   * reimplementing the listbox. It is a real listbox now — see `── Select ──` — so the
+   * chip is the trigger's content rather than something painted underneath it, and
+   * `:focus-within` is no longer standing in for a focus ring on a hidden control. */
 
   /* ── Request tabs ──────────────────────────────────────────────────────── */
   .request-tabs {
@@ -1109,7 +1077,12 @@
     gap: 15px;
   }
 
-  .auth-editor label {
+  /* `.auth-row` is the type picker's line. It cannot be a <label> like the three below
+   * it, because its control is a <button role="combobox"> and `htmlFor` only binds to
+   * labelable elements — so it is a plain grid row with `aria-labelledby` doing the
+   * naming. Same two columns, so the four rows still line up. */
+  .auth-editor label,
+  .auth-editor .auth-row {
     display: grid;
     grid-template-columns: 120px 1fr;
     align-items: center;
@@ -1117,7 +1090,9 @@
     font-size: var(--text-xs);
   }
 
-  .auth-editor select,
+  /* The auth type picker used to share this rule and inherited `--font-mono` from it.
+   * It is a `.select-trigger` now and takes sans instead: a token and a password are
+   * technical strings, "Bearer Token" is prose. */
   .auth-editor input {
     height: var(--h-control-md);
     padding: 0 9px;
@@ -1128,6 +1103,15 @@
     outline: 0;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
+  }
+
+  /* The three fields below stretch the 1fr column because a token, a username and a
+   * password are as long as they are. Three fixed words are not, and the picker
+   * inherited that stretch from being the same kind of grid item — ~470px of control
+   * behind the word "No Auth". It sizes to a comfortable minimum and stops. */
+  .auth-editor .select-trigger {
+    justify-self: start;
+    min-width: 180px;
   }
 
   .auth-editor p {
@@ -1280,35 +1264,32 @@
     border-bottom: 0;
   }
 
+  /* The language picker's trigger is a button in this row too, so it needs the same
+   * escape — plus one the segments do not: `.response-tabs button span` turns any span
+   * inside one of these buttons into a count badge, and the trigger's value is a span. */
+  .body-controls .select-trigger {
+    min-width: 0;
+  }
+
+  .body-controls .select-trigger span {
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font-size: inherit;
+  }
+
   .body-controls .segmented button:disabled {
     color: var(--color-text-subtle);
     opacity: 0.45;
     cursor: default;
   }
 
-  .body-language {
-    height: var(--h-control-xs);
-    padding: 0 4px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-xs);
-    background: none;
-    color: var(--color-text-subtle);
-    outline: 0;
-    font-family: var(--font-mono);
-    font-size: var(--text-2xs);
-    cursor: pointer;
-  }
-
-  .body-language:hover {
-    color: var(--color-text);
-    border-color: var(--color-border-control);
-  }
-
-  /* The popup list is drawn by the OS and inherits nothing useful from the row. */
-  .body-language option {
-    background: var(--color-surface-3);
-    color: var(--color-text);
-  }
+  /* The body language picker is `.select-trigger[data-variant='inline']`; its geometry
+   * moved to the `── Select ──` section along with the rest of it. The `option` rule
+   * that used to sit here — a hand-painted background, because the OS popup inherited
+   * nothing from the row — went with it, having never worked on Windows anyway. */
 
   .response-content {
     flex: 1;
@@ -1702,6 +1683,259 @@
     flex: 0 0 auto;
   }
 
+  /* ── Select ────────────────────────────────────────────────────────────── */
+  /* The app's own listbox, replacing every native <select>. The rationale for owning
+   * the popup rather than leaving it to the platform is in `Select.tsx`; the short
+   * version is that WebView2 draws it from the *system* theme, so a dark app got a
+   * white list with a grey hover and neither `color-scheme` nor the `option`
+   * background rules that used to sit here could reach it.
+   *
+   * This is the second listbox in the app and it deliberately looks like the first:
+   * the option row is `.palette-option`'s recipe, with the highlight swapped for the
+   * one below. */
+  .select {
+    /* A scaffold, not a box. `display: contents` leaves the trigger exactly where the
+     * <select> used to sit, so `.auth-editor label`'s grid column and `.settings-row`'s
+     * flex line keep working with no change. The menu is `position: fixed` in the top
+     * layer and never takes part in layout at all. */
+    display: contents;
+  }
+
+  .select-trigger {
+    display: flex;
+    align-items: center;
+    appearance: none;
+    cursor: pointer;
+    /* No `outline: 0` anywhere in this section. `.body-language` and `.auth-editor
+     * select` both carried one and, being class rules in this layer, beat the
+     * zero-specificity `:focus-visible` in base.css — so neither control had a visible
+     * focus ring. Both inherit one now. */
+  }
+
+  .select-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .select-caret {
+    flex: 0 0 auto;
+    color: var(--color-text-subtle);
+    transition: rotate var(--duration-fast) var(--ease-standard);
+  }
+
+  .select-trigger[aria-expanded='true'] .select-caret {
+    rotate: 180deg;
+  }
+
+  /* Inherits `.settings-select` and `.auth-editor select`'s geometry exactly, so
+   * nothing on either surface moves. Sans, not mono: these are prose — "System",
+   * "Bearer Token" — and the old `.auth-editor select` only got mono from sharing a
+   * rule with the token and password fields, which are technical strings. */
+  .select-trigger[data-variant='field'] {
+    height: var(--h-control-md);
+    gap: 8px;
+    padding: 0 8px 0 9px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    font-size: var(--text-xs);
+  }
+
+  /* `.body-language`'s geometry: a 24px control with no fill, whose border only
+   * appears on approach. It sits in a strip of metrics, not in a form. */
+  .select-trigger[data-variant='inline'] {
+    /* Sized to "JSON" it came out at ~44px, which read as a fragment rather than as a
+     * control — and handed the menu the same width, since `place` measures this rect. */
+    min-width: 72px;
+    height: var(--h-control-xs);
+    gap: 3px;
+    padding: 0 4px 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-xs);
+    background: none;
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  /* `.method-field`'s geometry. The transparent select that used to be stretched over
+   * this is gone: the chip is the trigger's own content now. */
+  .select-trigger[data-variant='method'] {
+    flex: 0 0 auto;
+    /* Set by the widest *value*, not by the widest row. OPTIONS as a filled chip is seven
+     * mono characters at 10px plus 12px of padding and border, ~54px, and what is left
+     * for it here is this width less the borders, the padding, the 3px gap and the 12px
+     * caret — so anything under ~85px clips it, which is what 82px was doing. 92px leaves
+     * the chip a few px of slack and the menu rows, sized from this same rect, plenty.
+     * The URL input is `flex: 1` and absorbs whatever this takes. */
+    width: 92px;
+    height: var(--h-control-lg);
+    gap: 3px;
+    padding: 0 6px 0 8px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-3);
+  }
+
+  .select-trigger[data-variant='field']:hover,
+  .select-trigger[data-variant='method']:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .select-trigger[data-variant='inline']:hover {
+    border-color: var(--color-border-control);
+    color: var(--color-text);
+  }
+
+  .select-popover {
+    /* The UA stylesheet gives every [popover] `inset: 0` and `margin: auto`, which
+     * would centre the menu on the window. Both have to be undone before the inline
+     * coordinates `Select.tsx` writes mean anything. */
+    inset: auto;
+    margin: 0;
+    padding: 4px;
+    z-index: var(--z-dropdown);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-4);
+    color: var(--color-text);
+    box-shadow: var(--shadow-menu);
+    overflow: hidden auto;
+    /* Scrolling past the end of a long menu must not start scrolling the panel behind it. */
+    overscroll-behavior: contain;
+    /* The app's first entrance animation, on the tokens that were reserved for one:
+     * `--ease-out` is annotated "entrances, menus" and `--duration-base` "panels, menus,
+     * disclosure". `allow-discrete` is what lets `display` and `overlay` participate, so
+     * the menu animates out as well as in instead of vanishing. The reduced-motion block
+     * in base.css already flattens all of it. */
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity var(--duration-base) var(--ease-out),
+      translate var(--duration-base) var(--ease-out),
+      display var(--duration-base) allow-discrete,
+      overlay var(--duration-base) allow-discrete;
+  }
+
+  .select-popover:not(:popover-open) {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+
+  @starting-style {
+    .select-popover:popover-open {
+      opacity: 0;
+      translate: 0 -4px;
+    }
+  }
+
+  .select-popover[data-variant='inline'] {
+    font-family: var(--font-mono);
+  }
+
+  /* The menu's labels are `ghost` chips — no fill, no border, just the method in its own
+   * colour. That is what settles an argument the filled pill could not: seven labels
+   * between three and seven characters can be all one width or can each fit their word,
+   * never both, and forcing the first left GET as three letters adrift in a colour band.
+   * With no box there is nothing to stretch and no right edge to leave ragged; the row
+   * carries the width and the word carries the colour.
+   *
+   * The inset is here rather than on `.method-chip-ghost`, which is `padding: 0` for the
+   * request bar's borderless slot. It is on every row, not just the chosen one, so that
+   * the pill below can appear without shifting a single label sideways. */
+  .select-popover[data-variant='method'] .method-chip {
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* The trigger goes the other way, because it is the opposite situation: one chip, no
+   * column to line up with. Filling here stretched a three-letter label's fill into a
+   * coloured band, so it hugs its word instead — `min-width: 0` drops the 46px floor that
+   * exists for the sidebar's method column — and centres in what the caret leaves over. */
+  .select-trigger[data-variant='method'] .select-value {
+    display: flex;
+    justify-content: center;
+  }
+
+  .select-trigger[data-variant='method'] .method-chip {
+    min-width: 0;
+  }
+
+  /* One step up the control scale, and only here. These rows are mono all-caps with a
+   * badge on one of them, which needs more room around it than the sentence-case labels
+   * every other menu holds. `padding-block` would not have done it — `min-height` wins
+   * until the padding pushes past it, and a 16px label plus padding never does. */
+  .select-popover[data-variant='method'] .select-option {
+    min-height: var(--h-control-lg);
+  }
+
+  .select-option {
+    min-height: var(--h-control-md);
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  /* Not `--color-surface-hover`, which is *below* `--color-surface-4` on the dark ladder
+   * and would read as a dent, and not the flat grey the OS popup used to paint. This is
+   * `.tree-row.selected`'s pair, and it means the same thing there and here — "this is
+   * the row in question". The accent rail survives at a glance where a tint alone does
+   * not, which matters because this highlight also has to serve as the keyboard cursor. */
+  .select-option[data-active='true'] {
+    background: var(--color-surface-accent);
+    color: var(--color-text-strong);
+    box-shadow: inset 3px 0 var(--color-accent);
+  }
+
+  .select-option-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Highlighted and chosen are two different states and need two different marks — the
+   * tint above follows the pointer and the arrow keys, so on its own it stops saying
+   * which value is actually set the moment the cursor moves off it. This was a check in
+   * a reserved 13px column; it is the label's own colour and weight now, which says the
+   * same thing without a glyph or a column.
+   *
+   * Below `data-active` deliberately: the two rules have equal specificity, so the chosen
+   * row keeps reading as chosen even while it is also the highlighted one — which is the
+   * state the menu opens in.
+   *
+   * Measured like every other colour here. The accent clears 6.8:1 on the tint in dark
+   * and 8.0:1 in light, and 7.6:1 / 5.9:1 on the menu's own surface. */
+  .select-option[aria-selected='true'] {
+    color: var(--color-accent);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* The one label the rule above cannot reach: a method option is a `.method-chip`, which
+   * paints its own `--method` colour and is already bold. So the mark runs the other way
+   * round from everywhere else — in a list of plain words, the chosen one is the only one
+   * wearing a box, which makes it the only badge on screen.
+   *
+   * Same 16%/30% `color-mix` as `.method-chip-chip` (see the HTTP methods section), so
+   * this badge and the sidebar's are the same object. `box-shadow` rather than `border`
+   * because `.method-chip-ghost` sets `border: 0` and a real one would move the word by
+   * a pixel as the selection changed. */
+  .select-option[aria-selected='true'] .method-chip {
+    background: color-mix(in oklab, var(--method) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--method) 30%, transparent);
+  }
+
   /* ── Command palette ───────────────────────────────────────────────────── */
   /* Built on <dialog> + showModal(), which supplies the focus trap, top-layer
    * rendering (so it never fights the sidebar for z-index), ::backdrop, focus
@@ -1981,7 +2215,12 @@
     padding: 10px 0;
   }
 
-  .settings-label > label {
+  /* Both, because the rows split on what their control is: a checkbox or a range takes a
+   * real <label>, a `Select` cannot — `htmlFor` only binds to labelable elements and its
+   * trigger is a <button role="combobox">, so those three rows name it with a <span> and
+   * `aria-labelledby` instead. They have to look identical either way. */
+  .settings-label > label,
+  .settings-label > span {
     display: block;
     color: var(--color-text);
     font-size: var(--text-xs);
@@ -1995,52 +2234,30 @@
     text-wrap: pretty;
   }
 
-  /* Left native rather than reimplemented: the OS draws the popup, and it already
-   * follows the app's theme because `color-scheme` is declared per theme. That also
-   * buys keyboard support and type-ahead for nothing, and lets a long translated
-   * option open as wide as it needs instead of having to fit inside the row. */
-  .settings-select {
+  /* This rule used to open "Left native rather than reimplemented: the OS draws the
+   * popup, and it already follows the app's theme because `color-scheme` is declared
+   * per theme." That is true on WebKitGTK and false on Windows, where WebView2 draws it
+   * from the system theme instead — a white list with a grey hover over a dark app, and
+   * an `option { background }` rule underneath it that never landed. So it is
+   * reimplemented after all; `Select.tsx` carries the full argument and what it cost.
+   *
+   * All that is left here is the part that was always about *this row* rather than
+   * about selects. */
+  .settings-row .select-trigger {
     /* `.settings-row` is `justify-content: space-between`, so without this the control
      * shrinks under the 20px gap — the same thing `.settings-row .segmented` supplied. */
     flex: 0 0 auto;
     /* Both rows line their controls up even though "System" and "Español" differ. */
     min-width: 132px;
-    height: var(--h-control-md);
-    padding: 0 9px;
-    border: 1px solid var(--color-border-control);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface-3);
-    color: var(--color-text);
-    /* Explicit, because `base.css` gives every select `font: inherit`, which resolves to
-     * the 13px on `:root` rather than the 12px this row is set in. And no `--font-mono`:
-     * this is prose, not a header token like the auth editor's fields.
-     *
-     * Deliberately no `outline: 0` either. `.body-language` and `.auth-editor select`
-     * both carry one, and being class rules in this layer they beat the zero-specificity
-     * `:focus-visible` ring in `base.css` — so neither of those controls has a visible
-     * focus ring. Leaving it alone is all this needs. */
-    font-size: var(--text-xs);
-    cursor: pointer;
   }
 
-  .settings-select:hover {
-    background: var(--color-surface-hover);
-  }
-
-  /* The popup list is drawn by the OS and inherits nothing from the row — the same
-   * belt-and-braces as `.body-language option`, which matters on WebKitGTK where
-   * `color-scheme` alone under-themes it. */
-  .settings-select option {
-    background: var(--color-surface-3);
-    color: var(--color-text);
-  }
-
-  /* Native again, and for the same reason as the select above: `accent-color` themes
-   * the track and the thumb in both palettes from one declaration, and the platform
-   * keeps the pointer and keyboard behaviour that the drag handles had to hand-roll. */
+  /* Native, unlike the select above — and it stays that way, because a range has no
+   * popup for the platform to get wrong: `accent-color` themes the track and the thumb
+   * in both palettes from one declaration, and the platform keeps the pointer and
+   * keyboard behaviour that the drag handles had to hand-roll. */
   .settings-range {
     /* `.settings-row` is `space-between`; without this the control shrinks under the
-     * 20px gap, the same thing `.settings-select` needs. */
+     * 20px gap, the same thing the select trigger needs. */
     flex: 0 0 auto;
     display: flex;
     align-items: center;
@@ -2048,12 +2265,13 @@
   }
 
   .settings-range input {
-    /* Matches `.settings-select`'s `min-width`, so every control in the panel lines up
-     * on the same edge. */
+    /* Matches `.settings-row .select-trigger`'s `min-width`, so every control in the
+     * panel lines up on the same edge. */
     width: 132px;
     accent-color: var(--color-accent);
     cursor: pointer;
-    /* No `outline: 0` — see the note on `.settings-select`. */
+    /* No `outline: 0` — the base.css focus ring is zero-specificity and a class rule in
+     * this layer would silently eat it, which is what happened to two selects here. */
   }
 
   /* Reserved width and tabular figures: without both, the row shifts sideways while the
@@ -2240,10 +2458,8 @@
 
   .url-input,
   .search-trigger,
-  .method-field,
-  .auth-editor select,
-  .auth-editor input,
-  .settings-select {
+  .select-trigger,
+  .auth-editor input {
     transition:
       border-color var(--duration-fast) var(--ease-standard),
       background-color var(--duration-fast) var(--ease-standard);
