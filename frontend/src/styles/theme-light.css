@@ -75,17 +75,23 @@
   --color-danger-strong: #7a1622; /* 9.16 on --color-surface-danger            */
   --color-danger-muted: #84434c; /*  7.27 s1 — error detail copy               */
   --color-warning: #8f5a09; /*      4.84 canvas                                */
+  --color-info: #03679e; /*         5.12 canvas — 3xx redirects                */
 
   /* ── HTTP methods ───────────────────────────────────────────────────────── */
   /* Measured on the chip each one paints for itself — `color-mix(… 16%, …)` over
    * the sidebar — which is a far tighter background than the plain surface, and
    * the reason these sit at 600/700 rather than at the dark theme's 400.
-   * GET 4.62, POST 4.72, PUT 4.51, PATCH 5.34, DELETE 4.66, HEAD 4.75,
-   * OPTIONS 5.91. GET keeps its push toward teal, away from the accent green. */
-  --color-method-get: #046e50;
+   * GET 5.02, POST 4.72, PUT 5.34, PATCH 4.82, DELETE 4.66, HEAD 4.75,
+   * OPTIONS 5.91.
+   *
+   * Same families as the dark theme, at the same hues within a few degrees:
+   * HEAD cyan 223° · GET blue 260° · PUT violet 293° · PATCH fuchsia 324° ·
+   * DELETE red 17° · POST orange 49° · OPTIONS grey. Light has the same reason
+   * to keep green for itself — GET used to sit 17° off the accent here. */
+  --color-method-get: #0b53c4;
   --color-method-post: #9a4708;
-  --color-method-put: #03679e;
-  --color-method-patch: #6a24d3;
+  --color-method-put: #6a24d3;
+  --color-method-patch: #9c1aa8;
   --color-method-delete: #b81139;
   --color-method-head: #0c6780;
   --color-method-options: #4f4f58;

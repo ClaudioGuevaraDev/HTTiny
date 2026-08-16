@@ -1170,10 +1170,14 @@
     color: var(--color-success);
   }
 
+  /* --color-info, not --color-method-put. This bucket used to borrow the PUT token,
+   * which was the odd one out among five pills that otherwise read a status token,
+   * and it meant a redirect changed colour whenever a method did. --color-info holds
+   * the exact sky PUT used to carry, so the pill itself is unchanged. */
   .status-pill[data-bucket='3xx'] {
-    border-color: color-mix(in oklab, var(--color-method-put) 32%, transparent);
-    background: color-mix(in oklab, var(--color-method-put) 14%, transparent);
-    color: var(--color-method-put);
+    border-color: color-mix(in oklab, var(--color-info) 32%, transparent);
+    background: color-mix(in oklab, var(--color-info) 14%, transparent);
+    color: var(--color-info);
   }
 
   .status-pill[data-bucket='4xx'] {

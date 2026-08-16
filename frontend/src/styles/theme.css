@@ -73,18 +73,37 @@
   --color-danger-strong: #ffdbe0; /* headings on --color-surface-danger          */
   --color-danger-muted: #b09298; /*  6.77 s1 — error detail copy                 */
   --color-warning: #fbbf24; /*      11.86 canvas                                 */
+  --color-info: #38bdf8; /*         9.24 canvas — 3xx redirects                  */
 
   /* ── HTTP methods ───────────────────────────────────────────────────────── */
   /* One token per method. Chip background and border are derived at 16%/30% via
    * color-mix, so these seven replace twenty-one hand-written hexes.
-   * Measured text-on-its-own-chip: GET 7.53, POST 8.46, PUT 6.92, PATCH 5.66,
-   * DELETE 5.75, HEAD 7.94, OPTIONS 5.89 — all clear 4.5:1.
-   * GET is deliberately pushed toward teal so it does not read as the accent
-   * green, which already means "send" and "ok". */
-  --color-method-get: #34d399;
-  --color-method-post: #fbbf24;
-  --color-method-put: #38bdf8;
-  --color-method-patch: #a78bfa;
+   *
+   * Hue carries the *class* of the verb, and the second member of a family is
+   * separated by tone and lightness rather than by a hue of its own:
+   *
+   *   safe reads   cool     HEAD cyan 212° · GET blue 255°
+   *   updates      purple   PUT violet 294° · PATCH fuchsia 322°
+   *   creation     orange   POST 56°
+   *   destruction  red      DELETE 13°
+   *   metadata     grey     OPTIONS
+   *
+   * Green is spent: the accent already means "send", "ok", "2xx" and "selected
+   * row" (--color-surface-accent). GET used to sit 13° off the accent hue, which
+   * made the app's most common method read as the app's own chrome — worst of all
+   * on a selected row, where a green chip landed on a green plate. Nothing here is
+   * now within 62° of the accent.
+   *
+   * DELETE stays equal to --color-danger on purpose: it is the one collision that
+   * tells the truth. POST left --color-warning and PUT left --color-collection-6,
+   * which said nothing.
+   *
+   * Measured text-on-its-own-chip over surface-1: GET 6.00, POST 6.63, PUT 5.66,
+   * PATCH 6.18, DELETE 5.75, HEAD 7.94, OPTIONS 5.89 — all clear 4.5:1. */
+  --color-method-get: #60a5fa;
+  --color-method-post: #fb923c;
+  --color-method-put: #a78bfa;
+  --color-method-patch: #e879f9;
   --color-method-delete: #fb7185;
   --color-method-head: #22d3ee;
   --color-method-options: #a1a1aa;
