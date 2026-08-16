@@ -12,6 +12,14 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// The same PNG the packaging tasks derive the .ico and .icns from. Windows reads
+// its icon from the resources linked into the binary and macOS from the .app
+// bundle, so this is what gives Linux — which has neither — a window and taskbar
+// icon instead of the toolkit's generic one.
+//
+//go:embed build/appicon.png
+var appIcon []byte
+
 func main() {
 	// Held in a variable rather than constructed inline: the same instance has to be
 	// both a bound service and the asset middleware, because the bytes it retains for
@@ -21,6 +29,8 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "HTTiny",
 		Description: "A tiny, focused HTTP client for developers.",
+		// Used by the default about box.
+		Icon: appIcon,
 		// Bound services. The bindings generator detects the type argument of
 		// application.NewService statically, so services must be registered
 		// through that call for `wails3 generate bindings` to see them.
@@ -48,6 +58,9 @@ func main() {
 		MinHeight:        680,
 		BackgroundColour: application.NewRGB(10, 10, 11),
 		URL:              "/",
+		Linux: application.LinuxWindow{
+			Icon: appIcon,
+		},
 	})
 	window.Center()
 	window.Show()

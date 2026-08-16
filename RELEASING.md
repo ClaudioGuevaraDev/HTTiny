@@ -91,7 +91,9 @@ discard two deliberate local edits:
 
 - `build/windows/info.json` — the language key is `0409` (en-US), not the template's `0000`
   (language-neutral), and `fixed.product_version` is set. See the note in CLAUDE.md.
-- `build/linux/nfpm/nfpm.yaml` — the homepage points at this repository, and the `license` field
-  is removed because the repository declares no license.
+- `build/linux/nfpm/nfpm.yaml` — the homepage points at this repository, the `license` field is
+  removed because the repository declares no license, and the icon installed is
+  `build/appicon.svg` into `hicolor/scalable/apps/` rather than the 1024×1024
+  `build/appicon.png` into `hicolor/128x128/apps/`, whose directory name lied about the size.
 
 It also recreates `build/ios/`, which this desktop-only project does not use; delete it.

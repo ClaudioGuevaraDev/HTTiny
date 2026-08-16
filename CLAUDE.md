@@ -175,6 +175,16 @@ stock template does. The platform build tasks compile with `-tags production -tr
 artifact and wrong for the loop `build/config.yml` drives under `wails3 task dev`. Packaging picks
 up the production build through its own `deps`, so both paths get what they need.
 
+Icons come from two committed sources and everything else is derived. `build/appicon.png`
+(1024×1024, rasterised from the frontend's `httiny-mark.svg`) feeds `generate:icons`, which emits
+the gitignored `windows/icon.ico` and `darwin/icons.icns`, and it is also what the AppImage
+embeds. `build/appicon.svg` is the vector, and it is what the `.deb`/`.rpm` install into
+`hicolor/scalable/apps/` — the template put the 1024px PNG into `hicolor/128x128/apps/`, where the
+directory name misreports the size. Windows takes its icon from the resources linked into the
+binary and macOS from the `.app` bundle, but Linux has neither, so `main.go` embeds the PNG and
+passes it as `LinuxWindow.Icon` (and `Options.Icon`, which is only the about box) — without it the
+window and taskbar fall back to the toolkit's generic icon.
+
 **Never run `wails3 generate build-assets -dir build`.** Its template tree contains `config.yml`
 and `Taskfile.tmpl.yml`, and extraction uses `os.Create`, so it truncates both hand-maintained
 files without a word. Generate into a scratch directory and copy across. `wails3 update

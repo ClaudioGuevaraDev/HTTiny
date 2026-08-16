@@ -20,8 +20,12 @@ release: "1"
 contents:
   - src: "./bin/httiny"
     dst: "/usr/local/bin/httiny"
-  - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/httiny.png"
+  # The template shipped appicon.png into hicolor/128x128, but that file is
+  # 1024x1024 and the icon theme spec expects the directory name to be the real
+  # pixel size. The vector source has no size to disagree about, so it goes to
+  # `scalable` instead and every desktop renders it at whatever size it needs.
+  - src: "./build/appicon.svg"
+    dst: "/usr/share/icons/hicolor/scalable/apps/httiny.svg"
   - src: "./build/linux/httiny.desktop"
     dst: "/usr/share/applications/httiny.desktop"
 
