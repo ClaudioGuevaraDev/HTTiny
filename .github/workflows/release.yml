@@ -204,11 +204,13 @@ jobs:
           GOARCH: amd64
           GIT_COMMITTER_NAME: ${{ github.repository_owner }}
           GIT_COMMITTER_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com
-        # Not `linux:package`, which would also build an .rpm and an Arch package
-        # that nobody here tests.
+        # Not `linux:package`, which would also build an Arch package nobody here
+        # tests. The three below cost nothing extra: nfpm is embedded in the Wails
+        # CLI, so the .deb and .rpm need no dpkg or rpmbuild on the runner.
         run: |
           wails3 task linux:create:appimage
           wails3 task linux:create:deb
+          wails3 task linux:create:rpm
 
       - name: Rename the artifacts
         shell: bash
@@ -246,6 +248,9 @@ jobs:
             linux)
               take '*.AppImage' "HTTiny-${VERSION}-linux-amd64.AppImage"
               take '*.deb' "HTTiny-${VERSION}-linux-amd64.deb"
+              # nfpm names the RPM architecture x86_64 rather than amd64; the
+              # asset name follows the package's own convention.
+              take '*.rpm' "HTTiny-${VERSION}-linux-x86_64.rpm"
               ;;
           esac
 
