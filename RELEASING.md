@@ -40,9 +40,13 @@ nothing was built with — it fails in `verify`, before anything is compiled.
 
 | Platform | Runner | Artifact |
 | --- | --- | --- |
-| Windows | `windows-latest` | `HTTiny-<version>-windows-amd64-installer.exe` (NSIS, per-user install, no UAC) |
-| macOS | `macos-latest` | `HTTiny-<version>-macos-universal.dmg` (Intel + Apple Silicon) |
-| Linux | `ubuntu-24.04` | `HTTiny-<version>-linux-amd64.AppImage`, `…-linux-amd64.deb` and `…-linux-x86_64.rpm` |
+| Windows | `windows-latest` | `httiny-<version>-windows-amd64-installer.exe` (NSIS, per-user install, no UAC) |
+| macOS | `macos-latest` | `httiny-<version>-macos-universal.dmg` (Intel + Apple Silicon) |
+| Linux | `ubuntu-24.04` | `httiny-<version>-linux-amd64.AppImage`, `…-linux-amd64.deb` and `…-linux-x86_64.rpm` |
+
+Asset filenames are lowercase `httiny`, matching the binary and the repository. Everything a
+person reads — the launcher entry, the installed executable, the macOS bundle, Add/Remove
+Programs — says `HTTiny`. See the naming note in CLAUDE.md before changing either.
 
 Linux is pinned to `ubuntu-24.04` because Wails v3 targets GTK4 and WebKitGTK 6.0. Ubuntu 22.04
 only ships WebKit2GTK 4.1 and would need the `-tags gtk3` opt-in. For the same reason the `.deb`

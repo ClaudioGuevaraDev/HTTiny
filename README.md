@@ -8,9 +8,9 @@ Installers for Windows, macOS and Linux are attached to every [release](https://
 
 | Platform | File | Notes |
 | --- | --- | --- |
-| Windows | `HTTiny-<version>-windows-amd64-installer.exe` | Installs per user, so it never asks for administrator rights |
-| macOS | `HTTiny-<version>-macos-universal.dmg` | Universal — Intel and Apple Silicon |
-| Linux | `HTTiny-<version>-linux-amd64.AppImage`, `.deb` or `.rpm` | Needs GTK4 and WebKitGTK 6.0 — Ubuntu 24.04+ / Debian 13+, or Fedora 40+ |
+| Windows | `httiny-<version>-windows-amd64-installer.exe` | Installs per user, so it never asks for administrator rights |
+| macOS | `httiny-<version>-macos-universal.dmg` | Universal — Intel and Apple Silicon |
+| Linux | `httiny-<version>-linux-amd64.AppImage`, `.deb` or `.rpm` | Needs GTK4 and WebKitGTK 6.0 — Ubuntu 24.04+ / Debian 13+, or Fedora 40+ |
 
 The binaries are **not code-signed**. Windows SmartScreen warns on first run — *More info* →
 *Run anyway* — and macOS Gatekeeper needs the app opened with right-click → *Open* the first

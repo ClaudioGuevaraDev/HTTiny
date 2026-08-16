@@ -168,14 +168,24 @@ tasks:
   generate:dotdesktop:
     summary: Generates a `.desktop` file
     dir: build
+    # `-name` is the label the application search shows, so it takes PRODUCT_NAME.
+    # The stock template passed APP_NAME here, which is why the launcher used to
+    # read `httiny`. EXEC, ICON and the filename stay APP_NAME: those are
+    # identifiers resolved against the binary and the installed icon, not prose.
     cmds:
       - mkdir -p {{.ROOT_DIR}}/build/linux/appimage
-      - wails3 generate .desktop -name "{{.APP_NAME}}" -exec "{{.EXEC}}" -icon "{{.ICON}}" -outputfile "{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop" -categories "{{.CATEGORIES}}"
+      - wails3 generate .desktop -name "{{.PRODUCT_NAME}}" -exec "{{.EXEC}}" -icon "{{.ICON}}" -outputfile "{{.OUTPUTFILE}}" -categories "{{.CATEGORIES}}" -comment "{{.COMMENT}}" -genericname "{{.GENERIC_NAME}}" -keywords "{{.KEYWORDS}}"
+      # `wails3 generate .desktop` has no flag for this, and without it GNOME and
+      # KDE cannot reliably tie the open window back to its launcher entry.
+      - echo "StartupWMClass={{.APP_NAME}}" >> "{{.OUTPUTFILE}}"
     vars:
-      APP_NAME: '{{.APP_NAME}}'
       EXEC: '{{.APP_NAME}}'
       ICON: '{{.APP_NAME}}'
-      CATEGORIES: 'Development;'
+      CATEGORIES: 'Development;Network;'
+      COMMENT: 'A tiny, focused HTTP client for developers.'
+      GENERIC_NAME: 'HTTP Client'
+      # Defaults to `wails` otherwise — the framework's name, not the product's.
+      KEYWORDS: 'http;api;rest;client;'
       OUTPUTFILE: '{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop'
 
   run:

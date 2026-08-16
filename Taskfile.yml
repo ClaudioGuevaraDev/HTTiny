@@ -7,9 +7,15 @@ includes:
   linux: ./build/linux/Taskfile.yml
 
 vars:
-  # The binary filename, so it matches the repo and the module path. The product
-  # name a person reads stays `HTTiny` and lives in build/config.yml.
+  # The binary filename, so it matches the repo and the module path. Identifiers
+  # derive from this — the executable, the .desktop basename, Exec and Icon — and
+  # so do the published asset names.
   APP_NAME: httiny
+  # The name a person reads: launcher entries, the macOS bundle, Finder. Keeping
+  # it apart from APP_NAME is the whole point — reusing the binary name here is
+  # what made Linux search show `httiny`. Duplicates info.productName in
+  # build/config.yml because Task cannot read that file; change one, change both.
+  PRODUCT_NAME: HTTiny
   BIN_DIR: bin
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   # Which platform Taskfile `package` dispatches to. `wails3 package` sets it

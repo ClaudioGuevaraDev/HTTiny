@@ -240,17 +240,17 @@ jobs:
 
           case "${{ matrix.name }}" in
             windows)
-              take '*-installer.exe' "HTTiny-${VERSION}-windows-amd64-installer.exe"
+              take '*-installer.exe' "httiny-${VERSION}-windows-amd64-installer.exe"
               ;;
             macos)
-              take '*.dmg' "HTTiny-${VERSION}-macos-universal.dmg"
+              take '*.dmg' "httiny-${VERSION}-macos-universal.dmg"
               ;;
             linux)
-              take '*.AppImage' "HTTiny-${VERSION}-linux-amd64.AppImage"
-              take '*.deb' "HTTiny-${VERSION}-linux-amd64.deb"
+              take '*.AppImage' "httiny-${VERSION}-linux-amd64.AppImage"
+              take '*.deb' "httiny-${VERSION}-linux-amd64.deb"
               # nfpm names the RPM architecture x86_64 rather than amd64; the
               # asset name follows the package's own convention.
-              take '*.rpm' "HTTiny-${VERSION}-linux-x86_64.rpm"
+              take '*.rpm' "httiny-${VERSION}-linux-x86_64.rpm"
               ;;
           esac
 

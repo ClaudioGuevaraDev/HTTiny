@@ -175,6 +175,27 @@ stock template does. The platform build tasks compile with `-tags production -tr
 artifact and wrong for the loop `build/config.yml` drives under `wails3 task dev`. Packaging picks
 up the production build through its own `deps`, so both paths get what they need.
 
+**Two names, and they are not interchangeable.** `APP_NAME: httiny` in the root Taskfile is the
+*identifier* — the executable, the `.desktop` basename and its `Exec`/`Icon` keys, and the
+published asset filenames. `PRODUCT_NAME: HTTiny` is what a person reads: the launcher entry, the
+macOS bundle directory, the DMG volume. The stock templates used `APP_NAME` for both, which is why
+Linux app search showed `httiny` while Windows — whose names come from `INFO_PRODUCTNAME` — looked
+right. `PRODUCT_NAME` duplicates `info.productName` in `build/config.yml` because Task cannot read
+that file; change one, change the other. On macOS the bundle directory (`HTTiny.app`) and the
+executable inside it (`Contents/MacOS/httiny`) are independent — only the latter must match
+`CFBundleExecutable`.
+
+`wails3 generate .desktop` has no flag for `StartupWMClass`, so `generate:dotdesktop` appends it
+afterwards; without it GNOME and KDE cannot tie a running window back to its launcher entry. Note
+`build/linux/desktop` is a *reference* extraction of the Wails template and is not installed by
+anything — the file that ships is generated into `build/linux/httiny.desktop`.
+
+Editing the platform Taskfiles is durable: `wails3 update build-assets` extracts only the
+`updatable_build_assets` tree, and `build/{windows,darwin,linux}/Taskfile.yml` live in
+`build_assets`, which only the forbidden `generate build-assets` touches. `Info.plist` is a middle
+case — the update merges, overwriting keys the template emits but keeping hand-added ones, which
+is what makes `CFBundleDisplayName` survive.
+
 Icons come from two committed sources and everything else is derived. `build/appicon.png`
 (1024×1024, rasterised from the frontend's `httiny-mark.svg`) feeds `generate:icons`, which emits
 the gitignored `windows/icon.ico` and `darwin/icons.icns`, and it is also what the AppImage
