@@ -296,6 +296,11 @@ export const en = {
   'response.timeline.redirects.one': '{count} redirect followed',
   'response.timeline.redirects.other': '{count} redirects followed',
   'response.timeline.final': 'Final',
+  // The two ways a chain ends without a final response. Distinct because the same URL
+  // means different things: one 3xx arrived and was refused, the other was requested and
+  // never answered.
+  'response.timeline.notFollowed': 'Not followed',
+  'response.timeline.unreached': 'No response',
   'response.timeline.security': 'Connection',
   'response.timeline.noTls': 'Sent over plain HTTP — nothing about this exchange was encrypted.',
   'response.timeline.resumed': 'resumed',

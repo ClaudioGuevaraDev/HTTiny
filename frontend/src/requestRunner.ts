@@ -50,7 +50,10 @@ export async function runRequest(id: string): Promise<void> {
     // instead of being frozen in whichever one it happened in. `errors.ts` owns the
     // rule about which of the two wins.
     const detail = (error instanceof RequestFailure && error.detail) || ''
-    useAppStore.getState().setResponse(id, { state: 'error', code, detail })
+    // The chain survives the failure now. A redirect loop is the one thing you open this
+    // panel to diagnose, and until this it reported the count without the URLs.
+    const redirects = error instanceof RequestFailure ? [...error.redirects] : []
+    useAppStore.getState().setResponse(id, { state: 'error', code, detail, redirects })
   } finally {
     controllers.delete(id)
   }

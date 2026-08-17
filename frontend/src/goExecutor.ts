@@ -86,7 +86,9 @@ export const goExecutor: RequestExecutor = {
       throw new RequestFailure('BACKEND_UNAVAILABLE')
     }
 
-    if (!result.ok) throw new RequestFailure(result.errorCode, result.errorText)
+    // The chain hangs off the result rather than off `response`, which a failure does not
+    // carry — that is what used to lose it. Go slices arrive as `T[] | null`.
+    if (!result.ok) throw new RequestFailure(result.errorCode, result.errorText, result.redirects ?? [])
 
     const response = result.response
     return {
@@ -109,7 +111,7 @@ export const goExecutor: RequestExecutor = {
       archive: response.archive ?? [],
       timings: response.timings,
       tls: toTls(response.tls),
-      redirects: response.redirects ?? [],
+      redirects: result.redirects ?? [],
       format: toFormat(response.format),
       truncated: response.truncated,
     }

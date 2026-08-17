@@ -128,13 +128,9 @@ type Response struct {
 	// Where the time went, as a waterfall. See trace.go.
 	Timings Timings `json:"timings"`
 	// The connection the final response arrived on. Nil for http://.
-	TLS *TLSInfo `json:"tls"`
-	// The redirects that were followed, oldest first. Empty when there were none — and
-	// also, deliberately, when the chain was abandoned for being too long: that path
-	// returns a failure, which carries no Response. See the note in Send.
-	Redirects []Hop  `json:"redirects"`
-	Format    string `json:"format"` // see classify.go
-	Truncated bool   `json:"truncated"`
+	TLS       *TLSInfo `json:"tls"`
+	Format    string   `json:"format"` // see classify.go
+	Truncated bool     `json:"truncated"`
 }
 
 // Result is an explicit success/failure union rather than a Go `error` return.
@@ -149,6 +145,14 @@ type Result struct {
 	ErrorCode string   `json:"errorCode"`
 	ErrorText string   `json:"errorText"`
 	Response  Response `json:"response"`
+	// The redirects that were followed, oldest first, and empty when there were none.
+	//
+	// Here rather than on Response, which is where it used to live, because the chain is
+	// a property of the *exchange* and not of whatever answered last. On Response it was
+	// unreachable from every failure — a chain abandoned for being too long, or one whose
+	// next hop timed out, was discarded at exactly the moment it was most worth reading.
+	// One home on the union means neither branch can forget it.
+	Redirects []Hop `json:"redirects"`
 }
 
 type HTTPService struct {
@@ -181,7 +185,9 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 	// view reads back through Wire. Nothing about the wire format is decided here.
 	httpReq, err := buildRequest(ctx, req)
 	if err != nil {
-		return failure(codeInvalidURL, err.Error())
+		// The only failure with no chain to report: nothing has been sent yet, and the
+		// tracer below does not exist.
+		return failure(codeInvalidURL, err.Error(), nil)
 	}
 
 	// Timed around the response read, not just the round trip: a response is not
@@ -205,6 +211,11 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 		Timeout:   timeoutFor(req),
 		CheckRedirect: func(next *http.Request, via []*http.Request) error {
 			if len(via) >= maxRedirects {
+				// Deliberately before the hop is recorded, so the chain holds exactly
+				// maxRedirects entries and cannot contradict the "stopped after 10
+				// redirects" copy with an eleventh row. Where it was heading is not lost:
+				// that is the last recorded hop's Location, which the viewer shows as the
+				// one URL it did not follow.
 				return errTooManyRedirects
 			}
 			// `next.Response` is the 3xx that caused this hop — guaranteed populated
@@ -218,14 +229,18 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		code, text := classify(ctx, err)
-		return failure(code, text)
+		// Whatever hops were followed before this went wrong. For TOO_MANY_REDIRECTS that
+		// is the whole point — "stopped after 10 redirects" without saying which ten is
+		// the one question a redirect loop asks — but it is worth as much when the fourth
+		// hop times out.
+		return failure(code, text, trace.redirects())
 	}
 	defer resp.Body.Close()
 
 	raw, truncated, err := readBody(resp.Body)
 	if err != nil {
 		code, text := classify(ctx, err)
-		return failure(code, text)
+		return failure(code, text, trace.redirects())
 	}
 	finished := time.Now()
 	elapsed := finished.Sub(started)
@@ -257,7 +272,6 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 		FinalURL:        finalURL(resp, httpReq.URL),
 		Timings:         trace.timings(finished),
 		TLS:             tlsInfoOf(resp.TLS),
-		Redirects:       trace.redirects(),
 		Truncated:       truncated,
 	}
 
@@ -295,7 +309,7 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 	// that claimed to be JSON and turned out to be bytes should not be suggested
 	// as `response.json`.
 	out.Filename = filenameFor(resp.Header.Get("Content-Disposition"), out.FinalURL, format)
-	return Result{OK: true, Response: out}
+	return Result{OK: true, Response: out, Redirects: trace.redirects()}
 }
 
 // finalURL reports where the request actually ended up. net/http points resp.Request
@@ -307,8 +321,13 @@ func finalURL(resp *http.Response, target *url.URL) string {
 	return target.String()
 }
 
-func failure(code, text string) Result {
-	return Result{ErrorCode: code, ErrorText: text}
+// failure builds the error half of the union.
+//
+// `hops` is a parameter rather than a variadic or an afterthought so that whoever adds
+// the next failure path has to answer "do I have a chain here?" instead of inheriting an
+// empty one by omission. Only the path that fails before the tracer exists passes nil.
+func failure(code, text string, hops []Hop) Result {
+	return Result{ErrorCode: code, ErrorText: text, Redirects: hops}
 }
 
 // applyHeaders uses Set for the first occurrence of a name and Add afterwards,

@@ -184,13 +184,6 @@ export interface Response {
     "tls": TLSInfo | null;
 
     /**
-     * The redirects that were followed, oldest first. Empty when there were none — and
-     * also, deliberately, when the chain was abandoned for being too long: that path
-     * returns a failure, which carries no Response. See the note in Send.
-     */
-    "redirects": Hop[] | null;
-
-    /**
      * see classify.go
      */
     "format": string;
@@ -211,6 +204,17 @@ export interface Result {
     "errorCode": string;
     "errorText": string;
     "response": Response;
+
+    /**
+     * The redirects that were followed, oldest first, and empty when there were none.
+     * 
+     * Here rather than on Response, which is where it used to live, because the chain is
+     * a property of the *exchange* and not of whatever answered last. On Response it was
+     * unreachable from every failure — a chain abandoned for being too long, or one whose
+     * next hop timed out, was discarded at exactly the moment it was most worth reading.
+     * One home on the union means neither branch can forget it.
+     */
+    "redirects": Hop[] | null;
 }
 
 /**

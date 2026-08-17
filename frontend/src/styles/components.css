@@ -1453,8 +1453,36 @@
 
   /* `.placeholder` centres itself with `flex: 1`, which does nothing to a child of a
    * block container. Same fix, and the same reason, as `.tree-scroll > .placeholder`. */
-  .response-content > .placeholder {
+  .response-content > .placeholder,
+  .response-content > .response-failure {
     height: 100%;
+  }
+
+  /* A failure with a redirect chain under it. Without one — a refused connection, a bad
+   * name — nothing changes: the placeholder still takes the whole pane and centres in it,
+   * which is why the override below is gated on the attribute rather than applied to every
+   * failure. */
+  .response-failure {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .response-failure[data-chain] > .placeholder {
+    flex: 0 0 auto;
+    padding-block: 20px 4px;
+  }
+
+  .response-failure-chain {
+    min-height: 0;
+    padding: 0 16px 16px;
+    overflow: auto;
+  }
+
+  /* The section's own top margin is meant for the gap under the waterfall; here it sits
+   * directly under the placeholder's actions, which already provide it. */
+  .response-failure-chain > .timeline-section {
+    margin-top: 0;
   }
 
   /* ── Response · media viewers ───────────────────────────────────────────────
@@ -2189,6 +2217,16 @@
 
   .timeline-hop[data-final='true'] {
     background: var(--color-surface-accent);
+  }
+
+  /* After the accent rule, not before: both selectors weigh the same, so the one that
+   * wins is the one that comes last. Neither of these is a place that answered — one
+   * 3xx was refused, the other was asked and said nothing — so the row is outlined
+   * rather than filled, and reads as a destination the request never arrived at. */
+  .timeline-hop[data-end='notFollowed'],
+  .timeline-hop[data-end='unreached'] {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--color-border);
   }
 
   .timeline-status {

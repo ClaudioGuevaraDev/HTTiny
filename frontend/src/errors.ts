@@ -1,4 +1,5 @@
 import type { Translate } from './i18n'
+import type { RedirectHop } from './types'
 
 /**
  * Failure copy, kept separate from any one executor so the response panes can resolve
@@ -51,15 +52,21 @@ export function errorCopy(t: Translate, code: string, diagnostic = ''): { title:
  * The code alone drives the headline and the UI's special cases, but the curated copy
  * is necessarily generic. Throwing a bare `new Error(CODE)` is still supported for
  * callers with nothing to add.
+ *
+ * `redirects` rides along for the same reason `detail` does — it is evidence the failure
+ * carries and the code cannot express. A type-only import, so this module still knows
+ * nothing about any transport.
  */
 export class RequestFailure extends Error {
   readonly code: string
   readonly detail?: string
+  readonly redirects: readonly RedirectHop[]
 
-  constructor(code: string, detail?: string) {
+  constructor(code: string, detail?: string, redirects: readonly RedirectHop[] = []) {
     super(code)
     this.name = 'RequestFailure'
     this.code = code
     this.detail = detail
+    this.redirects = redirects
   }
 }

@@ -50,6 +50,7 @@ import { useSave } from '../useSave'
 import { useRovingFocus } from '../useRovingFocus'
 import { BodyPanel } from './response/BodyPanel'
 import { CookiesPanel } from './response/CookiesPanel'
+import { RedirectChain } from './response/RedirectChain'
 import { TimelinePanel } from './response/TimelinePanel'
 import { ResponseSearchBar } from './response/ResponseSearchBar'
 import { Placeholder, PlaceholderAction, SkeletonLines } from './Placeholder'
@@ -512,19 +513,36 @@ export function ResponseViewer() {
       )}
 
       {response.state === 'error' && failure && (
-        <Placeholder tone="danger" icon={<TriangleAlert size={20} />} title={failure.title} description={failure.detail}>
-          <PlaceholderAction shortcut={shortcuts.send} onClick={() => activeId && void runRequest(activeId)}>
-            <RotateCcw size={13} aria-hidden="true" /> {t('response.error.retry')}
-          </PlaceholderAction>
-          {response.code === 'INVALID_URL' && (
-            <PlaceholderAction variant="secondary" onClick={() => document.getElementById('request-url')?.focus()}>
-              {t('response.error.fixUrl')}
+        // Wrapped so a chain can follow the placeholder. The wrapper also takes it out of
+        // `.response-content > .placeholder`, which is what let the failure fill the pane;
+        // `[data-chain]` puts that back only when there is nothing below it.
+        <div className="response-failure" data-chain={response.redirects.length > 0 ? 'true' : undefined}>
+          <Placeholder tone="danger" icon={<TriangleAlert size={20} />} title={failure.title} description={failure.detail}>
+            <PlaceholderAction shortcut={shortcuts.send} onClick={() => activeId && void runRequest(activeId)}>
+              <RotateCcw size={13} aria-hidden="true" /> {t('response.error.retry')}
             </PlaceholderAction>
+            {response.code === 'INVALID_URL' && (
+              <PlaceholderAction variant="secondary" onClick={() => document.getElementById('request-url')?.focus()}>
+                {t('response.error.fixUrl')}
+              </PlaceholderAction>
+            )}
+            <PlaceholderAction variant="secondary" onClick={() => copy(`${response.code}: ${failure.detail}`)}>
+              {copyStatus === 'copied' ? t('response.error.copied') : t('response.error.copyDetails')}
+            </PlaceholderAction>
+          </Placeholder>
+          {/* The one question a redirect loop asks is *which* URLs it went round, and the
+              failure used to report the count and throw the chain away. It is worth as
+              much when the fourth hop is the one that timed out. */}
+          {response.redirects.length > 0 && (
+            <div className="response-failure-chain">
+              <RedirectChain
+                hops={response.redirects}
+                end={response.code === 'TOO_MANY_REDIRECTS' ? { kind: 'notFollowed' } : { kind: 'unreached' }}
+                locale={locale}
+              />
+            </div>
           )}
-          <PlaceholderAction variant="secondary" onClick={() => copy(`${response.code}: ${failure.detail}`)}>
-            {copyStatus === 'copied' ? t('response.error.copied') : t('response.error.copyDetails')}
-          </PlaceholderAction>
-        </Placeholder>
+        </div>
       )}
 
       {response.state === 'success' && (

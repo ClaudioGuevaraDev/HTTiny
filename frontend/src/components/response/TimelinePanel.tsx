@@ -1,8 +1,9 @@
-import { ArrowRight, Link2Off, Lock, Unlock } from 'lucide-react'
+import { Link2Off, Lock, Unlock } from 'lucide-react'
 import { formatDate, formatDuration } from '../../format'
 import { useLocale, useT } from '../../language'
 import type { PlainMessageKey } from '../../i18n'
 import type { Locale, Phase, RedirectHop, Timings, TlsInfo } from '../../types'
+import { RedirectChain } from './RedirectChain'
 
 /**
  * Where the time went, as a waterfall.
@@ -55,7 +56,7 @@ export function TimelinePanel({ timings, tls, redirects, finalUrl }: { timings: 
             same place — and unexplained blank bars read as lost data, not as speed. */}
         {timings.reused && <p className="response-notice">{t('response.timeline.reused.desc')}</p>}
 
-        {redirects.length > 0 && <Chain hops={redirects} finalUrl={finalUrl} locale={locale} />}
+        {redirects.length > 0 && <RedirectChain hops={redirects} end={{ kind: 'final', url: finalUrl }} locale={locale} />}
         <Security tls={tls} locale={locale} />
       </div>
     </div>
@@ -87,46 +88,6 @@ function Bar({ label, phase, span, locale }: { label: string; phase: Phase; span
       <span className="timeline-value">{absent ? '—' : formatDuration(phase.ms, locale)}</span>
       <span className="sr-only">{absent ? t('response.timeline.absent') : ''}</span>
     </li>
-  )
-}
-
-/**
- * The redirects that were followed. Until now they happened in total silence: the app
- * reported where a request ended up and never how it got there.
- */
-function Chain({ hops, finalUrl, locale }: { hops: readonly RedirectHop[]; finalUrl: string; locale: Locale }) {
-  const { t, plural } = useT()
-
-  return (
-    <section className="timeline-section">
-      <h3 className="timeline-heading">{plural('response.timeline.redirects', hops.length)}</h3>
-      <ol className="timeline-hops">
-        {hops.map((hop, index) => (
-          <li key={index} className="timeline-hop">
-            <span className="timeline-status" data-bucket="3xx">
-              {hop.status}
-            </span>
-            {/* The method is shown because a 302 rewrites a POST into a GET, and that
-                surprise is most of why a chain is worth reading. */}
-            <span className="timeline-method">{hop.method}</span>
-            <code className="timeline-url" title={hop.url}>
-              {hop.url}
-            </code>
-            <ArrowRight size={11} aria-hidden="true" className="timeline-arrow" />
-            <code className="timeline-url" title={hop.location}>
-              {hop.location}
-            </code>
-            <span className="timeline-value">{formatDuration(hop.ms, locale)}</span>
-          </li>
-        ))}
-        <li className="timeline-hop" data-final="true">
-          <span className="timeline-status">{t('response.timeline.final')}</span>
-          <code className="timeline-url" title={finalUrl}>
-            {finalUrl}
-          </code>
-        </li>
-      </ol>
-    </section>
   )
 }
 

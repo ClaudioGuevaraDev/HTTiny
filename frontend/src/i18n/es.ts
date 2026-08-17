@@ -275,6 +275,10 @@ export const es: Catalog = {
   'response.timeline.redirects.one': '{count} redirección seguida',
   'response.timeline.redirects.other': '{count} redirecciones seguidas',
   'response.timeline.final': 'Final',
+  // «Sin seguir» y «Sin respuesta» en vez de participios: no hay sustantivo con el que
+  // concordar en la columna, donde las demás filas llevan un número de estado.
+  'response.timeline.notFollowed': 'Sin seguir',
+  'response.timeline.unreached': 'Sin respuesta',
   'response.timeline.security': 'Conexión',
   'response.timeline.noTls': 'Enviada por HTTP sin cifrar — nada de este intercambio viajó protegido.',
   'response.timeline.resumed': 'reanudada',

@@ -220,7 +220,18 @@ export interface ArchiveEntry {
 export type ResponseSnapshot =
   | { state: 'idle' }
   | { state: 'loading'; startedAt: number }
-  | { state: 'error'; code: string; detail: string }
+  | {
+      state: 'error'
+      code: string
+      detail: string
+      /**
+       * The redirects followed before this went wrong. The chain is a property of the
+       * exchange rather than of whatever answered last, which is why Go carries it on
+       * `Result` and not on `Response` — on the latter it was unreachable from here, and
+       * a redirect loop reported "stopped after 10 redirects" without saying which ten.
+       */
+      redirects: RedirectHop[]
+    }
   | {
       state: 'success'
       /**
@@ -256,11 +267,7 @@ export type ResponseSnapshot =
       timings: Timings
       /** Null for `http://`, and for a response that never reached a handshake. */
       tls: TlsInfo | null
-      /**
-       * The redirects followed, oldest first. Empty when there were none — and also,
-       * deliberately, when the chain was abandoned for being too long: that path
-       * returns a failure, which carries no response at all.
-       */
+      /** The redirects followed, oldest first, and empty when there were none. */
       redirects: RedirectHop[]
       format: ResponseFormat
       truncated: boolean
