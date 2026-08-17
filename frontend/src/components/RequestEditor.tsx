@@ -1,6 +1,6 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
-import { Check, FileX2, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
+import { Check, Code2, FileX2, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import type { MessageKey } from '../i18n'
 import { useT } from '../language'
@@ -331,6 +331,7 @@ export function RequestEditor() {
   const updateDocument = useAppStore(s => s.updateDocument)
   const addNode = useAppStore(s => s.addNode)
   const openPalette = useAppStore(s => s.openPalette)
+  const openCode = useAppStore(s => s.openCode)
   const sending = useAppStore(s => (s.activeId ? s.responses[s.activeId]?.state === 'loading' : false))
   const onPanelKeyDown = useRovingFocus('[role="tab"]')
 
@@ -414,12 +415,23 @@ export function RequestEditor() {
           autoComplete="off"
           spellCheck={false}
         />
+        {/* Between the URL and Save because that is what it is about: the URL that will
+            actually be sent, which is not always the one in the field beside it. */}
+        <button
+          type="button"
+          className="icon-btn bar-btn"
+          aria-label={t('editor.code.title', { keys: shortcutHint('code') })}
+          title={t('editor.code.title', { keys: shortcutHint('code') })}
+          onClick={openCode}
+        >
+          <Code2 size={16} aria-hidden="true" />
+        </button>
         {/* Everything autosaves, so this writes immediately rather than waiting out
             the debounce. Kept because "did that save?" is a real question and a
             button that answers it is worth one icon. */}
         <button
           type="button"
-          className="icon-btn save-btn"
+          className="icon-btn bar-btn"
           aria-label={t('editor.save.title', { keys: shortcutHint('save') })}
           title={t('editor.save.title', { keys: shortcutHint('save') })}
           onClick={flushNow}

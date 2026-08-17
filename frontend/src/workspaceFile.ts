@@ -1,4 +1,5 @@
 import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW } from './responseBody'
+import { DEFAULT_SNIPPET_TARGET, SNIPPET_TARGET_IDS, type SnippetTarget } from './snippets'
 import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
 import type { BodyLanguage, BodyView, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
 
@@ -78,6 +79,13 @@ export interface PrefsFile {
   codeFontSize: number
   /** `null` is "automatic" — the viewer reads the body, then falls back to Go's classification. */
   defaultBodyLanguage: BodyLanguage | null
+  /** Which language the code view was last showing. */
+  codeTarget: SnippetTarget
+  /**
+   * Whether the code view masks credentials. A preference and not a secret — the values
+   * it hides never reach this file, and neither does any generated snippet.
+   */
+  redactSecrets: boolean
 }
 
 // ── Writing ────────────────────────────────────────────────────────────────────
@@ -135,6 +143,8 @@ export const toPrefsFile = (state: {
   zoom: number
   codeFontSize: number
   defaultBodyLanguage: BodyLanguage | null
+  codeTarget: SnippetTarget
+  redactSecrets: boolean
 }): PrefsFile => ({
   tabs: state.tabs,
   activeId: state.activeId,
@@ -154,6 +164,8 @@ export const toPrefsFile = (state: {
   zoom: state.zoom,
   codeFontSize: state.codeFontSize,
   defaultBodyLanguage: state.defaultBodyLanguage,
+  codeTarget: state.codeTarget,
+  redactSecrets: state.redactSecrets,
 })
 
 // ── Reading ────────────────────────────────────────────────────────────────────
@@ -380,6 +392,8 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     // Not `oneOf`, for the same reason as `readBodyViews` above: the fallback is `null`,
     // which is not one of the allowed values.
     defaultBodyLanguage: BODY_LANGUAGES.find(candidate => candidate === raw.defaultBodyLanguage) ?? null,
+    codeTarget: oneOf(raw.codeTarget, SNIPPET_TARGET_IDS, DEFAULT_SNIPPET_TARGET),
+    redactSecrets: bool(raw.redactSecrets, false),
   }
 }
 

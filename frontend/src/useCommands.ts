@@ -6,6 +6,7 @@ import { flushNow } from './persistence'
 import { cancelRequest, runRequest, toggleRequest } from './requestRunner'
 import { shortcuts } from './shortcuts'
 import { methodOptions, useAppStore } from './store'
+import { copySnippet } from './wire'
 
 const EMPTY: Command[] = []
 
@@ -75,6 +76,10 @@ export function useCommands(enabled: boolean): Command[] {
       action('close', 'command.close.title', 'command.close.keywords', () => useAppStore.getState().closeRequest(activeId), shortcuts.close)
       action('reveal', 'command.reveal.title', 'command.reveal.keywords', () => useAppStore.getState().revealNode(activeId))
       action('copy-url', 'command.copyUrl.title', 'command.copyUrl.keywords', () => void navigator.clipboard.writeText(doc?.url ?? ''))
+      action('code', 'command.code.title', 'command.code.keywords', () => useAppStore.getState().openCode(), shortcuts.code)
+      // Straight to the clipboard, skipping the modal — the one target common enough that
+      // picking it from a list is a step rather than a choice.
+      if (doc) action('copy-curl', 'command.copyCurl.title', 'command.copyCurl.keywords', () => void copySnippet(doc, 'curl'))
 
       const response = store.responses[activeId]
       if (response?.state === 'success') {

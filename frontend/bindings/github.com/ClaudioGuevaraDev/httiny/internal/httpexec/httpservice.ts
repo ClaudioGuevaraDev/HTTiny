@@ -28,3 +28,17 @@ export function Release(id: string): $CancellablePromise<void> {
 export function Send(req: $models.Request): $CancellablePromise<$models.Result> {
     return $Call.ByID(2288105761, req);
 }
+
+/**
+ * Wire reports the request Send would perform, without performing it.
+ * 
+ * Deliberately not context-aware — it does no I/O, so there is nothing to cancel and no
+ * reason to hand the frontend a CancellablePromise.
+ * 
+ * The fidelity comes from *reading fields back off the built request* rather than
+ * deriving them a second time: this is the same object, produced by the same code, that
+ * a Send would hand to the transport.
+ */
+export function Wire(req: $models.Request): $CancellablePromise<$models.WireResult> {
+    return $Call.ByID(734947098, req);
+}

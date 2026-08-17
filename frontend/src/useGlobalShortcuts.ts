@@ -33,6 +33,13 @@ export function useGlobalShortcuts(): void {
         return
       }
 
+      if (matchesCombo(event, "mod+'")) {
+        event.preventDefault()
+        if (state.codeOpen) state.closeCode()
+        else state.openCode()
+        return
+      }
+
       // Not `matchesCombo`, and deliberately so. It compares modifiers exactly, but on a
       // US keyboard `Ctrl++` arrives as `Ctrl+Shift+=` — a browser takes both, and so
       // should this. Its combo strings could not express it either, since the parser
@@ -63,7 +70,7 @@ export function useGlobalShortcuts(): void {
       // and not `update.state`: a postponed update stays in the store so the sidebar
       // can offer it, and testing the state alone would leave the keyboard locked out
       // for the rest of the session.
-      if (state.paletteOpen || state.settingsOpen || isUpdateModalOpen(state.update, state.updateDismissed)) return
+      if (state.paletteOpen || state.settingsOpen || state.codeOpen || isUpdateModalOpen(state.update, state.updateDismissed)) return
 
       const id = state.activeId
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { translate } from './i18n'
 import { DEFAULT_BODY_VIEW } from './responseBody'
+import { DEFAULT_SNIPPET_TARGET, type SnippetTarget } from './snippets'
 import type {
   BodyLanguage,
   BodyView,
@@ -155,6 +156,19 @@ interface AppState {
   settingsOpen: boolean
 
   /**
+   * The code view. `codeOpen` is ephemeral like the other modals; the two choices inside
+   * it are preferences and are persisted.
+   *
+   * The generated snippet is in neither place. It is derived from the request and from
+   * `Wire`'s answer, both of which can change on any keystroke, so holding it would mean
+   * keeping a copy in sync for no reader — and it is the one string in the app that can
+   * contain a credential in plain text.
+   */
+  codeOpen: boolean
+  codeTarget: SnippetTarget
+  redactSecrets: boolean
+
+  /**
    * The response viewer's search bar. Unlike the palette's query, this one lives in the
    * store rather than in the component: three places open it — the global Ctrl+F, the
    * command palette and the viewer's own close button — and two of them have no way to
@@ -223,6 +237,10 @@ interface AppState {
   reopenUpdate: () => void
   openSettings: () => void
   closeSettings: () => void
+  openCode: () => void
+  closeCode: () => void
+  setCodeTarget: (target: SnippetTarget) => void
+  setRedactSecrets: (redact: boolean) => void
 }
 
 const mapTree = (nodes: TreeNode[], fn: (node: TreeNode) => TreeNode): TreeNode[] =>
@@ -395,6 +413,9 @@ export const useAppStore = create<AppState>(set => ({
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
+  codeOpen: false,
+  codeTarget: DEFAULT_SNIPPET_TARGET,
+  redactSecrets: false,
   persistenceState: 'loading',
   saveState: 'idle',
   secretsAvailable: true,
@@ -644,6 +665,10 @@ export const useAppStore = create<AppState>(set => ({
   reopenUpdate: () => set({ updateDismissed: false }),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
+  openCode: () => set({ codeOpen: true }),
+  closeCode: () => set({ codeOpen: false }),
+  setCodeTarget: codeTarget => set({ codeTarget }),
+  setRedactSecrets: redactSecrets => set({ redactSecrets }),
 }))
 
 /**

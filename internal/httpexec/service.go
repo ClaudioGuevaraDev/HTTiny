@@ -163,41 +163,16 @@ func newTransport() http.RoundTripper {
 // cancelling the CancellablePromise on the JS side cancels this context, which
 // aborts the connection rather than merely detaching the UI from it.
 func (s *HTTPService) Send(ctx context.Context, req Request) Result {
-	target, err := parseTarget(req.URL)
+	// Every field of the outgoing request is resolved in buildRequest, which the code
+	// view reads back through Wire. Nothing about the wire format is decided here.
+	httpReq, err := buildRequest(ctx, req)
 	if err != nil {
 		return failure(codeInvalidURL, err.Error())
 	}
 
-	var body io.Reader
-	if req.BodyType != "" && req.BodyType != "none" && req.Body != "" {
-		// strings.NewReader lets net/http compute ContentLength, which avoids
-		// chunked transfer encoding for a body we already hold entirely in memory.
-		body = strings.NewReader(req.Body)
-	}
-
-	method := strings.ToUpper(strings.TrimSpace(req.Method))
-	if method == "" {
-		method = http.MethodGet
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, method, target.String(), body)
-	if err != nil {
-		return failure(codeInvalidURL, err.Error())
-	}
-	applyHeaders(httpReq, req.Headers)
-	applyBodyDefaults(httpReq, req)
-	// Last, so the Auth panel wins over a hand-typed Authorization header. That is
-	// the precedence Postman and Insomnia use, and the panel is the more visible of
-	// the two controls — silently ignoring it would be the worse surprise.
-	applyAuth(httpReq, req.Auth)
-
-	timeout := defaultTimeout
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
 	client := &http.Client{
 		Transport: s.transport,
-		Timeout:   timeout,
+		Timeout:   timeoutFor(req),
 		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
 			if len(via) >= maxRedirects {
 				return errTooManyRedirects
@@ -248,7 +223,7 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 		Headers:         flattenHeaders(resp.Header),
 		ContentType:     media,
 		ContentEncoding: contentEncoding,
-		FinalURL:        finalURL(resp, target),
+		FinalURL:        finalURL(resp, httpReq.URL),
 		Truncated:       truncated,
 	}
 

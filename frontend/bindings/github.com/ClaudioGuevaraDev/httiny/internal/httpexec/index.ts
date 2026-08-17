@@ -12,5 +12,9 @@ export type {
     KeyValue,
     Request,
     Response,
-    Result
+    Result,
+    WireHeader,
+    WirePolicy,
+    WireRequest,
+    WireResult
 } from "./models.js";

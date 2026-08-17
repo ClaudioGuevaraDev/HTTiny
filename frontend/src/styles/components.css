@@ -8,14 +8,14 @@
  * All of those are gone.
  *
  * Order matters twice over. Shared primitives come first so the components that
- * extend them (`.panel-toggle` and `.save-btn` over `.icon-btn`) win on source
+ * extend them (`.panel-toggle` and `.bar-btn` over `.icon-btn`) win on source
  * order rather than on `!important`. After that the sections follow layout
  * containment order, so reading top to bottom walks the DOM.
  */
 
 @layer components {
   /* ── Shared primitives ─────────────────────────────────────────────────── */
-  /* Declared first: .panel-toggle and .save-btn both override .icon-btn and rely
+  /* Declared first: .panel-toggle and .bar-btn both override .icon-btn and rely
    * on coming later in the source. */
   .icon-btn {
     width: var(--h-control-sm);
@@ -50,7 +50,7 @@
    * `.split-handle` set their own offsets, and the key/value cells swap the outline
    * for an inset shadow. */
   .url-input:focus-visible,
-  .save-btn:focus-visible,
+  .bar-btn:focus-visible,
   .add-row:focus-visible,
   .tree-rename:focus-visible,
   .auth-editor input:focus-visible,
@@ -883,7 +883,12 @@
     border-color: var(--color-border-control);
   }
 
-  .save-btn {
+  /* The icon buttons in the request bar. Named for where they live rather than for
+   * either of its two users: Save and the code view are the same control, and one of
+   * them owning the class is how they came to differ — the code button inherited the
+   * bare 28px `.icon-btn` and sat visibly smaller than its neighbour. `--h-control-lg`
+   * is what lines both up with the URL field and Send. */
+  .bar-btn {
     width: var(--h-control-lg);
     height: var(--h-control-lg);
     border: 1px solid var(--color-border-control);
@@ -2760,6 +2765,7 @@
 
   .command-palette::backdrop,
   .settings-dialog::backdrop,
+  .code-dialog::backdrop,
   .update-dialog::backdrop {
     background: var(--color-scrim);
   }
@@ -3386,6 +3392,116 @@
     right: 10px;
   }
 
+  /* ── Code view ─────────────────────────────────────────────────────────── */
+  /* Same plate as the other three modals. Wider and taller than Settings, because
+   * what it holds is code at a width nobody chose: a Go snippet indents four levels
+   * and a bearer token is one very long word. */
+  .code-dialog {
+    width: min(840px, calc(94vw / var(--zoom, 1)));
+    height: min(calc(80vh / var(--zoom, 1)), 620px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-xl);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    box-shadow: var(--shadow-menu);
+    overflow: hidden;
+  }
+
+  /* Rows rather than a fixed height per part: the toolbar and the policy line size
+   * themselves and the editor takes what is left, which is what keeps a fourteen-line
+   * snippet and a two-line one in the same frame. */
+  .code-shell {
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .code-toolbar {
+    height: var(--h-section-title);
+    padding: 0 10px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-3);
+  }
+
+  .code-title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-strong);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* The copy button is pushed to the right edge, next to the close button, and the
+   * language picker stays beside the title where it reads as part of the heading. */
+  .code-toolbar .icon-btn {
+    margin-left: auto;
+  }
+
+  .code-toolbar .icon-btn + .icon-btn {
+    margin-left: 0;
+  }
+
+  /* A text switch rather than the sliding track of `.settings-switch`: it sits in a
+   * toolbar of icons and one more sliding thing would read as a third control type.
+   * The `.on` state is the accent border the method chips use. */
+  .code-redact {
+    height: var(--h-control-sm);
+    padding: 0 9px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+
+  .code-redact:hover {
+    border-color: var(--color-border-strong);
+    color: var(--color-text);
+  }
+
+  .code-redact.on {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .code-body {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .code-body .cm-editor {
+    height: 100%;
+  }
+
+  /* Facts about the client, not about the snippet — hence the muted treatment and the
+   * position under the code rather than in the toolbar. */
+  .code-policy {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border-top: 1px solid var(--color-border-subtle);
+    background: var(--color-surface-3);
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+  }
+
+  .code-policy p {
+    margin: 0;
+  }
+
+  .code-policy-added {
+    color: var(--color-text-faint);
+  }
+
   /* ── Text selection ────────────────────────────────────────────────────── */
   /* `.app-shell` used to carry a blanket `user-select: none`, which made response
    * headers, status codes and error messages impossible to copy. In an HTTP
@@ -3403,7 +3519,7 @@
   .kv-header,
   .icon-btn,
   .send-btn,
-  .save-btn,
+  .bar-btn,
   .add-row,
   .split-handle,
   .method-chip,

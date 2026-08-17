@@ -109,6 +109,54 @@ The viewer is a switch over `format` in `components/response/BodyPanel.tsx`, wit
 
 **The security rules on that route are not negotiable.** It serves a remote server's bytes from the application's own origin, so: only byte-backed formats are ever stored (never `text/html`); the `Content-Type` is written from `servedContentType`'s own allowlist and the remote header is never echoed; and every response carries `nosniff` plus `Content-Security-Policy: default-src 'none'; sandbox`. The HTML and Markdown previews are `<iframe sandbox="" srcdoc>` with no `<base>`, so they run no script and load no subresource.
 
+### Code view
+
+`HTTPService.Wire` answers "what would you send?" and the code view formats that answer as
+`curl`, as raw HTTP/1.1, or as one of eleven library snippets. **Go resolves, TypeScript
+formats**, and the split is not stylistic: the wire format depends on `encodeRawQuery`, on
+`applyHeaders`' precedence and Host diversion, on the `User-Agent` and `Content-Type`
+defaults, on `applyAuth`, and on `defaultTimeout`/`maxRedirects`. A resolver in the frontend
+would be a second one, and it would drift silently — the failure mode called out for
+`TEXT_FORMATS` against `byteBacked`. So `buildRequest` (`build.go`) builds the
+`*http.Request` for `Send` and for `Wire` alike, and `Wire` reads its fields *back off that
+object* rather than deriving them again.
+
+Two things `Wire` reports that are not in `httpReq.Header`, and both would otherwise be
+invisible: `Accept-Encoding: gzip`, which `http.Transport` adds on the way out (hence
+`Source: "transport"`, and hence curl's `--compressed` rather than the header), and
+`hostOverride` — `applyHeaders` diverts `Host` to `http.Request.Host`, so a Host row is in
+no map at all. `hostOverride` compares against `URL.Host` and **not** against `""`, because
+`http.NewRequest` seeds the field from the URL; testing for empty reported every request as
+overridden.
+
+`frontend/src/snippets/` is one file per target family plus a registry, like
+`src/response/`. `quote.ts` is the load-bearing part — a snippet that does not run is
+worthless — and every literal in every generator goes through it. Nine grammars for
+highlighting cost no new dependency: `@codemirror/legacy-modes` already carries them,
+`http` included.
+
+Four findings from *executing* the generated snippets rather than reading them, each now a
+comment where the fix lives: Windows PowerShell does not escape double quotes when it
+builds a native command line, so every JSON body silently lost them (`quote.windowsArg`);
+curl reads `[` and `]` in a URL as range syntax and refuses to run at all, which is exactly
+the Odoo domain filter (`shell.urlFlags`); `curl -X HEAD` hangs waiting for a body
+(`shell.methodFlag`); and Go's `Header.Set("Host", …)` is a no-op, the same trap
+`applyHeaders` documents from the other side (`go.ts`). The lesson generalises: verify a
+generator by running its output.
+
+`quote.posix` and `quote.powershell` pick the quote style that needs no escaping rather
+than always using single quotes. A single-quoted shell string cannot hold an apostrophe
+without being closed and reopened (`'\''`), which is correct and unreadable six times over
+in one URL — so a value containing an apostrophe takes double quotes *when nothing inside
+would come alive*, and falls back otherwise. The unsafe sets differ per shell and the `$`
+in them is not hypothetical: an OData `?$filter=…` would interpolate.
+
+`redactSecrets` masks a documented list of credential-carrying header names — the toggle has
+to cover an `api-key` typed into the grid, not only `auth.token`, or it would not protect
+the common case. The placeholder is a marker, not a live read: single quotes are what stop
+`$API_KEY` expanding, and a redacted snippet that silently picked up the environment would
+be a different request from the one on screen.
+
 ### i18n
 
 English and Spanish, from a hand-rolled catalogue in `frontend/src/i18n/` — no library, for
@@ -282,5 +330,5 @@ duplicate drafts. Linux must be `ubuntu-24.04` (GTK4/WebKitGTK 6.0), the AppImag
 - Byte-backed bodies still never cross the binding — base64 would inflate them by a third, hold them twice and give up Range requests. They go over the asset route instead; see "The byte route" above.
 - `trimPartialRune` exists because slicing at a fixed byte offset lands mid-rune on any body with non-ASCII text, `utf8.Valid` then failed, and a large but perfectly valid JSON response was reported as `binary` with an empty body. The truncation itself caused the downgrade. Do not remove it.
 - Non-UTF-8 charsets are transcoded via `golang.org/x/text` and reported in `encoding`. Before that, a plain `text/html; charset=ISO-8859-1` page with accents failed the UTF-8 veto and was shown as binary.
-- `url.Parse` does **not** validate or escape the query: it keeps `RawQuery` byte for byte, and `URL.String()` and `URL.RequestURI()` write it straight back. So `parseTarget` (`internal/httpexec/target.go`) percent-encodes it through `encodeRawQuery` before the request is built. Without that, a URL pasted with a literal space — an ordinary way to write an Odoo domain filter, `?domain=[('state', '=', 'sale')]` — produces a request-line a proxy truncates at the first space, and nginx answers 400 before the application sees it; a query with accents left as raw UTF-8 fails the same way. The set is the WHATWG URL standard's *special-query* set (C0 controls, space, non-ASCII, `"` `#` `<` `>` `'`), so what works pasted into a browser works pasted here. `%` is deliberately never touched, which is what keeps the function idempotent — a hand-typed `%20` must not become `%2520`. The path needs no equivalent: `EscapedPath()` discards an invalid `RawPath` and re-escapes on its own. `finalUrl` reports the encoded form, so the response panel shows what actually went out.
+- `url.Parse` does **not** validate or escape the query: it keeps `RawQuery` byte for byte, and `URL.String()` and `URL.RequestURI()` write it straight back. So `parseTarget` (`internal/httpexec/target.go`) percent-encodes it through `encodeRawQuery` before the request is built. Without that, a URL pasted with a literal space — an ordinary way to write an Odoo domain filter, `?domain=[('state', '=', 'sale')]` — produces a request-line a proxy truncates at the first space, and nginx answers 400 before the application sees it; a query with accents left as raw UTF-8 fails the same way. The set is the WHATWG URL standard's *special-query* set (C0 controls, space, non-ASCII, `"` `#` `<` `>`) **minus the apostrophe**, so what works pasted into a browser works pasted here — encoding *less* than a browser is safe while what is left is legal in a request-target. `'` came out because a browser encodes it to keep an apostrophe from closing an HTML `href='…'`, which is not a concern here, RFC 3986 lists it as a legal sub-delim, and the endpoint answers 200 either way; keeping it cost six `%27` in the middle of every generated snippet. Nothing else in the set is optional — `"` `<` `>` are excluded by RFC 3986 and make `java.net.URI` throw. `%` is deliberately never touched, which is what keeps the function idempotent — a hand-typed `%20` must not become `%2520`. The path needs no equivalent: `EscapedPath()` discards an invalid `RawPath` and re-escapes on its own. `finalUrl` reports the encoded form, so the response panel shows what actually went out.
 - Setting `Accept-Encoding` by hand disables Go's transparent gzip. `decompress` now undoes `gzip` and `deflate` (stdlib) and reports the encoding in `contentEncoding`; `br` and `zstd` are named honestly and left compressed rather than pretended away. Decompression is capped at `maxBodyBytes`, because a few kilobytes of hostile gzip otherwise expands into gigabytes of heap in a desktop process nobody restarts.

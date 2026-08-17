@@ -48,8 +48,21 @@ func parseTarget(raw string) (*url.URL, error) {
 // equivalent: EscapedPath() already discards an invalid RawPath and re-escapes.
 //
 // The set is the WHATWG URL standard's special-query percent-encode set — what a
-// browser applies for http(s) — so a URL that works when pasted into a browser
-// works when pasted here.
+// browser applies for http(s) — **minus the apostrophe**. Encoding less than a
+// browser is safe as long as what is left is legal in a request-target, so the
+// property that matters still holds: a URL that works pasted into a browser works
+// pasted here.
+//
+// The apostrophe is the one member of that set a browser encodes for a reason that
+// does not apply to an HTTP client — keeping `'` from closing an HTML attribute in
+// `href='…'`. RFC 3986 lists it as a legal sub-delim in a query, and the endpoint
+// that prompted all of this answers 200 either way, reporting the same domain
+// filter. What it bought instead was six `%27` in the middle of every generated
+// snippet, for an Odoo filter that reads perfectly well as `[('state', '=', …)]`.
+//
+// Nothing else in the set is optional. The space and the non-ASCII bytes are the
+// failure above; `"`, `<` and `>` are excluded by RFC 3986 and make java.net.URI
+// throw outright; the C0 controls cannot appear in a request-target at all.
 func encodeRawQuery(query string) string {
 	needed := 0
 	for i := 0; i < len(query); i++ {
@@ -95,8 +108,10 @@ func shouldEncodeQueryByte(b byte) bool {
 	if b <= 0x20 || b > 0x7E {
 		return true
 	}
+	// Deliberately without '\'' — see encodeRawQuery for why the one member of the
+	// browser's set that is legal here is left alone.
 	switch b {
-	case '"', '#', '<', '>', '\'':
+	case '"', '#', '<', '>':
 		return true
 	}
 	return false

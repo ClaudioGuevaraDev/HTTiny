@@ -75,6 +75,7 @@ export const en = {
   'editor.method': 'HTTP method',
   'editor.url': 'Request URL',
   'editor.save.title': 'Save now ({keys})',
+  'editor.code.title': 'Show the code for this request ({keys})',
   'editor.send.title': 'Send request ({keys})',
   'editor.cancel.title': 'Cancel request ({keys})',
   'editor.send': 'Send',
@@ -271,6 +272,31 @@ export const en = {
   'response.headers.name': 'Name',
   'response.headers.value': 'Value',
 
+  // ── Code view ────────────────────────────────────────────────────────────────
+  // The target names — curl, HTTPie, Python · requests — are not here on purpose.
+  // They are product and library names, and they sit with the HTTP methods and the
+  // format badges on the list of things this app does not translate.
+  'code.title': 'Code',
+  'code.target': 'Language',
+  'code.copy.aria': 'Copy snippet',
+  'code.copied.aria': 'Snippet copied',
+  'code.copy.title': 'Copy',
+  'code.copied.live': 'Copied to clipboard',
+  'code.copyFailed.live': 'Could not copy — clipboard access was denied',
+  'code.close': 'Close code view',
+  'code.redact.label': 'Hide secrets',
+  'code.redact.desc': 'Replace tokens, passwords and API keys with an environment variable, so the snippet is safe to paste into a ticket.',
+  // Facts about the client, read from Go's own constants rather than written here.
+  // Joined with a middot at the render site, so each one is a fragment and not a
+  // sentence — which is also why none of them ends in a full stop.
+  'code.policy.timeout': '{seconds}s timeout',
+  'code.policy.redirects': 'up to {limit} redirects',
+  'code.policy.gzip': 'gzip negotiated',
+  'code.policy.http2': 'HTTP/2 offered',
+  'code.policy.tls': 'TLS verified',
+  'code.policy.cap': 'reads up to {size}',
+  'code.policy.added': 'HTTiny adds: {headers}',
+
   // ── Tree row actions ─────────────────────────────────────────────────────────
   // The aria/title pair differs on purpose: the accessible name takes the bare name,
   // the tooltip wraps it in typographic quotes.
@@ -329,6 +355,10 @@ export const en = {
   'command.reveal.keywords': 'find locate show tree',
   'command.copyUrl.title': 'Copy request URL',
   'command.copyUrl.keywords': 'clipboard link',
+  'command.code.title': 'Show code',
+  'command.code.keywords': 'curl snippet generate export raw http fetch python go language',
+  'command.copyCurl.title': 'Copy as curl',
+  'command.copyCurl.keywords': 'clipboard curl snippet shell terminal',
   'command.findInResponse.title': 'Find in response',
   'command.findInResponse.keywords': 'search filter locate',
   'command.copyBody.title': 'Copy response body',

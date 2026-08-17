@@ -145,3 +145,82 @@ export interface Result {
     "errorText": string;
     "response": Response;
 }
+
+export interface WireHeader {
+    "key": string;
+    "value": string;
+
+    /**
+     * One of the source constants above. Cosmetic: the header list itself is read off
+     * the real *http.Request, so a mislabelled row still reports what is actually sent.
+     */
+    "source": string;
+}
+
+/**
+ * WirePolicy is what the client does that no request line shows — and what a generated
+ * snippet has to opt into by hand to behave like this app does. Every field is read
+ * from the constants Send uses, never restated as a literal.
+ */
+export interface WirePolicy {
+    "timeoutMs": number;
+    "maxRedirects": number;
+    "http2": boolean;
+
+    /**
+     * Whether the transport will negotiate and transparently undo gzip. False as soon
+     * as the user sets Accept-Encoding by hand, which is exactly when it stops being
+     * transparent — see decompress.
+     */
+    "gzip": boolean;
+    "verifyTls": boolean;
+    "maxBodyBytes": number;
+    "maxTextBytes": number;
+}
+
+/**
+ * WireRequest is the request as it will leave this process.
+ */
+export interface WireRequest {
+    "method": string;
+
+    /**
+     * Absolute, and already percent-encoded by parseTarget — so this is where a URL
+     * typed with a literal space visibly becomes one with %20.
+     */
+    "url": string;
+
+    /**
+     * Path and query only, which is what goes in the request-line.
+     */
+    "target": string;
+
+    /**
+     * The Host header, whether it came from the URL or from an override row.
+     */
+    "host": string;
+
+    /**
+     * Whether Host came from a header row rather than from the URL. It is not in
+     * Headers because applyHeaders diverts it to http.Request.Host — net/http reads
+     * the field and ignores the map — so without this flag an override would be
+     * invisible in every snippet.
+     */
+    "hostOverride": boolean;
+    "headers": WireHeader[] | null;
+    "body": string;
+    "hasBody": boolean;
+    "policy": WirePolicy;
+}
+
+/**
+ * WireResult is a success/failure union for the same reason Result is one: the frontend
+ * needs a stable code, and an invalid URL has to reach the code view as INVALID_URL
+ * rather than as a half-built snippet.
+ */
+export interface WireResult {
+    "ok": boolean;
+    "errorCode": string;
+    "errorText": string;
+    "request": WireRequest;
+}

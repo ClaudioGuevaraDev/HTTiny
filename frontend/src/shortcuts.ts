@@ -14,6 +14,10 @@ export const shortcuts = {
   toggleSidebar: ['Ctrl', 'B'],
   toggleSplit: ['Ctrl', '\\'],
   settings: ['Ctrl', ','],
+  // Not Ctrl+/ and not Ctrl+Shift+C, which both look more mnemonic and are both taken:
+  // the first is `toggleComment` in CodeMirror's default keymap, so it belongs to the body
+  // editor, and the second opens the webview's element inspector.
+  code: ['Ctrl', "'"],
   // `+` rather than `=`, because that is the key the user is aiming for even though the
   // event arrives as `=` unshifted. `useGlobalShortcuts` accepts both.
   zoomIn: ['Ctrl', '+'],
