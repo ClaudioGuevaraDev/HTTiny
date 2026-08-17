@@ -3,9 +3,10 @@ import { documentKeywords, flattenRequests, type Command } from './commands'
 import type { PlainMessageKey } from './i18n'
 import { useT } from './language'
 import { flushNow } from './persistence'
-import { cancelRequest, runRequest, toggleRequest } from './requestRunner'
+import { cancelRequest, runRequest, saveResponseBody, toggleRequest } from './requestRunner'
 import { shortcuts } from './shortcuts'
 import { methodOptions, useAppStore } from './store'
+import { isByteFormat } from './types'
 import { copySnippet } from './wire'
 
 const EMPTY: Command[] = []
@@ -91,6 +92,17 @@ export function useCommands(enabled: boolean): Command[] {
           shortcuts.find,
         )
         action('copy-body', 'command.copyBody.title', 'command.copyBody.keywords', () => void navigator.clipboard.writeText(response.body))
+        // Reaches the same Go call the toolbar button does. The acknowledgement is
+        // the button's job, so from here a cancel and a success look alike — which is
+        // right for a palette entry: the dialog it opens is the feedback.
+        action('save-body', 'command.saveBody.title', 'command.saveBody.keywords', () => {
+          void saveResponseBody({
+            id: activeId,
+            text: isByteFormat(response.format) ? '' : response.body,
+            filename: response.filename,
+            title: t('response.save.dialog'),
+          })
+        })
         action('clear-response', 'command.clearResponse.title', 'command.clearResponse.keywords', () =>
           useAppStore.getState().setResponse(activeId, { state: 'idle' }),
         )

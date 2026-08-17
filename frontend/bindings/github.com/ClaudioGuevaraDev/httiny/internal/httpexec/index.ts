@@ -13,6 +13,8 @@ export type {
     Request,
     Response,
     Result,
+    SaveRequest,
+    SaveResult,
     WireHeader,
     WirePolicy,
     WireRequest,

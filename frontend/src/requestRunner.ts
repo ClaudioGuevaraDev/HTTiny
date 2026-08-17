@@ -1,7 +1,7 @@
 import { RequestFailure } from './errors'
 import { goExecutor } from './goExecutor'
 import { useAppStore } from './store'
-import type { RequestExecutor } from './types'
+import type { RequestExecutor, SaveBodyRequest } from './types'
 
 /**
  * Owns request execution and the in-flight AbortController registry.
@@ -65,6 +65,20 @@ export function cancelRequest(id: string): void {
 export function toggleRequest(id: string): void {
   if (controllers.has(id)) cancelRequest(id)
   else void runRequest(id)
+}
+
+/**
+ * Writes a response body to a file the user picks.
+ *
+ * Goes through the executor rather than the binding directly, for the reason the
+ * executor exists at all: this module is the one place that knows how requests are
+ * carried out, and a second import of `goExecutor` elsewhere would be a second
+ * answer to that question. An executor with no `save` — a future in-browser one —
+ * reports a cancel, which is the outcome that shows nothing rather than an error.
+ */
+export async function saveResponseBody(request: SaveBodyRequest): Promise<{ ok: boolean; cancelled: boolean }> {
+  if (!executor.save) return { ok: false, cancelled: true }
+  return executor.save(request)
 }
 
 /**

@@ -19,6 +19,24 @@ export function Release(id: string): $CancellablePromise<void> {
 }
 
 /**
+ * SaveBody writes a response body to a file the user chooses.
+ * 
+ * This exists because the byte route made the app a dead end for its own best
+ * output. A PDF, a PNG or a zip renders beautifully and cannot be got out: the copy
+ * button is disabled for a body that is not text, and the bytes live only in this
+ * process, under a 64 MiB ceiling that evicts them as soon as another large response
+ * arrives.
+ * 
+ * The dialog is opened here rather than from the frontend, although the Wails
+ * runtime offers both. The process that opens it is already the one holding the
+ * bytes; going the other way would mean handing a filesystem path back across the
+ * binding for Go to write to, which is a wider door than this needs.
+ */
+export function SaveBody(req: $models.SaveRequest): $CancellablePromise<$models.SaveResult> {
+    return $Call.ByID(371893958, req);
+}
+
+/**
  * Send performs one request and reports the outcome.
  * 
  * ctx is the first parameter so that Wails marks the method as context-aware:

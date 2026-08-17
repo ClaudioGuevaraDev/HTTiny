@@ -133,6 +133,18 @@ export const en = {
   'response.copiedBody.aria': 'Response body copied',
   'response.copyBody.title': 'Copy body',
   'response.copied.title': 'Copied',
+  'response.save.aria': 'Save the response body to a file',
+  'response.save.title': 'Save body',
+  // The dialog's own title. It has to come from here rather than from Go, which has
+  // no catalogue — see SaveRequest.Title.
+  'response.save.dialog': 'Save response body',
+  // Said before writing, not discovered afterwards: the file is whatever the panel is
+  // showing, and these are the two ways that can differ from what the server sent.
+  'response.save.truncated': 'Save body — only the part shown here, the response was truncated',
+  'response.save.transcoded': 'Save body — as UTF-8, decoded from {charset}',
+  'response.save.unavailable': 'This response has no body',
+  'response.saved.live': 'Response body saved',
+  'response.saveFailed.live': 'Could not save the response body',
   'response.clear.aria': 'Clear response',
   'response.clear.title': 'Clear',
   'response.copied.live': 'Copied to clipboard',
@@ -353,6 +365,8 @@ export const en = {
   'command.copyCurl.keywords': 'clipboard curl snippet shell terminal',
   'command.findInResponse.title': 'Find in response',
   'command.findInResponse.keywords': 'search filter locate',
+  'command.saveBody.title': 'Save response body…',
+  'command.saveBody.keywords': 'download export write file disk',
   'command.copyBody.title': 'Copy response body',
   'command.copyBody.keywords': 'clipboard json',
   'command.clearResponse.title': 'Clear response',

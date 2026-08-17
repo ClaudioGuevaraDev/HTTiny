@@ -96,6 +96,7 @@ export const goExecutor: RequestExecutor = {
       encoding: response.encoding,
       contentEncoding: response.contentEncoding,
       finalUrl: response.finalUrl,
+      filename: response.filename,
       // Null for every format but zip, and for a zip whose directory would not read.
       archive: response.archive ?? [],
       format: toFormat(response.format),
@@ -115,5 +116,20 @@ export const goExecutor: RequestExecutor = {
     } catch (error) {
       console.warn('Could not release the retained response body', error)
     }
+  },
+
+  /**
+   * Go opens the dialog and writes the file. It is already holding the bytes of a
+   * byte-backed response — they never crossed the binding — so doing it here instead
+   * would mean sending a filesystem path back the other way for Go to write to.
+   *
+   * `cancelled` arrives as its own field rather than as an error code, so a dismissed
+   * dialog cannot be rendered as a failure. A rejection, by contrast, means the call
+   * never completed and is a real failure.
+   */
+  async save(request) {
+    const result = await HTTPService.SaveBody(request)
+    if (!result.ok && !result.cancelled) console.error('Save failed:', result.errorCode, result.errorText)
+    return { ok: result.ok, cancelled: result.cancelled }
   },
 }

@@ -5,6 +5,7 @@ import {
   Check,
   Code,
   Copy,
+  Download,
   FileArchive,
   FileAudio,
   FileJson2,
@@ -40,10 +41,11 @@ import {
 import { buildPattern, findMatches, segments, stepMatch } from '../response/search'
 import { isByteFormat } from '../types'
 import type { BodyLanguage, BodyMode, BodyView, KeyValueRow, ResponseFormat } from '../types'
-import { cancelRequest, runRequest } from '../requestRunner'
+import { cancelRequest, runRequest, saveResponseBody } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
 import { DEFAULT_RESPONSE_PANEL, useAppStore } from '../store'
 import { useCopy } from '../useCopy'
+import { useSave } from '../useSave'
 import { useRovingFocus } from '../useRovingFocus'
 import { BodyPanel } from './response/BodyPanel'
 import { ResponseSearchBar } from './response/ResponseSearchBar'
@@ -257,6 +259,7 @@ export function ResponseViewer() {
   const response = stored ?? { state: 'idle' as const }
   const elapsed = useElapsed(response.state === 'loading' ? response.startedAt : null)
   const { status: copyStatus, copy } = useCopy()
+  const { status: saveStatus, save } = useSave()
   const onTabsKeyDown = useRovingFocus('[role="tab"]')
   // Which request the hex escape hatch is open for, rather than a bare boolean: the
   // viewer does not remount when tabs change, so a boolean would leak the choice from
@@ -310,6 +313,18 @@ export function ResponseViewer() {
   // the whole rest of the row greyed out behind it — a dead end that gave no clue it was
   // one. Each control still does its own job; leaving hex is what makes that job visible.
   const leaveHex = () => setHexFor(null)
+
+  // The saved file is whatever the panel is showing, so the two ways that can differ
+  // from what the server sent have to be said *before* writing, not discovered after:
+  // a body past the editor's ceiling saves short, and one transcoded from another
+  // charset saves as UTF-8. Both facts are already on the response.
+  const saveTitle = !hasPayload
+    ? t('response.save.unavailable')
+    : response.state === 'success' && response.truncated
+      ? t('response.save.truncated')
+      : response.state === 'success' && response.encoding !== ''
+        ? t('response.save.transcoded', { charset: response.encoding })
+        : t('response.save.title')
 
   // Whether lines are actually wrapping, which is not the same as whether the preference
   // is set: a hex dump has fixed-width rows and wraps nothing. The distinction is what
@@ -379,6 +394,33 @@ export function ResponseViewer() {
             {copyStatus === 'copied' ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
           </button>
         )}
+        {response.state === 'success' && (
+          <button
+            type="button"
+            className="icon-btn xs"
+            /* The one action that works for a payload the clipboard cannot take, so
+               it sits beside copy: whichever of the pair is greyed out, the other is
+               the way to get this response out of the app. */
+            disabled={!hasPayload}
+            aria-label={t('response.save.aria')}
+            title={saveTitle}
+            onClick={() =>
+              save(() =>
+                saveResponseBody({
+                  id: activeId ?? '',
+                  // Only read when Go holds no bytes for this id — a textual body,
+                  // which is not retained there. `bodyText` rather than
+                  // `response.body`, so what lands on disk is what is on screen.
+                  text: byteBacked ? '' : bodyText,
+                  filename: response.filename,
+                  title: t('response.save.dialog'),
+                }),
+              )
+            }
+          >
+            {saveStatus === 'saved' ? <Check size={13} aria-hidden="true" /> : <Download size={13} aria-hidden="true" />}
+          </button>
+        )}
         {(response.state === 'success' || response.state === 'error') && activeId && (
           <button
             type="button"
@@ -396,7 +438,15 @@ export function ResponseViewer() {
           call: nothing moved on screen, nothing was announced, and a rejected promise —
           a denied clipboard permission — was indistinguishable from success. */}
       <p className="sr-only" role="status" aria-live="polite">
-        {copyStatus === 'copied' ? t('response.copied.live') : copyStatus === 'failed' ? t('response.copyFailed.live') : ''}
+        {copyStatus === 'copied'
+          ? t('response.copied.live')
+          : copyStatus === 'failed'
+            ? t('response.copyFailed.live')
+            : saveStatus === 'saved'
+              ? t('response.saved.live')
+              : saveStatus === 'failed'
+                ? t('response.saveFailed.live')
+                : ''}
       </p>
 
       {response.state === 'idle' && (

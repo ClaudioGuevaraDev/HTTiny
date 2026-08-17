@@ -178,6 +178,12 @@ export type ResponseSnapshot =
       encoding: string
       contentEncoding: string
       finalUrl: string
+      /**
+       * What to call this body if it is saved, decided in Go: the server's
+       * `Content-Disposition` where there is one, else the URL's last segment, else
+       * a generic name with the format's extension.
+       */
+      filename: string
       /** Populated for a zip response only; empty for everything else. */
       archive: ArchiveEntry[]
       format: ResponseFormat
@@ -199,6 +205,28 @@ export interface RequestExecutor {
    * that keeps bytes out of the response object has anything to release.
    */
   release?(id: string): Promise<void>
+  /**
+   * Writes a body to a file the user picks, and reports which of the three things
+   * happened. `cancelled` is separate from `ok` on purpose: dismissing the dialog is
+   * not a failure and must never be shown as one.
+   *
+   * Optional for the same reason as `release`: only an executor that can reach a
+   * native dialog and holds the bytes can do this at all.
+   */
+  save?(request: SaveBodyRequest): Promise<{ ok: boolean; cancelled: boolean }>
+}
+
+/**
+ * `text` is the body as the viewer has it, and is used only when the executor has no
+ * bytes of its own for this request — which is every textual response, since those
+ * cross the binding as a string and are deliberately not retained on the Go side.
+ */
+export interface SaveBodyRequest {
+  id: string
+  text: string
+  filename: string
+  /** The dialog's title. Translated here, because the catalogue is not in Go. */
+  title: string
 }
 
 /**

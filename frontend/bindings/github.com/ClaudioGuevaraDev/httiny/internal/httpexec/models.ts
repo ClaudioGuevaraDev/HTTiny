@@ -118,6 +118,14 @@ export interface Response {
     "finalUrl": string;
 
     /**
+     * What to call this body if it is saved. Read from the server's
+     * Content-Disposition where there is one, else derived from the URL and the
+     * format. Computed here because parsing that header correctly — including the
+     * RFC 2231 encoded form — is `mime`'s job, not the viewer's.
+     */
+    "filename": string;
+
+    /**
      * The entries of a zip response. Empty for every other format, and for an archive
      * whose index could not be read.
      */
@@ -144,6 +152,56 @@ export interface Result {
     "errorCode": string;
     "errorText": string;
     "response": Response;
+}
+
+/**
+ * SaveRequest asks for a response body to be written to a file the user picks.
+ */
+export interface SaveRequest {
+    /**
+     * The request whose body to save. Byte-backed payloads are found in the store
+     * under this key; see bodystore.go.
+     */
+    "id": string;
+
+    /**
+     * The body as the viewer has it. Used only when the store holds nothing for ID —
+     * a textual payload crossed the binding as a string and is deliberately not
+     * retained here, so the frontend is the only place it still exists.
+     */
+    "text": string;
+
+    /**
+     * Suggested name, normally Response.Filename handed straight back. Sanitised
+     * again on arrival rather than trusted: it made a round trip through the
+     * frontend, and this is the side that puts it in front of a file dialog.
+     */
+    "filename": string;
+
+    /**
+     * The dialog's title. It comes from the frontend because it is translated copy
+     * and the catalogue lives there; Go has no way to read it.
+     */
+    "title": string;
+}
+
+/**
+ * SaveResult reports what happened.
+ * 
+ * Cancelled is its own field rather than an error code, and that is the whole point
+ * of the shape: dismissing a file dialog is the most ordinary thing a person can do
+ * with one, and the interface must not be able to render it as a failure.
+ */
+export interface SaveResult {
+    "ok": boolean;
+    "cancelled": boolean;
+
+    /**
+     * Where it was written, so the UI can name the file it just produced.
+     */
+    "path": string;
+    "errorCode": string;
+    "errorText": string;
 }
 
 export interface WireHeader {

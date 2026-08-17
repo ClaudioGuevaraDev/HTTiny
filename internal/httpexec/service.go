@@ -116,6 +116,11 @@ type Response struct {
 	ContentEncoding string `json:"contentEncoding"`
 	// Where the request ended up after redirects, which are otherwise invisible.
 	FinalURL string `json:"finalUrl"`
+	// What to call this body if it is saved. Read from the server's
+	// Content-Disposition where there is one, else derived from the URL and the
+	// format. Computed here because parsing that header correctly — including the
+	// RFC 2231 encoded form — is `mime`'s job, not the viewer's.
+	Filename string `json:"filename"`
 	// The entries of a zip response. Empty for every other format, and for an archive
 	// whose index could not be read.
 	Archive   []ArchiveEntry `json:"archive"`
@@ -257,6 +262,10 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 	}
 
 	out.Format = format
+	// Last, because it reads the format the veto above may have changed: a payload
+	// that claimed to be JSON and turned out to be bytes should not be suggested
+	// as `response.json`.
+	out.Filename = filenameFor(resp.Header.Get("Content-Disposition"), out.FinalURL, format)
 	return Result{OK: true, Response: out}
 }
 

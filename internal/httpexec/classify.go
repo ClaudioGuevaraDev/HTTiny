@@ -8,6 +8,9 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
+	"path"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -186,6 +189,91 @@ func servedContentType(format, media string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+// ── Suggested filename ───────────────────────────────────────────────────────────
+
+// Fallback extensions, keyed by render format. Only consulted when neither the
+// server nor the URL offered a name, so this is the "you asked for a JSON endpoint
+// and got no filename anywhere" case rather than a general media-type table.
+//
+// `mime.ExtensionsByType` would answer for more types and is deliberately not used:
+// it reads the system's MIME database, so the name suggested for the same response
+// would differ between machines.
+var formatExtension = map[string]string{
+	formatJSON: ".json", formatNDJSON: ".ndjson", formatXML: ".xml", formatHTML: ".html",
+	formatSVG: ".svg", formatCSV: ".csv", formatMarkdown: ".md", formatYAML: ".yaml",
+	formatJavaScript: ".js", formatCSS: ".css", formatSSE: ".txt", formatText: ".txt",
+	formatPDF: ".pdf", formatArchive: ".zip", formatBinary: ".bin",
+}
+
+// sanitiseFilename reduces anything a server sent to a bare name.
+//
+// `filename` in a Content-Disposition is attacker-controlled, and a save dialog
+// pre-filled with `../../.bashrc` is a real problem rather than a theoretical one:
+// the user would be confirming a path they did not read. `filepath.Base` collapses
+// any directory part on the host's own separator, and the rest is belt and braces
+// for the separators it does not treat as one — a Windows path arriving on Linux.
+func sanitiseFilename(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	if cut := strings.LastIndexAny(name, `/\`); cut >= 0 {
+		name = name[cut+1:]
+	}
+	name = filepath.Base(name)
+	// `.` and `..` survive Base intact, and neither is a filename.
+	if name == "." || name == ".." || name == string(filepath.Separator) {
+		return ""
+	}
+	// Reserved on Windows, and nothing worth keeping on the others either.
+	name = strings.Map(func(r rune) rune {
+		if r < 0x20 || strings.ContainsRune(`<>:"|?*`, r) {
+			return -1
+		}
+		return r
+	}, name)
+	return strings.TrimSpace(name)
+}
+
+// filenameFor suggests what to call this body if it were saved.
+//
+// In order of how much the source knows: the server's own `Content-Disposition`,
+// then the last segment of the URL the request actually ended at, then a generic
+// name with an extension derived from the format.
+//
+// `mime.ParseMediaType` is what reads the header, and it is the reason this lives in
+// Go rather than in the viewer: it decodes the RFC 2231 `filename*=UTF-8”…` form,
+// which is how any filename outside ASCII arrives, and which a parser written by
+// hand on the other side of the binding would get wrong.
+func filenameFor(disposition, finalURL, format string) string {
+	if disposition != "" {
+		if _, params, err := mime.ParseMediaType(disposition); err == nil {
+			// ParseMediaType folds `filename*` into `filename`, already decoded.
+			if name := sanitiseFilename(params["filename"]); name != "" {
+				return name
+			}
+		}
+	}
+
+	if parsed, err := url.Parse(finalURL); err == nil {
+		// The *escaped* path would leave `%20` in the name; Path is already decoded.
+		if name := sanitiseFilename(path.Base(parsed.Path)); name != "" && name != "/" {
+			// A path segment with no extension is usually a resource id rather than a
+			// file — `/v1/users/42`. Giving it the format's suffix beats saving `42`.
+			if filepath.Ext(name) == "" {
+				return name + formatExtension[format]
+			}
+			return name
+		}
+	}
+
+	ext, known := formatExtension[format]
+	if !known {
+		ext = ".bin"
+	}
+	return "response" + ext
 }
 
 // ── Text decoding ────────────────────────────────────────────────────────────────
