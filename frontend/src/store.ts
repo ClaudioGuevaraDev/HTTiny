@@ -124,6 +124,11 @@ interface AppState {
    * leaving one request on Headers opened every *other* request on Headers too, including
    * ones that had never been looked at. Which section you are editing belongs to the
    * request, the way its URL does.
+   *
+   * Per request, but **not** across launches — these three never reach `ui.json`. Closing
+   * the app on Timeline and finding it there again is restoring a view of a response that
+   * no longer exists, since `responses` below is never persisted either. See the note in
+   * `workspaceFile.ts`.
    */
   requestPanels: Record<string, RequestPanel>
   responsePanels: Record<string, ResponsePanel>
@@ -204,6 +209,10 @@ interface AppState {
    * `Wire`'s answer, both of which can change on any keystroke, so holding it would mean
    * keeping a copy in sync for no reader — and it is the one string in the app that can
    * contain a credential in plain text.
+   *
+   * `codeTarget` lasts the session and is not written to `ui.json`, for the reason its
+   * neighbour above is: it is where you left the picker, not a preference you went and
+   * set. Same rule as the panel maps.
    */
   codeOpen: boolean
   codeTarget: SnippetTarget

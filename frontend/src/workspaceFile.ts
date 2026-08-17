@@ -1,19 +1,6 @@
-import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW } from './responseBody'
-import { DEFAULT_SNIPPET_TARGET, SNIPPET_TARGET_IDS, type SnippetTarget } from './snippets'
-import { CODE_FONT_SIZE, DEFAULT_REQUEST_PANEL, DEFAULT_RESPONSE_PANEL, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
-import type {
-  BodyLanguage,
-  BodyView,
-  HttpMethod,
-  KeyValueRow,
-  Locale,
-  RequestDocument,
-  RequestPanel,
-  ResponsePanel,
-  SplitOrientation,
-  ThemePreference,
-  TreeNode,
-} from './types'
+import { BODY_LANGUAGES } from './responseBody'
+import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
+import type { BodyLanguage, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
 
 /**
  * The on-disk schema.
@@ -71,20 +58,6 @@ export interface PrefsFile {
   activeCollectionId: string | null
   recentIds: string[]
   collapsedNodeIds: string[]
-  /**
-   * Keyed by request id, and like `bodyViews` below only the requests that differ from
-   * the default are written. The two were single fields until the panel became per
-   * request; the old keys are simply not read any more, which lands every request on its
-   * default once — the behaviour being restored.
-   */
-  requestPanels: Record<string, RequestPanel>
-  responsePanels: Record<string, ResponsePanel>
-  /**
-   * Only the requests whose view differs from the default appear here. Writing an
-   * entry per request would grow this file in lockstep with the workspace to record
-   * that nothing was chosen.
-   */
-  bodyViews: Record<string, BodyView>
   sidebarWidth: number
   sidebarCollapsed: boolean
   splitOrientation: SplitOrientation
@@ -103,9 +76,23 @@ export interface PrefsFile {
    * field may still carry its old `redactSecrets` key, which is simply not read.
    */
   defaultRedactSecrets: boolean
-  /** Which language the code view was last showing. */
-  codeTarget: SnippetTarget
 }
+
+/*
+ * Four things this file deliberately does **not** carry, and one rule that decides it.
+ *
+ * `requestPanels`, `responsePanels`, `bodyViews` and `codeTarget` are where you happened
+ * to leave a panel, not anything you went and configured. They live in the store for as
+ * long as the window is open — switching tabs still returns each request to the section
+ * you were on — and they start over on the next launch.
+ *
+ * The clearest case is `responsePanels`. `responses` is never persisted at all, so on the
+ * next launch there is no response to have a Timeline of; restoring the tab meant reopening
+ * on a view of something that no longer existed. `bodyViews` describes the same absent
+ * response. The durable half of both is in Settings and does persist:
+ * `defaultBodyLanguage`, next to `defaultRedactSecrets`, which already draws exactly this
+ * line — the switch in the modal lasts one visit, the preference is what gets written.
+ */
 
 /**
  * What `readPrefs` hands back: the prefs file minus the one field of it that is not
@@ -153,14 +140,6 @@ export const toWorkspaceFile = (state: { tree: TreeNode[]; documents: Record<str
   documents: Object.fromEntries(Object.entries(state.documents).map(([id, doc]) => [id, toStoredDocument(doc)])),
 })
 
-/** A request showing its body the default way records nothing — see `PrefsFile`. */
-const nonDefaultViews = (views: Record<string, BodyView>): Record<string, BodyView> =>
-  Object.fromEntries(Object.entries(views).filter(([, view]) => view.mode !== DEFAULT_BODY_VIEW.mode || view.language !== DEFAULT_BODY_VIEW.language))
-
-/** The same rule for the panel maps: a request left where it opens records nothing. */
-const nonDefaultPanels = <T extends string>(panels: Record<string, T>, fallback: T): Record<string, T> =>
-  Object.fromEntries(Object.entries(panels).filter(([, panel]) => panel !== fallback))
-
 export const toPrefsFile = (state: {
   tree: TreeNode[]
   tabs: string[]
@@ -168,9 +147,6 @@ export const toPrefsFile = (state: {
   selectedNodeId: string | null
   activeCollectionId: string | null
   recentIds: string[]
-  requestPanels: Record<string, RequestPanel>
-  responsePanels: Record<string, ResponsePanel>
-  bodyViews: Record<string, BodyView>
   sidebarWidth: number
   sidebarCollapsed: boolean
   splitOrientation: SplitOrientation
@@ -181,7 +157,6 @@ export const toPrefsFile = (state: {
   codeFontSize: number
   defaultBodyLanguage: BodyLanguage | null
   defaultRedactSecrets: boolean
-  codeTarget: SnippetTarget
 }): PrefsFile => ({
   tabs: state.tabs,
   activeId: state.activeId,
@@ -189,9 +164,6 @@ export const toPrefsFile = (state: {
   activeCollectionId: state.activeCollectionId,
   recentIds: state.recentIds,
   collapsedNodeIds: collapsedIn(state.tree),
-  requestPanels: nonDefaultPanels(state.requestPanels, DEFAULT_REQUEST_PANEL),
-  responsePanels: nonDefaultPanels(state.responsePanels, DEFAULT_RESPONSE_PANEL),
-  bodyViews: nonDefaultViews(state.bodyViews),
   sidebarWidth: state.sidebarWidth,
   sidebarCollapsed: state.sidebarCollapsed,
   splitOrientation: state.splitOrientation,
@@ -202,7 +174,6 @@ export const toPrefsFile = (state: {
   codeFontSize: state.codeFontSize,
   defaultBodyLanguage: state.defaultBodyLanguage,
   defaultRedactSecrets: state.defaultRedactSecrets,
-  codeTarget: state.codeTarget,
 })
 
 // ── Reading ────────────────────────────────────────────────────────────────────
@@ -227,55 +198,6 @@ const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T)
 
 const BODY_TYPES = ['none', 'json', 'text'] as const
 const AUTH_TYPES = ['none', 'bearer', 'basic'] as const
-const PANELS = ['params', 'headers', 'body', 'auth'] as const satisfies readonly RequestPanel[]
-/**
- * Widen this whenever `ResponsePanel` gains a member, and note that nothing will remind
- * you: `satisfies` checks that every entry *is* a `ResponsePanel`, not that they are all
- * here. Forgetting compiles cleanly and fails at runtime in the quietest possible way —
- * `readPanels` drops the unknown value, so the tab is left open, the app is restarted,
- * and it silently opens on Body instead.
- */
-const RESPONSE_PANELS = ['body', 'headers', 'cookies', 'timeline'] as const satisfies readonly ResponsePanel[]
-
-/**
- * Dropped for requests that no longer exist, like `readBodyViews` below — and dropped
- * for a panel this build does not have, which is what keeps a hand-edited or
- * newer-build file from selecting a tab with nothing behind it. Entries equal to the
- * default are never written, so anything absent here simply opens where it should.
- */
-const readPanels = <T extends string>(value: unknown, allowed: readonly T[], documents: Record<string, RequestDocument>): Record<string, T> => {
-  if (!isRecord(value)) return {}
-  const out: Record<string, T> = {}
-  for (const [id, panel] of Object.entries(value)) {
-    if (!documents[id]) continue
-    const known = allowed.find(candidate => candidate === panel)
-    if (known) out[id] = known
-  }
-  return out
-}
-
-/**
- * Dropped for requests that no longer exist, the same way `tabs` and `recentIds`
- * are: a view kept for a deleted request can never be reached or cleared, so it
- * would only accumulate.
- */
-const readBodyViews = (value: unknown, documents: Record<string, RequestDocument>): Record<string, BodyView> => {
-  if (!isRecord(value)) return {}
-  const out: Record<string, BodyView> = {}
-  for (const [id, view] of Object.entries(value)) {
-    if (!documents[id] || !isRecord(view)) continue
-    out[id] = {
-      // Neither uses `oneOf`: the fallback for both is `null` — nothing chosen — which
-      // is not one of the allowed values. A file written by an older build carries
-      // `'pretty'` or `'raw'`, both of which are still members and survive; anything
-      // else, including a mode a future build invents, falls back to the per-format
-      // default rather than into a panel with no renderer.
-      mode: BODY_MODES.find(candidate => candidate === view.mode) ?? null,
-      language: BODY_LANGUAGES.find(candidate => candidate === view.language) ?? null,
-    }
-  }
-  return out
-}
 const ORIENTATIONS = ['rows', 'columns'] as const
 const THEMES = ['system', 'light', 'dark'] as const
 /** `satisfies` so a locale that has no catalogue cannot be listed here as readable. */
@@ -438,9 +360,6 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     selectedNodeId: selectedCandidate && nodeIds.has(selectedCandidate) ? selectedCandidate : null,
     activeCollectionId: collectionCandidate && collectionIds.includes(collectionCandidate) ? collectionCandidate : (collectionIds[0] ?? null),
     recentIds: ids(raw.recentIds).filter(id => documents[id]).slice(0, 12),
-    requestPanels: readPanels(raw.requestPanels, PANELS, documents),
-    responsePanels: readPanels(raw.responsePanels, RESPONSE_PANELS, documents),
-    bodyViews: readBodyViews(raw.bodyViews, documents),
     sidebarWidth: clamped(raw.sidebarWidth, SIDEBAR_WIDTH),
     sidebarCollapsed: bool(raw.sidebarCollapsed, false),
     splitOrientation: oneOf(raw.splitOrientation, ORIENTATIONS, 'rows'),
@@ -449,11 +368,10 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     language: oneOf(raw.language, LOCALES, 'en'),
     zoom: clamped(raw.zoom, ZOOM),
     codeFontSize: clamped(raw.codeFontSize, CODE_FONT_SIZE),
-    // Not `oneOf`, for the same reason as `readBodyViews` above: the fallback is `null`,
-    // which is not one of the allowed values.
+    // Not `oneOf`: the fallback is `null` — nothing chosen — which is not one of the
+    // allowed values.
     defaultBodyLanguage: BODY_LANGUAGES.find(candidate => candidate === raw.defaultBodyLanguage) ?? null,
     defaultRedactSecrets: bool(raw.defaultRedactSecrets, false),
-    codeTarget: oneOf(raw.codeTarget, SNIPPET_TARGET_IDS, DEFAULT_SNIPPET_TARGET),
   }
 }
 
