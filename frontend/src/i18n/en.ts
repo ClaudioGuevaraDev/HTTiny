@@ -443,9 +443,16 @@ export const en = {
   // for the same reason the dev command is in `errors.ts`: a translator cannot
   // mistype a number they never see.
   'update.dialog': 'Update',
-  'update.ready.title': 'Ready to install',
-  'update.ready.body': 'HTTiny {version} has been downloaded and verified. Installing takes a moment and reopens the app.',
-  'update.ready.action': 'Install and restart',
+  'update.available.title': 'Update available',
+  'update.available.body': 'HTTiny {version} is out. Installing takes a moment: the app closes, updates and opens again.',
+  'update.available.action': 'Install and restart',
+  'update.downloading.title': 'Downloading',
+  'update.downloading.body': 'Fetching HTTiny {version}.',
+  // Both sides are already formatted, so they arrive as strings — the units belong to
+  // formatBytes, which follows the app's language rather than the system's.
+  'update.progress': '{received} of {total}',
+  'update.preparing.title': 'Preparing',
+  'update.preparing.body': 'Verifying HTTiny {version} and getting it ready. The app will close and reopen on its own.',
   'update.manual.title': 'Update available',
   'update.manual.body': 'HTTiny {version} is out. This installation cannot update itself, so download the new version and install it the way you installed this one.',
   'update.manual.action': 'Download',

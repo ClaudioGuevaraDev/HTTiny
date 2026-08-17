@@ -1,4 +1,4 @@
-import { Call } from '@wailsio/runtime'
+import { Call, Events, Updater } from '@wailsio/runtime'
 import { Service as UpdateService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/updates'
 import type { Result } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/updates'
 import { useAppStore } from './store'
@@ -27,11 +27,25 @@ const call = async (fn: () => Promise<Result>): Promise<Result> => {
 }
 
 /**
- * Runs the whole flow once, at startup.
+ * The payload of `wails:updater:download-progress`. Declared here because the runtime
+ * types every event's `data` as `any` — this is untrusted input in the same sense the
+ * workspace file is, so it is read defensively rather than asserted.
+ */
+const readProgress = (data: unknown): { received: number; total: number } => {
+  const record = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {}
+  const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
+  return { received: num(record.written), total: num(record.total) }
+}
+
+/**
+ * Looks for a new version, once, at startup.
  *
- * Silence is the point: no update, no network, no backend and a version the user has
- * already skipped all end with nothing on screen. The modal is only ever opened for a
- * decision — install now, or go and download it.
+ * Nothing is downloaded here: the transfer is what the user is agreeing to when they
+ * press the button, and pulling several megabytes on every launch for an update most
+ * launches will not install is bandwidth nobody asked to spend.
+ *
+ * Silence is the other half of it. No update, no network and no backend all end with
+ * nothing on screen; the modal only ever opens to ask something.
  */
 export const checkForUpdate = async (): Promise<void> => {
   const store = useAppStore.getState()
@@ -45,37 +59,59 @@ export const checkForUpdate = async (): Promise<void> => {
   }
 
   const { version, notes, canSelfUpdate } = checked.update
-
   // Linux: never download. A .deb or .rpm belongs to the package manager, and the
   // AppImage is one file rather than the loose executable the updater swaps.
-  if (!canSelfUpdate) {
-    store.setUpdate({ state: 'manual', version, notes })
-    return
-  }
-
-  store.setUpdate({ state: 'downloading', version })
-  const downloaded = await call(() => UpdateService.Download())
-  if (!downloaded.ok) {
-    // The download is the one failure worth surfacing: an update exists and we
-    // could not fetch it, so offer the manual route instead of going quiet.
-    store.setUpdate({ state: 'error', version, code: downloaded.errorCode, detail: downloaded.errorText })
-    return
-  }
-  store.setUpdate({ state: 'ready', version, notes })
+  store.setUpdate({ state: canSelfUpdate ? 'available' : 'manual', version, notes })
 }
 
 /**
- * Installs what was staged. On success the process is already on its way out, so
- * there is nothing to report; only a failure comes back, and it falls through to the
- * manual download like any other.
+ * Downloads, verifies and installs, reporting progress along the way. On success the
+ * process is already on its way out, so only a failure ever comes back — and it lands
+ * in the same error state that offers the manual download.
+ *
+ * The event subscription lives here rather than in a `useEffect`: the modal body only
+ * mounts while the dialog is open, and the download has to outlive any remount. Wails
+ * throttles the progress event to ~10 Hz itself, so there is nothing to rate-limit.
  */
-export const applyUpdate = async (): Promise<void> => {
+export const installUpdate = async (): Promise<void> => {
   const store = useAppStore.getState()
   const current = store.update
-  const version = 'version' in current ? current.version : ''
+  if (!('version' in current)) return
+  const { version } = current
 
+  store.setUpdate({ state: 'downloading', version, received: 0, total: 0 })
+
+  const offProgress = Events.On(Updater.Events.DownloadProgress, event => {
+    // Ignore late ticks once the flow has moved on, so a trailing event cannot drag
+    // the modal back from `preparing` to a bar at 100%.
+    if (useAppStore.getState().update.state !== 'downloading') return
+    const { received, total } = readProgress(event.data)
+    useAppStore.getState().setUpdate({ state: 'downloading', version, received, total })
+  })
+  // Verification and unpacking emit no progress at all, and `Download` does not resolve
+  // until they finish. Without this the bar would sit at 100% looking hung.
+  const offVerifying = Events.On(Updater.Events.Verifying, () => {
+    useAppStore.getState().setUpdate({ state: 'preparing', version })
+  })
+
+  let downloaded: Result
+  try {
+    downloaded = await call(() => UpdateService.Download())
+  } finally {
+    offProgress()
+    offVerifying()
+  }
+
+  if (!downloaded.ok) {
+    store.setUpdate({ state: 'error', version, code: downloaded.errorCode, detail: downloaded.errorText })
+    return
+  }
+
+  // Installing quits the app, so this state is the last thing drawn. Set it anyway:
+  // the download may have finished without a `verifying` event ever arriving.
+  useAppStore.getState().setUpdate({ state: 'preparing', version })
   const applied = await call(() => UpdateService.Apply())
-  if (!applied.ok) store.setUpdate({ state: 'error', version, code: applied.errorCode, detail: applied.errorText })
+  if (!applied.ok) useAppStore.getState().setUpdate({ state: 'error', version, code: applied.errorCode, detail: applied.errorText })
 }
 
 /** Opens the releases page in the user's browser. */

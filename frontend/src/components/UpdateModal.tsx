@@ -1,19 +1,25 @@
 import { useEffect, useRef } from 'react'
 import { Download, RefreshCw, X } from 'lucide-react'
 import { useAppStore } from '../store'
-import { useT } from '../language'
-import { applyUpdate, openDownloadPage } from '../updates'
+import { useLocale, useT } from '../language'
+import { formatBytes } from '../format'
+import { installUpdate, openDownloadPage } from '../updates'
 import type { UpdateState } from '../types'
 
 /**
- * The three states worth interrupting for. Checking and downloading happen without
- * a word, so the modal only ever opens to ask a question — which is what "tell me
- * before restarting" means: the work is done, the decision is not.
+ * Every state the modal is on screen for. `idle` and `checking` are the silent ones:
+ * looking for an update is not worth interrupting anybody, and only its outcome is.
  */
-type Decision = Extract<UpdateState, { state: 'ready' | 'manual' | 'error' }>
+type Shown = Exclude<UpdateState, { state: 'idle' } | { state: 'checking' }>
 
-const isDecision = (update: UpdateState): update is Decision =>
-  update.state === 'ready' || update.state === 'manual' || update.state === 'error'
+const isShown = (update: UpdateState): update is Shown => update.state !== 'idle' && update.state !== 'checking'
+
+/**
+ * Downloading and installing cannot be interrupted: the app is about to replace itself
+ * and there is no half-way state worth leaving somebody in. Closing the modal would
+ * hide a transfer that is still running and then quit the app out from under them.
+ */
+const isBusy = (update: Shown): boolean => update.state === 'downloading' || update.state === 'preparing'
 
 /**
  * Same shell as the settings modal and the command palette, and for the same four
@@ -26,7 +32,8 @@ export function UpdateModal() {
   const update = useAppStore(s => s.update)
   const dismissUpdate = useAppStore(s => s.dismissUpdate)
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const open = isDecision(update)
+  const open = isShown(update)
+  const busy = open && isBusy(update)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -42,33 +49,36 @@ export function UpdateModal() {
       aria-modal="true"
       aria-labelledby="update-title"
       onClose={dismissUpdate}
+      // Escape reaches a modal dialog as `cancel`, and it is the one dismissal the
+      // markup cannot simply omit — so while busy it is refused here instead.
+      onCancel={event => {
+        if (busy) event.preventDefault()
+      }}
       onClick={event => {
-        if (event.target === dialogRef.current) dialogRef.current?.close()
+        if (!busy && event.target === dialogRef.current) dialogRef.current?.close()
       }}
     >
-      {isDecision(update) && <UpdateBody update={update} onDismiss={() => dialogRef.current?.close()} />}
+      {isShown(update) && <UpdateBody update={update} onDismiss={() => dialogRef.current?.close()} />}
     </dialog>
   )
 }
 
-function UpdateBody({ update, onDismiss }: { update: Decision; onDismiss: () => void }) {
+function UpdateBody({ update, onDismiss }: { update: Shown; onDismiss: () => void }) {
   const { t } = useT()
+  const locale = useLocale()
 
   // `state` is the discriminant everywhere else in the app, so the copy keys are
   // spliced from it rather than switched on. Flat dotted keys make that typecheck.
   const title = t(`update.${update.state}.title`)
   const body = t(`update.${update.state}.body`, { version: update.version })
-  const notes = update.state === 'error' ? '' : update.notes
-
-  // Only a staged, verified update can be installed in place. The other two states
-  // send the user to the releases page, which is the same escape hatch either way.
-  const install = update.state === 'ready'
+  const notes = update.state === 'available' || update.state === 'manual' ? update.notes : ''
+  const busy = isBusy(update)
 
   return (
     <div className="update-shell">
       <div className="update-head">
         <span className="update-icon" aria-hidden="true">
-          {install ? <RefreshCw size={18} /> : <Download size={18} />}
+          {update.state === 'manual' || update.state === 'error' ? <Download size={18} /> : <RefreshCw size={18} />}
         </span>
         <div>
           <h2 id="update-title">{title}</h2>
@@ -85,29 +95,51 @@ function UpdateBody({ update, onDismiss }: { update: Decision; onDismiss: () => 
         </section>
       )}
 
-      <div className="update-actions">
-        <button type="button" className="update-later" onClick={onDismiss}>
-          {t('update.later')}
-        </button>
-        <button
-          type="button"
-          className="send-btn"
-          autoFocus
-          onClick={() => {
-            // Neither call resolves in the normal case: installing ends the process,
-            // and opening the browser hands off. Failures come back through the
-            // store as an `error` state, so nothing is awaited here.
-            if (install) void applyUpdate()
-            else void openDownloadPage()
-          }}
-        >
-          {install ? t('update.ready.action') : t('update.manual.action')}
-        </button>
-      </div>
+      {busy && (
+        <div className="update-progress">
+          {/* A native `<progress>`: accessible without hand-rolled ARIA, and omitting
+              `value` is exactly the indeterminate state — which is what `preparing`
+              needs, and what an unknown total falls back to. */}
+          {update.state === 'downloading' && update.total > 0 ? (
+            <progress value={update.received} max={update.total} />
+          ) : (
+            <progress />
+          )}
+          {update.state === 'downloading' && update.total > 0 && (
+            <span className="update-progress-bytes">
+              {t('update.progress', { received: formatBytes(update.received, locale), total: formatBytes(update.total, locale) })}
+            </span>
+          )}
+        </div>
+      )}
 
-      <button type="button" className="icon-btn update-close" aria-label={t('update.later')} onClick={onDismiss}>
-        <X size={15} aria-hidden="true" />
-      </button>
+      {!busy && (
+        <div className="update-actions">
+          <button type="button" className="update-later" onClick={onDismiss}>
+            {t('update.later')}
+          </button>
+          <button
+            type="button"
+            className="send-btn"
+            autoFocus
+            onClick={() => {
+              // Neither call resolves in the normal case: installing ends the process,
+              // and opening the browser hands off. Failures come back through the
+              // store as an `error` state, so nothing is awaited here.
+              if (update.state === 'available') void installUpdate()
+              else void openDownloadPage()
+            }}
+          >
+            {update.state === 'available' ? t('update.available.action') : t('update.manual.action')}
+          </button>
+        </div>
+      )}
+
+      {!busy && (
+        <button type="button" className="icon-btn update-close" aria-label={t('update.later')} onClick={onDismiss}>
+          <X size={15} aria-hidden="true" />
+        </button>
+      )}
     </div>
   )
 }

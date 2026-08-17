@@ -235,12 +235,19 @@ export const methodToken = (method: HttpMethod): MethodToken => method.toLowerCa
 export type UpdateState =
   | { state: 'idle' }
   | { state: 'checking' }
-  | { state: 'downloading'; version: string }
-  /** Staged and verified; one click away from installing. */
-  | { state: 'ready'; version: string; notes: string }
+  /** Found, and nothing downloaded yet. The click is what starts the transfer. */
+  | { state: 'available'; version: string; notes: string }
+  /** `total` is 0 when the size is unknown, which the bar shows as indeterminate. */
+  | { state: 'downloading'; version: string; received: number; total: number }
+  /**
+   * Verifying the signature and unpacking. Deliberately indeterminate: the updater
+   * emits no progress for these, so a bar left at 100% would look hung. Also covers
+   * the install itself, right up to the process exiting.
+   */
+  | { state: 'preparing'; version: string }
   /** A new version exists but this install cannot replace itself — Linux, always. */
   | { state: 'manual'; version: string; notes: string }
-  /** Checking or downloading failed after an update was known to exist. */
+  /** Downloading or installing failed after an update was known to exist. */
   | { state: 'error'; version: string; code: string; detail: string }
 
 /**

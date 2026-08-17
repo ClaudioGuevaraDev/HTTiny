@@ -401,9 +401,14 @@ export const es: Catalog = {
 
   // ── Updates ──────────────────────────────────────────────────────────────────
   'update.dialog': 'Actualización',
-  'update.ready.title': 'Lista para instalar',
-  'update.ready.body': 'HTTiny {version} se ha descargado y verificado. Instalarla lleva un momento y vuelve a abrir la aplicación.',
-  'update.ready.action': 'Instalar y reiniciar',
+  'update.available.title': 'Hay una versión nueva',
+  'update.available.body': 'Ya está disponible HTTiny {version}. Instalarla lleva un momento: la aplicación se cierra, se actualiza y vuelve a abrirse.',
+  'update.available.action': 'Instalar y reiniciar',
+  'update.downloading.title': 'Descargando',
+  'update.downloading.body': 'Obteniendo HTTiny {version}.',
+  'update.progress': '{received} de {total}',
+  'update.preparing.title': 'Preparando',
+  'update.preparing.body': 'Verificando HTTiny {version} y dejándola lista. La aplicación se cerrará y volverá a abrirse sola.',
   'update.manual.title': 'Hay una versión nueva',
   'update.manual.body':
     'Ya está disponible HTTiny {version}. Esta instalación no puede actualizarse sola, así que descarga la versión nueva e instálala como instalaste esta.',
