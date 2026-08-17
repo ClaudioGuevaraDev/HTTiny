@@ -1,11 +1,11 @@
 {
 	"fixed": {
-		"file_version": "0.21.1",
-		"product_version": "0.21.1"
+		"file_version": "0.21.2",
+		"product_version": "0.21.2"
 	},
 	"info": {
 		"0409": {
-			"ProductVersion": "0.21.1",
+			"ProductVersion": "0.21.2",
 			"CompanyName": "HTTiny",
 			"FileDescription": "A tiny, focused HTTP client for developers.",
 			"LegalCopyright": "Copyright 2026 HTTiny",

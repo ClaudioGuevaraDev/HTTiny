@@ -14,7 +14,7 @@
     !define INFO_PRODUCTNAME "HTTiny"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "0.21.1"
+    !define INFO_PRODUCTVERSION "0.21.2"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "Copyright 2026 HTTiny"
