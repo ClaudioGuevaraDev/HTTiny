@@ -78,8 +78,6 @@ export interface PrefsFile {
   codeFontSize: number
   /** `null` is "automatic" — the viewer reads the body, then falls back to Go's classification. */
   defaultBodyLanguage: BodyLanguage | null
-  /** A release the user asked not to be reminded about. Empty means none. */
-  skippedVersion: string
 }
 
 // ── Writing ────────────────────────────────────────────────────────────────────
@@ -137,7 +135,6 @@ export const toPrefsFile = (state: {
   zoom: number
   codeFontSize: number
   defaultBodyLanguage: BodyLanguage | null
-  skippedVersion: string
 }): PrefsFile => ({
   tabs: state.tabs,
   activeId: state.activeId,
@@ -157,7 +154,6 @@ export const toPrefsFile = (state: {
   zoom: state.zoom,
   codeFontSize: state.codeFontSize,
   defaultBodyLanguage: state.defaultBodyLanguage,
-  skippedVersion: state.skippedVersion,
 })
 
 // ── Reading ────────────────────────────────────────────────────────────────────
@@ -384,10 +380,6 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     // Not `oneOf`, for the same reason as `readBodyViews` above: the fallback is `null`,
     // which is not one of the allowed values.
     defaultBodyLanguage: BODY_LANGUAGES.find(candidate => candidate === raw.defaultBodyLanguage) ?? null,
-    // `str` rather than a union check: this is an arbitrary version string, and an
-    // unrecognised one is harmless — at worst a release the user skipped is offered
-    // again, which is the safe direction to fail in.
-    skippedVersion: str(raw.skippedVersion),
   }
 }
 

@@ -172,15 +172,6 @@ interface AppState {
    */
   update: UpdateState
 
-  /**
-   * A version the user chose not to be reminded about. Persisted in `ui.json`, unlike
-   * `update` itself: the point of skipping is that it survives the next launch.
-   *
-   * Empty means nothing is skipped. Not part of `SETTINGS_DEFAULTS` — it is a decision
-   * about one release, not a preference the Settings panel owns or resets.
-   */
-  skippedVersion: string
-
   openRequest: (id: string) => void
   closeRequest: (id: string) => void
   setActive: (id: string) => void
@@ -218,7 +209,6 @@ interface AppState {
   setResponseSearch: (patch: Partial<ResponseSearch>) => void
   setUpdate: (update: UpdateState) => void
   dismissUpdate: () => void
-  skipUpdate: () => void
   openSettings: () => void
   closeSettings: () => void
 }
@@ -389,7 +379,6 @@ export const useAppStore = create<AppState>(set => ({
   sidebarCollapsed: false,
   responseSearch: DEFAULT_RESPONSE_SEARCH,
   update: { state: 'idle' },
-  skippedVersion: '',
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
@@ -629,14 +618,12 @@ export const useAppStore = create<AppState>(set => ({
   // shortcut worth pressing twice.
   setResponseSearch: patch => set(s => ({ responseSearch: { ...s.responseSearch, ...patch } })),
   setUpdate: update => set({ update }),
-  /** Closes the modal for this session; the same version is offered again next launch. */
-  dismissUpdate: () => set({ update: { state: 'idle' } }),
   /**
-   * Closes it for good. Reads the version off the current state rather than taking an
-   * argument, so a caller cannot skip a version that is not the one on screen.
+   * Closes the modal. Nothing is remembered: the same version is offered again on the
+   * next launch, which is the whole behaviour now that skipping is gone — a release
+   * silenced by a stray click would never be offered again.
    */
-  skipUpdate: () =>
-    set(s => ('version' in s.update ? { skippedVersion: s.update.version, update: { state: 'idle' } } : { update: { state: 'idle' } })),
+  dismissUpdate: () => set({ update: { state: 'idle' } }),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
 }))

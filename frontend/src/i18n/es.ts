@@ -412,7 +412,6 @@ export const es: Catalog = {
   'update.error.body': 'Ya está disponible HTTiny {version}, pero la descarga falló. Puedes obtenerla desde la página de versiones.',
   'update.notes': 'Novedades',
   'update.later': 'Más tarde',
-  'update.skip': 'Omitir esta versión',
 
   // ── Default names for new nodes ──────────────────────────────────────────────
   'data.newRequest': 'Nueva solicitud',

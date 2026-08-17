@@ -53,7 +53,6 @@ export function UpdateModal() {
 
 function UpdateBody({ update, onDismiss }: { update: Decision; onDismiss: () => void }) {
   const { t } = useT()
-  const skipUpdate = useAppStore(s => s.skipUpdate)
 
   // `state` is the discriminant everywhere else in the app, so the copy keys are
   // spliced from it rather than switched on. Flat dotted keys make that typecheck.
@@ -87,10 +86,6 @@ function UpdateBody({ update, onDismiss }: { update: Decision; onDismiss: () => 
       )}
 
       <div className="update-actions">
-        <button type="button" className="link-btn" onClick={skipUpdate}>
-          {t('update.skip')}
-        </button>
-        <span className="update-actions-gap" />
         <button type="button" className="update-later" onClick={onDismiss}>
           {t('update.later')}
         </button>

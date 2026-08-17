@@ -453,7 +453,6 @@ export const en = {
   'update.error.body': 'HTTiny {version} is out, but downloading it failed. You can get it from the releases page instead.',
   'update.notes': 'What changed',
   'update.later': 'Later',
-  'update.skip': 'Skip this version',
 
   // ── Default names for new nodes ──────────────────────────────────────────────
   // Written into workspace.json as user data: switching language later does not

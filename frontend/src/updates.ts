@@ -45,10 +45,6 @@ export const checkForUpdate = async (): Promise<void> => {
   }
 
   const { version, notes, canSelfUpdate } = checked.update
-  if (useAppStore.getState().skippedVersion === version) {
-    store.setUpdate({ state: 'idle' })
-    return
-  }
 
   // Linux: never download. A .deb or .rpm belongs to the package manager, and the
   // AppImage is one file rather than the loose executable the updater swaps.

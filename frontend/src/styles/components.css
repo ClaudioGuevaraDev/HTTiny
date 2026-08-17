@@ -2835,13 +2835,8 @@
   .update-actions {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.5rem;
-  }
-
-  /* Pushes the two decisions to the right and leaves "skip" on the far left, where a
-   * choice you rarely want is harder to hit by reflex. */
-  .update-actions-gap {
-    flex: 1;
   }
 
   .update-later {
