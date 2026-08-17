@@ -94,7 +94,10 @@ Section
     !insertmacro wails.files
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
-    CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    # The template also put one on the desktop. Deliberately not: nobody asked for it,
+    # and because updates run this installer, every release would plant the icon again
+    # for anyone who had deleted it. The uninstaller still removes it, so a desktop
+    # shortcut created by an earlier version gets cleaned up.
 
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols

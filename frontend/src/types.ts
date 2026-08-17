@@ -232,6 +232,16 @@ export const methodToken = (method: HttpMethod): MethodToken => method.toLowerCa
  * states that need an answer. That is what "tell me before restarting" means here: the
  * download happens without interrupting, and the question comes when it is ready.
  */
+/**
+ * Whether the update dialog is on screen. Exported because two places need the answer
+ * and they must not drift apart: the modal decides whether to render, and the global
+ * shortcut handler decides whether the keyboard belongs to the dialog. Asking `update`
+ * alone would leave the shortcuts dead for the rest of the session once an update was
+ * found and postponed.
+ */
+export const isUpdateModalOpen = (update: UpdateState, dismissed: boolean): boolean =>
+  update.state !== 'idle' && update.state !== 'checking' && !dismissed
+
 export type UpdateState =
   | { state: 'idle' }
   | { state: 'checking' }

@@ -4,6 +4,7 @@ import { useAppStore } from '../store'
 import { useLocale, useT } from '../language'
 import { formatBytes } from '../format'
 import { installUpdate, openDownloadPage } from '../updates'
+import { isUpdateModalOpen } from '../types'
 import type { UpdateState } from '../types'
 
 /**
@@ -30,15 +31,26 @@ const isBusy = (update: Shown): boolean => update.state === 'downloading' || upd
  */
 export function UpdateModal() {
   const update = useAppStore(s => s.update)
+  const dismissed = useAppStore(s => s.updateDismissed)
   const dismissUpdate = useAppStore(s => s.dismissUpdate)
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const open = isShown(update)
-  const busy = open && isBusy(update)
+  const open = isUpdateModalOpen(update, dismissed)
+  const busy = isShown(update) && isBusy(update)
 
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
-    if (open && !dialog.open) dialog.showModal()
+    if (open && !dialog.open) {
+      dialog.showModal()
+      // `showModal()` focuses the first focusable control, which is "Later" — and
+      // because this dialog opens on its own, with no prior interaction, the browser
+      // has no pointer signal to suppress `:focus-visible` and draws a ring on it.
+      // Every other modal here is opened by a click, which is why none of them show
+      // this. Parking focus on the shell instead keeps the dialog focused — Escape and
+      // the tab order still work — while the base ring rule skips `[tabindex='-1']`,
+      // so no button comes up looking pre-selected.
+      dialog.focus()
+    }
     if (!open && dialog.open) dialog.close()
   }, [open])
 
@@ -46,6 +58,9 @@ export function UpdateModal() {
     <dialog
       ref={dialogRef}
       className="update-dialog"
+      // Focusable only programmatically, and excluded from the base focus ring — see
+      // the effect above for why the dialog itself takes the initial focus.
+      tabIndex={-1}
       aria-modal="true"
       aria-labelledby="update-title"
       onClose={dismissUpdate}
@@ -121,7 +136,6 @@ function UpdateBody({ update, onDismiss }: { update: Shown; onDismiss: () => voi
           <button
             type="button"
             className="send-btn"
-            autoFocus
             onClick={() => {
               // Neither call resolves in the normal case: installing ends the process,
               // and opening the browser hands off. Failures come back through the

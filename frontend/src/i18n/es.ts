@@ -31,6 +31,7 @@ export const es: Catalog = {
   'sidebar.save.saving': 'Guardando…',
   'sidebar.save.noKeychain': 'Guardado · sin llavero',
   'sidebar.save.saved': 'Guardado',
+  'sidebar.update': 'Actualizar a {version}',
   'sidebar.noCollections.title': 'Todavía no hay colecciones',
   'sidebar.noCollections.desc': 'Las colecciones agrupan tus solicitudes. Crea una para empezar.',
   'sidebar.noCollections.action': 'Nueva colección',

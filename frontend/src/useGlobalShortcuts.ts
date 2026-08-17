@@ -4,6 +4,7 @@ import { flushNow } from './persistence'
 import { cancelRequest, toggleRequest } from './requestRunner'
 import { matchesCombo } from './shortcuts'
 import { useAppStore } from './store'
+import { isUpdateModalOpen } from './types'
 
 /**
  * One window listener with an empty dependency array. The previous effect listed
@@ -58,8 +59,11 @@ export function useGlobalShortcuts(): void {
       // this line with the palette and the settings: it has to answer while the panel
       // that offers it is open.
       // The update modal counts too, or Ctrl+Enter would fire a request behind a
-      // dialog asking whether to restart the app.
-      if (state.paletteOpen || state.settingsOpen || state.update.state !== 'idle') return
+      // dialog asking whether to restart the app. It has to be the shared predicate
+      // and not `update.state`: a postponed update stays in the store so the sidebar
+      // can offer it, and testing the state alone would leave the keyboard locked out
+      // for the rest of the session.
+      if (state.paletteOpen || state.settingsOpen || isUpdateModalOpen(state.update, state.updateDismissed)) return
 
       const id = state.activeId
 

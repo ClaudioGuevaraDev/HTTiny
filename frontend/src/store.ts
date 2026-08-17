@@ -172,6 +172,17 @@ interface AppState {
    */
   update: UpdateState
 
+  /**
+   * Whether the update modal has been closed. Kept apart from `update` on purpose:
+   * that field says *what* update exists and this one says whether its modal is on
+   * screen, so postponing hides the dialog without losing the finding — which is what
+   * lets the sidebar footer keep offering it.
+   *
+   * Not persisted. The check runs again on the next launch and will re-open the modal
+   * by itself, so remembering this across restarts would only suppress it.
+   */
+  updateDismissed: boolean
+
   openRequest: (id: string) => void
   closeRequest: (id: string) => void
   setActive: (id: string) => void
@@ -209,6 +220,7 @@ interface AppState {
   setResponseSearch: (patch: Partial<ResponseSearch>) => void
   setUpdate: (update: UpdateState) => void
   dismissUpdate: () => void
+  reopenUpdate: () => void
   openSettings: () => void
   closeSettings: () => void
 }
@@ -379,6 +391,7 @@ export const useAppStore = create<AppState>(set => ({
   sidebarCollapsed: false,
   responseSearch: DEFAULT_RESPONSE_SEARCH,
   update: { state: 'idle' },
+  updateDismissed: false,
   paletteOpen: false,
   paletteSeed: '',
   settingsOpen: false,
@@ -617,13 +630,18 @@ export const useAppStore = create<AppState>(set => ({
   // what you were looking for — which is what every editor does and what makes the
   // shortcut worth pressing twice.
   setResponseSearch: patch => set(s => ({ responseSearch: { ...s.responseSearch, ...patch } })),
-  setUpdate: update => set({ update }),
   /**
-   * Closes the modal. Nothing is remembered: the same version is offered again on the
-   * next launch, which is the whole behaviour now that skipping is gone — a release
-   * silenced by a stray click would never be offered again.
+   * Clears `updateDismissed` as well: every phase change is worth surfacing, so a
+   * download that starts or a failure that lands re-opens the modal even if the
+   * previous phase had been closed.
    */
-  dismissUpdate: () => set({ update: { state: 'idle' } }),
+  setUpdate: update => set({ update, updateDismissed: false }),
+  /**
+   * Hides the modal without forgetting the update, so the sidebar footer can go on
+   * offering it. Nothing is persisted — the next launch checks again anyway.
+   */
+  dismissUpdate: () => set({ updateDismissed: true }),
+  reopenUpdate: () => set({ updateDismissed: false }),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
 }))

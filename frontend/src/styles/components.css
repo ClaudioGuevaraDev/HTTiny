@@ -501,6 +501,24 @@
     box-shadow: var(--shadow-dot);
   }
 
+  /* Sits exactly where the version number does, because it replaces it — the footer is
+   * one line and there is no room to show both. Inherits the footer's tiny type so the
+   * row keeps its height. */
+  .sidebar-update {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 4px;
+    border-radius: var(--radius-sm);
+    color: var(--color-accent);
+    font-size: inherit;
+    font-weight: var(--font-weight-bold);
+  }
+
+  .sidebar-update:hover {
+    background: var(--color-accent-soft);
+  }
+
   /* The dot is never the only signal — the footer always carries the state in words
    * beside it — so colour here is reinforcement, not information. */
   .sidebar-footer[data-tone='pending'] .status-dot {

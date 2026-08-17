@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Boxes, ChevronDown, ChevronRight, Folder, Search } from 'lucide-react'
+import { ArrowUp, Boxes, ChevronDown, ChevronRight, Folder, Search } from 'lucide-react'
 import { useT } from '../language'
 import type { VisibleRow } from '../store'
 import { collectionsIn, useAppStore } from '../store'
@@ -42,8 +42,36 @@ function SaveStatus() {
     <footer className="sidebar-footer" data-tone={tone} title={dataDir || undefined}>
       <span className="status-dot" aria-hidden="true" />
       {t(label)}
-      <span className="ml-auto">{__APP_VERSION__}</span>
+      <UpdateBadge />
     </footer>
+  )
+}
+
+/**
+ * The version, and the one place a postponed update stays visible.
+ *
+ * Closing the modal hides it but does not forget it, so this corner turns into the way
+ * back — otherwise an update declined once would need a restart to be offered again.
+ * The number that changes is the signal, not the colour: the footer's rule is that
+ * colour reinforces and never carries the meaning alone, and the full sentence is in
+ * the label a screen reader and a hover both get.
+ */
+function UpdateBadge() {
+  const { t } = useT()
+  const update = useAppStore(s => s.update)
+  const dismissed = useAppStore(s => s.updateDismissed)
+  const reopenUpdate = useAppStore(s => s.reopenUpdate)
+
+  // Only while the modal is away. During a download it cannot be closed at all, so
+  // there is nothing to offer and the installed version stays put.
+  const pending = dismissed && 'version' in update ? update.version : ''
+  if (!pending) return <span className="ml-auto">{__APP_VERSION__}</span>
+
+  return (
+    <button type="button" className="sidebar-update ml-auto" onClick={reopenUpdate} title={t('sidebar.update', { version: pending })}>
+      <ArrowUp size={11} aria-hidden="true" />
+      {pending}
+    </button>
   )
 }
 

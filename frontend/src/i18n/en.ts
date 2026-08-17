@@ -34,6 +34,9 @@ export const en = {
   'sidebar.save.saving': 'Saving…',
   'sidebar.save.noKeychain': 'Saved · no keychain',
   'sidebar.save.saved': 'Saved',
+  // The footer shows the version number; this carries the sentence, for the tooltip
+  // and for a screen reader, so an arrow and a number are never the only explanation.
+  'sidebar.update': 'Update to {version}',
   'sidebar.noCollections.title': 'No collections yet',
   'sidebar.noCollections.desc': 'Collections group your requests. Create one to get started.',
   'sidebar.noCollections.action': 'New collection',
