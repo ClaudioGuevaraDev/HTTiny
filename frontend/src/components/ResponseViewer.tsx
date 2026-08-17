@@ -38,6 +38,7 @@ import {
   resolveMode,
   richLabel,
 } from '../responseBody'
+import { parseCookies } from '../response/cookies'
 import { buildPattern, findMatches, segments, stepMatch } from '../response/search'
 import { isByteFormat } from '../types'
 import type { BodyLanguage, BodyMode, BodyView, KeyValueRow, ResponseFormat } from '../types'
@@ -48,6 +49,7 @@ import { useCopy } from '../useCopy'
 import { useSave } from '../useSave'
 import { useRovingFocus } from '../useRovingFocus'
 import { BodyPanel } from './response/BodyPanel'
+import { CookiesPanel } from './response/CookiesPanel'
 import { ResponseSearchBar } from './response/ResponseSearchBar'
 import { Placeholder, PlaceholderAction, SkeletonLines } from './Placeholder'
 import { ResponseStatus } from './ResponseStatus'
@@ -100,6 +102,8 @@ const FORMAT_LABEL: Record<ResponseFormat, string> = {
 
 /** Module scope, so the "no headers yet" case is one stable reference and not a new []. */
 const NO_HEADERS: KeyValueRow[] = []
+/** Same, for the panel that has no row-match model of its own — the body. */
+const NO_ROWS: number[] = []
 
 /**
  * Renders a cell with the search matches marked.
@@ -299,6 +303,12 @@ export function ResponseViewer() {
   // that depended on it would recompute constantly. The headers array off the store
   // snapshot is stable, which is what the header search memo below actually needs.
   const headers = response.state === 'success' ? response.headers : NO_HEADERS
+  // When the response landed, not when this happened to render. `Max-Age` is defined as a
+  // duration from receipt, so that is the only instant it can be resolved against — and
+  // reading the clock here instead would make the expiry drift on every repaint, of which
+  // there are ten a second while a *later* request is in flight.
+  const receivedAt = response.state === 'success' ? response.receivedAt : 0
+  const cookies = useMemo(() => parseCookies(headers, receivedAt), [headers, receivedAt])
   const byteBacked = response.state === 'success' && isByteFormat(response.format)
   const textual = response.state === 'success' && !byteBacked && response.body !== ''
   const hasPayload = response.state === 'success' && (response.body !== '' || response.bodyUrl !== '')
@@ -336,31 +346,51 @@ export function ResponseViewer() {
   // Matches are found here, over strings this component already holds, rather than asked
   // of CodeMirror. That is what lets one bar serve the headers tab, which has no editor
   // at all, and it is why the count is available without a round trip.
-  const onHeaders = responsePanel === 'headers'
+  const onBody = responsePanel === 'body'
   // Destructured so the memo's dependencies are the three fields the pattern is built
   // from. Passing `search` whole would rebuild it whenever the bar merely opened.
   const { query, caseSensitive, regexp } = search
   const pattern = useMemo(() => buildPattern(query, { caseSensitive, regexp }), [query, caseSensitive, regexp])
-  // Only the plain text view can be traversed. The tree, the table, the hex dump and the
-  // previews draw from their own models, and two of them render a window of rows rather
-  // than the whole document — "scroll to the match" is a different feature there.
-  const searchable = response.state === 'success' && (onHeaders || (textual && !hex && mode !== 'rich'))
+  // Both tables can always be traversed — they are strings in cells. The body can only
+  // when it is the editor showing: the tree, the CSV table, the hex dump and the previews
+  // draw from their own models, and two of them render a window of rows rather than the
+  // whole document, so "scroll to the match" is a different feature there.
+  const searchable = response.state === 'success' && (!onBody || (textual && !hex && mode !== 'rich'))
 
-  const bodyMatches = useMemo(() => (searchable && !onHeaders ? findMatches(bodyText, pattern) : []), [searchable, onHeaders, bodyText, pattern])
+  const bodyMatches = useMemo(() => (searchable && onBody ? findMatches(bodyText, pattern) : []), [searchable, onBody, bodyText, pattern])
 
   // One entry per match, holding the row it sits in — that is all stepping needs, since
   // the highlighting is done per cell by `Highlighted` regardless of which is current.
-  const headerMatches = useMemo(() => {
-    if (!onHeaders || !pattern) return []
-    const rows: number[] = []
-    headers.forEach((header, index) => {
-      const hits = findMatches(header.key, pattern).length + findMatches(header.value, pattern).length
-      for (let hit = 0; hit < hits; hit += 1) rows.push(index)
+  //
+  // Shared by both tables rather than written once per panel. It used to be inline for
+  // the headers, keyed off an `onHeaders` boolean that really meant "not the body"; a
+  // third panel would have made that boolean wrong in five places at once.
+  const rowMatches = (rows: readonly (readonly string[])[]): number[] => {
+    if (!pattern) return []
+    const out: number[] = []
+    rows.forEach((cells, index) => {
+      const hits = cells.reduce((sum, cell) => sum + findMatches(cell, pattern).length, 0)
+      for (let hit = 0; hit < hits; hit += 1) out.push(index)
     })
-    return rows
-  }, [onHeaders, pattern, headers])
+    return out
+  }
 
-  const total = onHeaders ? headerMatches.length : bodyMatches.length
+  const headerMatches = useMemo(
+    () => (responsePanel === 'headers' ? rowMatches(headers.map(header => [header.key, header.value])) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rowMatches` closes over `pattern`, which is listed.
+    [responsePanel, pattern, headers],
+  )
+  const cookieMatches = useMemo(
+    () => (responsePanel === 'cookies' ? rowMatches(cookies.map(cookie => [cookie.name, cookie.value, cookie.domain, cookie.path, cookie.sameSite])) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- as above.
+    [responsePanel, pattern, cookies],
+  )
+
+  // The two models stay apart because they are not the same thing: the body's are
+  // character offsets into `bodyText`, a table's are row indices. Merging them into one
+  // list would typecheck only by widening to a union that neither consumer can index.
+  const activeRows = responsePanel === 'headers' ? headerMatches : responsePanel === 'cookies' ? cookieMatches : NO_ROWS
+  const total = onBody ? bodyMatches.length : activeRows.length
   const [activeMatch, setActiveMatch] = useState(0)
   // Clamped rather than reset: refining a query usually narrows it, and jumping back to
   // the first hit on every keystroke would undo the stepping just done. The clamp only
@@ -368,11 +398,12 @@ export function ResponseViewer() {
   const current = total === 0 ? 0 : Math.min(activeMatch, total - 1)
   const step = (delta: number) => setActiveMatch(stepMatch(current, delta, total))
 
-  const headersBody = useRef<HTMLTableSectionElement>(null)
+  // One ref for whichever table is showing: they are never mounted at the same time.
+  const tableBody = useRef<HTMLTableSectionElement>(null)
   useEffect(() => {
-    if (!onHeaders || headerMatches.length === 0) return
-    headersBody.current?.children[headerMatches[current]]?.scrollIntoView({ block: 'nearest' })
-  }, [onHeaders, headerMatches, current])
+    if (onBody || activeRows.length === 0) return
+    tableBody.current?.children[activeRows[current]]?.scrollIntoView({ block: 'nearest' })
+  }, [onBody, activeRows, current])
 
   return (
     <section className="response-viewer" aria-label={t('response.region')}>
@@ -516,6 +547,22 @@ export function ResponseViewer() {
                 {t('response.tab.headers')} <span aria-hidden="true">{response.headers.length}</span>
                 <span className="sr-only">{plural('response.tab.returned', response.headers.length)}</span>
               </button>
+              {/* Always present, with its count, like Headers. A response that set none
+                  shows a zero and says so in the panel — a tab that came and went with
+                  the response would move the two beside it under the pointer. */}
+              <button
+                type="button"
+                role="tab"
+                id="response-tab-cookies"
+                aria-selected={responsePanel === 'cookies'}
+                aria-controls="response-content"
+                tabIndex={responsePanel === 'cookies' ? 0 : -1}
+                className={responsePanel === 'cookies' ? 'active' : ''}
+                onClick={() => activeId && setResponsePanel(activeId, 'cookies')}
+              >
+                {t('response.tab.cookies')} <span aria-hidden="true">{cookies.length}</span>
+                <span className="sr-only">{plural('response.tab.returned', cookies.length)}</span>
+              </button>
             </div>
             {responsePanel === 'body' && (
               <div className="body-toolbar">
@@ -607,7 +654,17 @@ export function ResponseViewer() {
                 formatFailed={formatFailed}
                 hex={hex}
                 wrap={wrap}
-                match={search.open && !onHeaders ? (bodyMatches[current] ?? null) : null}
+                match={search.open && onBody ? (bodyMatches[current] ?? null) : null}
+              />
+            ) : responsePanel === 'cookies' ? (
+              <CookiesPanel
+                cookies={cookies}
+                now={receivedAt}
+                currentRow={search.open ? (activeRows[current] ?? -1) : -1}
+                bodyRef={tableBody}
+                /* The same marking as the headers table, passed rather than reimplemented:
+                   two ways of drawing a search hit in one panel is one too many. */
+                highlight={text => <Highlighted text={text} pattern={search.open ? pattern : null} />}
               />
             ) : (
               /* A real table, not a grid of divs with <b> for column heads. Name/value
@@ -622,11 +679,11 @@ export function ResponseViewer() {
                     <th scope="col">{t('response.headers.value')}</th>
                   </tr>
                 </thead>
-                <tbody ref={headersBody}>
+                <tbody ref={tableBody}>
                   {response.headers.map((h, index) => (
                     /* Marked when a match in this row is the current one, so stepping
                        through a table where several rows match is followable. */
-                    <tr key={h.id} data-current={search.open && headerMatches[current] === index ? 'true' : undefined}>
+                    <tr key={h.id} data-current={search.open && activeRows[current] === index ? 'true' : undefined}>
                       <td>
                         <Highlighted text={h.key} pattern={search.open ? pattern : null} />
                       </td>

@@ -1949,6 +1949,7 @@
 
   .csv-table,
   .archive-body,
+  .cookies-panel,
   .sse-body {
     height: 100%;
     display: flex;
@@ -1957,7 +1958,8 @@
   }
 
   .csv-scroller,
-  .archive-scroller {
+  .archive-scroller,
+  .cookies-scroller {
     flex: 1;
     min-height: 0;
     overflow: auto;
@@ -1965,7 +1967,8 @@
   }
 
   .csv-grid,
-  .archive-grid {
+  .archive-grid,
+  .cookies-grid {
     width: 100%;
     border-collapse: collapse;
     font-family: var(--font-mono);
@@ -1975,7 +1978,9 @@
   .csv-grid th,
   .csv-grid td,
   .archive-grid th,
-  .archive-grid td {
+  .archive-grid td,
+  .cookies-grid th,
+  .cookies-grid td {
     padding: 5px 10px;
     border-bottom: 1px solid var(--color-border-subtle);
     text-align: left;
@@ -1984,7 +1989,8 @@
   }
 
   .csv-grid thead th,
-  .archive-grid thead th {
+  .archive-grid thead th,
+  .cookies-grid thead th {
     position: sticky;
     top: 0;
     z-index: 1;
@@ -2029,6 +2035,83 @@
 
   .archive-grid tbody td {
     color: var(--color-text-muted);
+  }
+
+  /* ── Response · cookies ──────────────────────────────────────────────────────*/
+
+  .cookies-grid tbody th {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text);
+  }
+
+  .cookies-grid tbody td {
+    color: var(--color-text-muted);
+  }
+
+  /* The two columns that carry arbitrary server strings. Everything else in this table
+   * is short enough to stay on one line, and letting a JWT push the flags off the edge
+   * would defeat the point of having columns. */
+  .cookie-value {
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cookie-name code,
+  .cookie-value code {
+    overflow-wrap: anywhere;
+  }
+
+  .cookie-session,
+  .cookie-noflags {
+    color: var(--color-text-faint);
+  }
+
+  /* Already past. Not an error — a response deleting its own cookie is routine — so it
+   * is dimmed rather than coloured danger. */
+  .cookie-expired {
+    color: var(--color-text-faint);
+    text-decoration: line-through;
+  }
+
+  .cookie-flags {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .cookie-flag {
+    padding: 1px 5px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    color: var(--color-text-muted);
+  }
+
+  /* The response is clearing this cookie rather than setting it. Worth marking, because
+   * "the server just logged me out" is a thing you open this panel to find out and it
+   * otherwise looks identical to an ordinary row. */
+  .cookies-grid tr[data-deletion='true'] th,
+  .cookies-grid tr[data-deletion='true'] td {
+    color: var(--color-text-faint);
+  }
+
+  .cookies-grid tr[data-deletion='true'] .cookie-name svg {
+    color: var(--color-danger);
+  }
+
+  /* Same pair as the headers table: `mark` carries a UA background of its own, and the
+   * current match has to be tellable from the rest. */
+  .cookies-grid mark {
+    border-radius: var(--radius-xs);
+    background: var(--color-selection-match);
+    color: var(--color-text-strong);
+  }
+
+  .cookies-grid tr[data-current='true'] mark {
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
   }
 
   /* ── Response · server-sent events ───────────────────────────────────────────*/

@@ -167,6 +167,17 @@ export type ResponseSnapshot =
   | { state: 'error'; code: string; detail: string }
   | {
       state: 'success'
+      /**
+       * When this response landed, in epoch milliseconds. Stamped by `requestRunner`
+       * rather than by the executor, which is transport and has no business deciding it.
+       *
+       * It exists for cookie expiry: RFC 6265 defines `Max-Age` as a duration from the
+       * moment the cookie was *received*, so the absolute instant can only be computed
+       * from here. Reading the clock while rendering instead would be both wrong — the
+       * answer would drift every time the panel repainted — and impure, which the React
+       * Compiler rejects outright.
+       */
+      receivedAt: number
       status: number
       statusText: string
       time: number
@@ -198,7 +209,11 @@ export type ResponseSnapshot =
 export type SuccessResponse = Extract<ResponseSnapshot, { state: 'success' }>
 
 export interface RequestExecutor {
-  execute(request: RequestDocument, signal: AbortSignal): Promise<SuccessResponse>
+  /**
+   * `receivedAt` is not the executor's to supply — it is a fact about the app's clock,
+   * not about the wire — so `requestRunner` stamps it on the way into the store.
+   */
+  execute(request: RequestDocument, signal: AbortSignal): Promise<Omit<SuccessResponse, 'receivedAt'>>
   /**
    * Lets the executor drop whatever it retained for a response the UI has discarded.
    * Optional because it is a property of *how* an executor ships a payload: only one
@@ -237,7 +252,7 @@ export interface SaveBodyRequest {
  * union was previously written out three times.
  */
 export type RequestPanel = 'params' | 'headers' | 'body' | 'auth'
-export type ResponsePanel = 'body' | 'headers'
+export type ResponsePanel = 'body' | 'headers' | 'cookies'
 
 export type SplitOrientation = 'rows' | 'columns'
 

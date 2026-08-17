@@ -228,7 +228,14 @@ const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T)
 const BODY_TYPES = ['none', 'json', 'text'] as const
 const AUTH_TYPES = ['none', 'bearer', 'basic'] as const
 const PANELS = ['params', 'headers', 'body', 'auth'] as const satisfies readonly RequestPanel[]
-const RESPONSE_PANELS = ['body', 'headers'] as const satisfies readonly ResponsePanel[]
+/**
+ * Widen this whenever `ResponsePanel` gains a member, and note that nothing will remind
+ * you: `satisfies` checks that every entry *is* a `ResponsePanel`, not that they are all
+ * here. Forgetting compiles cleanly and fails at runtime in the quietest possible way —
+ * `readPanels` drops the unknown value, so the tab is left open, the app is restarted,
+ * and it silently opens on Body instead.
+ */
+const RESPONSE_PANELS = ['body', 'headers', 'cookies'] as const satisfies readonly ResponsePanel[]
 
 /**
  * Dropped for requests that no longer exist, like `readBodyViews` below — and dropped

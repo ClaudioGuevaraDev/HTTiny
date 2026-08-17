@@ -39,7 +39,9 @@ export async function runRequest(id: string): Promise<void> {
 
   try {
     const result = await executor.execute(request, controller.signal)
-    if (!controller.signal.aborted) useAppStore.getState().setResponse(id, result)
+    // Stamped here rather than in the executor: when the app saw the response is a fact
+    // about this process, not about the transport. Cookie expiry is measured from it.
+    if (!controller.signal.aborted) useAppStore.getState().setResponse(id, { ...result, receivedAt: Date.now() })
   } catch (error) {
     if (controller.signal.aborted) return
     const code = error instanceof RequestFailure ? error.code : error instanceof Error ? error.message : 'UNKNOWN'

@@ -1,5 +1,5 @@
 import { FileArchive, Folder } from 'lucide-react'
-import { formatBytes } from '../../format'
+import { formatBytes, formatDate } from '../../format'
 import { useLocale, useT } from '../../language'
 import type { SuccessResponse } from '../../types'
 import { HexBody } from './HexBody'
@@ -55,7 +55,10 @@ export function ArchiveBody({ response }: { response: SuccessResponse }) {
                     read as a fact rather than as an absence. */}
                 <td>{entry.directory ? '—' : formatBytes(entry.size, locale)}</td>
                 <td>{entry.directory ? '—' : formatBytes(entry.compressedSize, locale)}</td>
-                <td>{entry.modified ? new Date(entry.modified).toLocaleString(locale) : '—'}</td>
+                {/* Through the shared helper rather than an inline `toLocaleString`: the
+                    cookies table renders dates too, and two ways of drawing one in the
+                    same panel is one too many. */}
+                <td>{entry.modified ? formatDate(entry.modified, locale) : '—'}</td>
               </tr>
             ))}
           </tbody>
