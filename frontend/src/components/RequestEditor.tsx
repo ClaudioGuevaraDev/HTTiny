@@ -1,10 +1,9 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
-import { Check, Code2, FileX2, Plus, Save, Search, Send, Square, Trash2 } from 'lucide-react'
+import { Check, Code2, FileX2, Plus, Search, Send, Square, Trash2 } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import type { MessageKey } from '../i18n'
 import { useT } from '../language'
-import { flushNow } from '../persistence'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
 import { methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
@@ -415,8 +414,15 @@ export function RequestEditor() {
           autoComplete="off"
           spellCheck={false}
         />
-        {/* Between the URL and Save because that is what it is about: the URL that will
-            actually be sent, which is not always the one in the field beside it. */}
+        {/* Next to the URL because that is what it is about: the URL that will actually be
+            sent, which is not always the one in the field beside it.
+
+            There used to be a Save button here too, on the grounds that "did that save?" is
+            a real question and a button that answers it is worth one icon. It does not
+            answer it — the sidebar footer does, with Saving / Saved / Failed — and the only
+            thing it did that autosave does not is write inside the 600 ms debounce instead
+            of at the end of it. `Ctrl+S` and the command palette still do that, invisibly,
+            for the reflex to press it. */}
         <button
           type="button"
           className="icon-btn bar-btn"
@@ -425,18 +431,6 @@ export function RequestEditor() {
           onClick={openCode}
         >
           <Code2 size={16} aria-hidden="true" />
-        </button>
-        {/* Everything autosaves, so this writes immediately rather than waiting out
-            the debounce. Kept because "did that save?" is a real question and a
-            button that answers it is worth one icon. */}
-        <button
-          type="button"
-          className="icon-btn bar-btn"
-          aria-label={t('editor.save.title', { keys: shortcutHint('save') })}
-          title={t('editor.save.title', { keys: shortcutHint('save') })}
-          onClick={flushNow}
-        >
-          <Save size={16} aria-hidden="true" />
         </button>
         <button
           type="button"

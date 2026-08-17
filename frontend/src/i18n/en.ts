@@ -74,7 +74,6 @@ export const en = {
   'editor.empty.search': 'Search requests',
   'editor.method': 'HTTP method',
   'editor.url': 'Request URL',
-  'editor.save.title': 'Save now ({keys})',
   'editor.code.title': 'Show the code for this request ({keys})',
   'editor.send.title': 'Send request ({keys})',
   'editor.cancel.title': 'Cancel request ({keys})',

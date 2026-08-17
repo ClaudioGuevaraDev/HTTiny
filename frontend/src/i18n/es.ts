@@ -69,7 +69,6 @@ export const es: Catalog = {
   'editor.empty.search': 'Buscar solicitudes',
   'editor.method': 'Método HTTP',
   'editor.url': 'URL de la solicitud',
-  'editor.save.title': 'Guardar ahora ({keys})',
   'editor.code.title': 'Ver el código de esta solicitud ({keys})',
   'editor.send.title': 'Enviar la solicitud ({keys})',
   'editor.cancel.title': 'Cancelar la solicitud ({keys})',

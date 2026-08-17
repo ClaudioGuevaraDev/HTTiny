@@ -883,11 +883,11 @@
     border-color: var(--color-border-control);
   }
 
-  /* The icon buttons in the request bar. Named for where they live rather than for
-   * either of its two users: Save and the code view are the same control, and one of
-   * them owning the class is how they came to differ — the code button inherited the
-   * bare 28px `.icon-btn` and sat visibly smaller than its neighbour. `--h-control-lg`
-   * is what lines both up with the URL field and Send. */
+  /* The icon buttons in the request bar. It was `.save-btn` while Save owned it, which
+   * is how the code button came to differ — inheriting the bare 28px `.icon-btn`, it sat
+   * visibly smaller than its neighbour. Save has since gone (autosave made it a button
+   * that answered nothing), so this has one user again, but the name stays on what the
+   * control *is*. `--h-control-lg` is what lines it up with the URL field and Send. */
   .bar-btn {
     width: var(--h-control-lg);
     height: var(--h-control-lg);
