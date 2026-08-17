@@ -281,8 +281,6 @@ export const en = {
   'response.emptyBody.title': 'Empty body',
   'response.emptyBody.desc': 'The response arrived with nothing in it.',
   'response.cookies.caption': 'The cookies this response set',
-  'response.cookies.count.one': '{count} cookie',
-  'response.cookies.count.other': '{count} cookies',
   'response.cookies.name': 'Name',
   'response.cookies.value': 'Value',
   'response.cookies.scope': 'Scope',

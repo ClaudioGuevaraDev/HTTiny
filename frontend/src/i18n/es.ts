@@ -262,8 +262,6 @@ export const es: Catalog = {
   'response.emptyBody.title': 'Cuerpo vacío',
   'response.emptyBody.desc': 'La respuesta llegó sin contenido.',
   'response.cookies.caption': 'Las cookies que puso esta respuesta',
-  'response.cookies.count.one': '{count} cookie',
-  'response.cookies.count.other': '{count} cookies',
   'response.cookies.name': 'Nombre',
   'response.cookies.value': 'Valor',
   'response.cookies.scope': 'Ámbito',

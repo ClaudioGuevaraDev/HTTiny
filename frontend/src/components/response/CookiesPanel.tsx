@@ -34,7 +34,7 @@ export function CookiesPanel({
   /** The viewer's `Highlighted`, passed down so the marking is identical to the headers table. */
   highlight: (text: string) => ReactNode
 }) {
-  const { t, plural } = useT()
+  const { t } = useT()
   const locale = useLocale()
 
   if (cookies.length === 0) {
@@ -43,9 +43,10 @@ export function CookiesPanel({
 
   return (
     <div className="cookies-panel">
-      <div className="media-toolbar">
-        <p className="media-facts">{plural('response.cookies.count', cookies.length)}</p>
-      </div>
+      {/* No toolbar with a count. The tab above already carries one, and a strip whose
+          only content repeats the label two centimetres above it is a row of the panel
+          spent saying nothing. `CsvTable` and `ArchiveBody` keep theirs because their
+          facts — delimiter, packed vs unpacked — are not on any tab. */}
       <div className="cookies-scroller">
         <table className="cookies-grid">
           <caption className="sr-only">{t('response.cookies.caption')}</caption>

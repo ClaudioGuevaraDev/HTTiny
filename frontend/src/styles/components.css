@@ -1957,12 +1957,17 @@
     min-height: 0;
   }
 
+  /* The trailing space is deliberate, and the same one `.json-scroller` already keeps.
+   * Without it the last row's bottom border sits flush against the panel edge, which
+   * reads as a table cut off mid-scroll rather than one that has ended — most visibly
+   * when the pane is short enough to hold only a row or two. */
   .csv-scroller,
   .archive-scroller,
   .cookies-scroller {
     flex: 1;
     min-height: 0;
     overflow: auto;
+    padding-bottom: 18px;
     user-select: text;
   }
 
@@ -2026,10 +2031,17 @@
     color: var(--color-text);
   }
 
+  /* Not `display: flex`, however tempting it is for lining an icon up with its label.
+   * A `<th>` given any `display` other than `table-cell` leaves the row's layout: it
+   * stops stretching to the height of its siblings, and under `border-collapse` its
+   * bottom border is then drawn on its own shorter box — so the rule under the first
+   * column sits a few pixels above the rule under the rest and the row reads as cut in
+   * half. The icon gets its spacing inline instead, below.
+   *
+   * `.response-headers` a few rules down already carries this warning for the same
+   * reason, in its own words: overriding `display` on a table strips its implicit row
+   * and cell roles. */
   .archive-grid tbody th {
-    display: flex;
-    align-items: center;
-    gap: 7px;
     color: var(--color-text-subtle);
   }
 
@@ -2039,29 +2051,42 @@
 
   /* ── Response · cookies ──────────────────────────────────────────────────────*/
 
+  /* Same as `.archive-grid tbody th` above, and the same reason it must not be a flex
+   * container: this is the cell whose short bottom border was stepping out of the row. */
   .cookies-grid tbody th {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     color: var(--color-text);
+  }
+
+  /* The spacing the flex `gap` used to give, moved onto the icon itself so the cell can
+   * stay a cell. The nudge is optical — lucide glyphs sit high against a monospace
+   * baseline. */
+  .cookie-name svg,
+  .archive-name svg {
+    margin-right: 6px;
+    vertical-align: -2px;
   }
 
   .cookies-grid tbody td {
     color: var(--color-text-muted);
   }
 
-  /* The two columns that carry arbitrary server strings. Everything else in this table
-   * is short enough to stay on one line, and letting a JWT push the flags off the edge
-   * would defeat the point of having columns. */
-  .cookie-value {
-    max-width: 22ch;
+  /* The one column carrying an arbitrary server string, and the only one that needs
+   * bounding: a session token is routinely 40 characters and a JWT several hundred,
+   * which would push Expires and Flags off the panel and defeat having columns at all.
+   *
+   * The cap is on the inner element, not the cell. `max-width` on a `<td>` is ignored
+   * unless the table is `table-layout: fixed`, which this one is not — an earlier
+   * version put it on the cell and it silently did nothing. `inline-block` is what
+   * gives the code element a box to clip.
+   *
+   * Nothing is lost: the row's title carries the whole Set-Cookie header. */
+  .cookie-value code {
+    display: inline-block;
+    max-width: 34ch;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .cookie-name code,
-  .cookie-value code {
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    vertical-align: bottom;
   }
 
   .cookie-session,
