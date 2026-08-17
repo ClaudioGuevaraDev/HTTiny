@@ -2774,7 +2774,7 @@
    * command palette, which searches every request by name, method and URL. */
   .search-trigger {
     height: var(--h-control-md);
-    margin: 0 9px 7px;
+    margin: 4px 9px 7px;
     padding: 0 8px;
     display: flex;
     align-items: center;
