@@ -2928,28 +2928,6 @@
     gap: 0.5rem;
   }
 
-  /* Scoped to the modal rather than changed on `.send-btn`, which is also the request
-   * bar's Send button — bold is deliberate there, since it is the application's primary
-   * action. Inside a dialog the weight only has to match the other accent buttons, so it
-   * follows `.placeholder-action.action-primary`. */
-  .update-actions .send-btn {
-    font-weight: var(--font-weight-semibold);
-  }
-
-  .update-later {
-    height: var(--h-control-md);
-    padding-inline: 0.75rem;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    background: var(--color-surface-3);
-    color: var(--color-text);
-    font-size: var(--text-xs);
-  }
-
-  .update-later:hover {
-    background: var(--color-surface-4);
-  }
-
   .update-close {
     position: absolute;
     top: 0.625rem;

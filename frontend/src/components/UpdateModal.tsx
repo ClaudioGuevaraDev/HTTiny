@@ -130,12 +130,17 @@ function UpdateBody({ update, onDismiss }: { update: Shown; onDismiss: () => voi
 
       {!busy && (
         <div className="update-actions">
-          <button type="button" className="update-later" onClick={onDismiss}>
+          {/* The placeholder actions rather than `.send-btn`: that one is sized for the
+              request bar — taller, with a minimum width and an accent glow — and next to
+              a dialog's secondary button it read as oversized. This pair already exists
+              for "accent action inside content", so the two buttons match each other and
+              the Send request button by construction instead of by copied values. */}
+          <button type="button" className="placeholder-action action-secondary" onClick={onDismiss}>
             {t('update.later')}
           </button>
           <button
             type="button"
-            className="send-btn"
+            className="placeholder-action action-primary"
             onClick={() => {
               // Neither call resolves in the normal case: installing ends the process,
               // and opening the browser hands off. Failures come back through the

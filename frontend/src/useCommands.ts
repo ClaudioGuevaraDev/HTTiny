@@ -6,6 +6,7 @@ import { flushNow } from './persistence'
 import { cancelRequest, runRequest, toggleRequest } from './requestRunner'
 import { shortcuts } from './shortcuts'
 import { methodOptions, useAppStore } from './store'
+import type { UpdateState } from './types'
 
 const EMPTY: Command[] = []
 
@@ -125,6 +126,32 @@ export function useCommands(enabled: boolean): Command[] {
     action('zoom-in', 'command.zoomIn.title', 'command.zoomIn.keywords', () => useAppStore.getState().zoomIn(), shortcuts.zoomIn)
     action('zoom-out', 'command.zoomOut.title', 'command.zoomOut.keywords', () => useAppStore.getState().zoomOut(), shortcuts.zoomOut)
     action('zoom-reset', 'command.zoomReset.title', 'command.zoomReset.keywords', () => useAppStore.getState().resetZoom(), shortcuts.zoomReset)
+
+    // Development only, and stripped from a production bundle by the `import.meta.env.DEV`
+    // check the same way the catalogue's placeholder audit is.
+    //
+    // The update modal is otherwise only reachable by actually publishing a newer release,
+    // which is a slow and irreversible way to look at a button. Titles are literals rather
+    // than catalogue keys on purpose: a developer tool that never ships is not copy, and
+    // adding keys for it would mean translating strings no user can reach.
+    if (import.meta.env.DEV) {
+      const preview = (id: string, title: string, state: UpdateState) =>
+        commands.push({
+          id: `dev:${id}`,
+          group: 'action',
+          title,
+          keywords: 'dev preview update modal',
+          run: () => useAppStore.getState().setUpdate(state),
+        })
+
+      const version = '9.9.9'
+      const notes = 'A fake release, for looking at the dialog.\n\n- One bullet\n- Another one'
+      preview('update-available', 'Preview update · available', { state: 'available', version, notes })
+      preview('update-downloading', 'Preview update · downloading', { state: 'downloading', version, received: 3_100_000, total: 7_200_000 })
+      preview('update-preparing', 'Preview update · preparing', { state: 'preparing', version })
+      preview('update-manual', 'Preview update · manual download', { state: 'manual', version, notes })
+      preview('update-error', 'Preview update · error', { state: 'error', version, code: 'UPDATE_DOWNLOAD_FAILED', detail: 'fake failure' })
+    }
 
     // Every request in the tree, searchable by name, method, URL and breadcrumb.
     for (const entry of requests) {
