@@ -10,6 +10,8 @@ import type {
   KeyValueRow,
   Locale,
   RequestDocument,
+  RequestPanel,
+  ResponsePanel,
   ResponseSearch,
   ResponseSnapshot,
   SplitOrientation,
@@ -84,7 +86,13 @@ const stepZoom = (zoom: number, direction: 1 | -1): number => {
   return next ?? (direction === 1 ? ZOOM.max : ZOOM.min)
 }
 
-type Panel = 'params' | 'headers' | 'body' | 'auth'
+/**
+ * What a request opens on when it has never chosen a panel of its own. Exported because
+ * three places need the same answer: the two components that read the maps below, and
+ * `workspaceFile.ts`, which leaves a request at its default out of the prefs file.
+ */
+export const DEFAULT_REQUEST_PANEL: RequestPanel = 'params'
+export const DEFAULT_RESPONSE_PANEL: ResponsePanel = 'body'
 
 interface AppState {
   tree: TreeNode[]
@@ -98,8 +106,18 @@ interface AppState {
    * when a request is revealed from the command palette.
    */
   activeCollectionId: string | null
-  requestPanel: Panel
-  responsePanel: 'body' | 'headers'
+  /**
+   * Which section each half of the workspace is showing, keyed by request id and in the
+   * same class of state as `bodyViews` below: per request, absent until something is
+   * chosen, meaningless once the request is gone.
+   *
+   * Both were single fields once, and that made the panel a property of the window:
+   * leaving one request on Headers opened every *other* request on Headers too, including
+   * ones that had never been looked at. Which section you are editing belongs to the
+   * request, the way its URL does.
+   */
+  requestPanels: Record<string, RequestPanel>
+  responsePanels: Record<string, ResponsePanel>
   responses: Record<string, ResponseSnapshot>
   /**
    * How each request's response body is being shown. Keyed by request id and pruned
@@ -215,8 +233,8 @@ interface AppState {
   renameNode: (nodeId: string, name: string) => void
   deleteNode: (nodeId: string) => void
   revealNode: (requestId: string) => void
-  setRequestPanel: (panel: Panel) => void
-  setResponsePanel: (panel: 'body' | 'headers') => void
+  setRequestPanel: (id: string, panel: RequestPanel) => void
+  setResponsePanel: (id: string, panel: ResponsePanel) => void
   setResponse: (id: string, response: ResponseSnapshot) => void
   setBodyView: (id: string, patch: Partial<BodyView>) => void
   setSidebarWidth: (width: number) => void
@@ -404,8 +422,8 @@ export const useAppStore = create<AppState>(set => ({
   activeId: null,
   selectedNodeId: null,
   activeCollectionId: null,
-  requestPanel: 'params',
-  responsePanel: 'body',
+  requestPanels: {},
+  responsePanels: {},
   responses: {},
   bodyViews: {},
   recentIds: [],
@@ -574,10 +592,14 @@ export const useAppStore = create<AppState>(set => ({
       const documents = { ...s.documents }
       const responses = { ...s.responses }
       const bodyViews = { ...s.bodyViews }
+      const requestPanels = { ...s.requestPanels }
+      const responsePanels = { ...s.responsePanels }
       removed.forEach(id => {
         delete documents[id]
         delete responses[id]
         delete bodyViews[id]
+        delete requestPanels[id]
+        delete responsePanels[id]
       })
       const index = s.activeId ? s.tabs.indexOf(s.activeId) : -1
       const tabs = s.tabs.filter(tab => !removed.includes(tab))
@@ -600,6 +622,8 @@ export const useAppStore = create<AppState>(set => ({
         documents,
         responses,
         bodyViews,
+        requestPanels,
+        responsePanels,
         tabs,
         activeId,
         activeCollectionId,
@@ -620,8 +644,8 @@ export const useAppStore = create<AppState>(set => ({
    */
   revealNode: requestId => set(s => revealPatch(s.tree, requestId, s.selectedNodeId, s.activeCollectionId)),
 
-  setRequestPanel: requestPanel => set({ requestPanel }),
-  setResponsePanel: responsePanel => set({ responsePanel }),
+  setRequestPanel: (id, panel) => set(s => ({ requestPanels: { ...s.requestPanels, [id]: panel } })),
+  setResponsePanel: (id, panel) => set(s => ({ responsePanels: { ...s.responsePanels, [id]: panel } })),
   setResponse: (id, response) => set(s => ({ responses: { ...s.responses, [id]: response } })),
   // Merged over the default rather than over the stored entry alone, so setting one
   // field on a request that has never been touched still yields a whole `BodyView`.

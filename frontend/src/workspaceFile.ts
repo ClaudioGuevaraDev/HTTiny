@@ -1,7 +1,19 @@
 import { BODY_LANGUAGES, BODY_MODES, DEFAULT_BODY_VIEW } from './responseBody'
 import { DEFAULT_SNIPPET_TARGET, SNIPPET_TARGET_IDS, type SnippetTarget } from './snippets'
-import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
-import type { BodyLanguage, BodyView, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
+import { CODE_FONT_SIZE, DEFAULT_REQUEST_PANEL, DEFAULT_RESPONSE_PANEL, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
+import type {
+  BodyLanguage,
+  BodyView,
+  HttpMethod,
+  KeyValueRow,
+  Locale,
+  RequestDocument,
+  RequestPanel,
+  ResponsePanel,
+  SplitOrientation,
+  ThemePreference,
+  TreeNode,
+} from './types'
 
 /**
  * The on-disk schema.
@@ -59,8 +71,14 @@ export interface PrefsFile {
   activeCollectionId: string | null
   recentIds: string[]
   collapsedNodeIds: string[]
-  requestPanel: 'params' | 'headers' | 'body' | 'auth'
-  responsePanel: 'body' | 'headers'
+  /**
+   * Keyed by request id, and like `bodyViews` below only the requests that differ from
+   * the default are written. The two were single fields until the panel became per
+   * request; the old keys are simply not read any more, which lands every request on its
+   * default once — the behaviour being restored.
+   */
+  requestPanels: Record<string, RequestPanel>
+  responsePanels: Record<string, ResponsePanel>
   /**
    * Only the requests whose view differs from the default appear here. Writing an
    * entry per request would grow this file in lockstep with the workspace to record
@@ -133,6 +151,10 @@ export const toWorkspaceFile = (state: { tree: TreeNode[]; documents: Record<str
 const nonDefaultViews = (views: Record<string, BodyView>): Record<string, BodyView> =>
   Object.fromEntries(Object.entries(views).filter(([, view]) => view.mode !== DEFAULT_BODY_VIEW.mode || view.language !== DEFAULT_BODY_VIEW.language))
 
+/** The same rule for the panel maps: a request left where it opens records nothing. */
+const nonDefaultPanels = <T extends string>(panels: Record<string, T>, fallback: T): Record<string, T> =>
+  Object.fromEntries(Object.entries(panels).filter(([, panel]) => panel !== fallback))
+
 export const toPrefsFile = (state: {
   tree: TreeNode[]
   tabs: string[]
@@ -140,8 +162,8 @@ export const toPrefsFile = (state: {
   selectedNodeId: string | null
   activeCollectionId: string | null
   recentIds: string[]
-  requestPanel: PrefsFile['requestPanel']
-  responsePanel: PrefsFile['responsePanel']
+  requestPanels: Record<string, RequestPanel>
+  responsePanels: Record<string, ResponsePanel>
   bodyViews: Record<string, BodyView>
   sidebarWidth: number
   sidebarCollapsed: boolean
@@ -160,8 +182,8 @@ export const toPrefsFile = (state: {
   activeCollectionId: state.activeCollectionId,
   recentIds: state.recentIds,
   collapsedNodeIds: collapsedIn(state.tree),
-  requestPanel: state.requestPanel,
-  responsePanel: state.responsePanel,
+  requestPanels: nonDefaultPanels(state.requestPanels, DEFAULT_REQUEST_PANEL),
+  responsePanels: nonDefaultPanels(state.responsePanels, DEFAULT_RESPONSE_PANEL),
   bodyViews: nonDefaultViews(state.bodyViews),
   sidebarWidth: state.sidebarWidth,
   sidebarCollapsed: state.sidebarCollapsed,
@@ -197,8 +219,25 @@ const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T)
 
 const BODY_TYPES = ['none', 'json', 'text'] as const
 const AUTH_TYPES = ['none', 'bearer', 'basic'] as const
-const PANELS = ['params', 'headers', 'body', 'auth'] as const
-const RESPONSE_PANELS = ['body', 'headers'] as const
+const PANELS = ['params', 'headers', 'body', 'auth'] as const satisfies readonly RequestPanel[]
+const RESPONSE_PANELS = ['body', 'headers'] as const satisfies readonly ResponsePanel[]
+
+/**
+ * Dropped for requests that no longer exist, like `readBodyViews` below — and dropped
+ * for a panel this build does not have, which is what keeps a hand-edited or
+ * newer-build file from selecting a tab with nothing behind it. Entries equal to the
+ * default are never written, so anything absent here simply opens where it should.
+ */
+const readPanels = <T extends string>(value: unknown, allowed: readonly T[], documents: Record<string, RequestDocument>): Record<string, T> => {
+  if (!isRecord(value)) return {}
+  const out: Record<string, T> = {}
+  for (const [id, panel] of Object.entries(value)) {
+    if (!documents[id]) continue
+    const known = allowed.find(candidate => candidate === panel)
+    if (known) out[id] = known
+  }
+  return out
+}
 
 /**
  * Dropped for requests that no longer exist, the same way `tabs` and `recentIds`
@@ -384,8 +423,8 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     selectedNodeId: selectedCandidate && nodeIds.has(selectedCandidate) ? selectedCandidate : null,
     activeCollectionId: collectionCandidate && collectionIds.includes(collectionCandidate) ? collectionCandidate : (collectionIds[0] ?? null),
     recentIds: ids(raw.recentIds).filter(id => documents[id]).slice(0, 12),
-    requestPanel: oneOf(raw.requestPanel, PANELS, 'params'),
-    responsePanel: oneOf(raw.responsePanel, RESPONSE_PANELS, 'body'),
+    requestPanels: readPanels(raw.requestPanels, PANELS, documents),
+    responsePanels: readPanels(raw.responsePanels, RESPONSE_PANELS, documents),
     bodyViews: readBodyViews(raw.bodyViews, documents),
     sidebarWidth: clamped(raw.sidebarWidth, SIDEBAR_WIDTH),
     sidebarCollapsed: bool(raw.sidebarCollapsed, false),

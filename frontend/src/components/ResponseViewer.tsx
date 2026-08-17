@@ -42,7 +42,7 @@ import { isByteFormat } from '../types'
 import type { BodyLanguage, BodyMode, BodyView, KeyValueRow, ResponseFormat } from '../types'
 import { cancelRequest, runRequest } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
-import { useAppStore } from '../store'
+import { DEFAULT_RESPONSE_PANEL, useAppStore } from '../store'
 import { useCopy } from '../useCopy'
 import { useRovingFocus } from '../useRovingFocus'
 import { BodyPanel } from './response/BodyPanel'
@@ -244,7 +244,9 @@ export function ResponseViewer() {
   const { t, plural } = useT()
   const locale = useLocale()
   const activeId = useAppStore(s => s.activeId)
-  const responsePanel = useAppStore(s => s.responsePanel)
+  // Per request, for the reason the editor's panel is: leaving one response on Headers
+  // has no business opening the next one there.
+  const responsePanel = useAppStore(s => (s.activeId ? s.responsePanels[s.activeId] : undefined) ?? DEFAULT_RESPONSE_PANEL)
   const setResponsePanel = useAppStore(s => s.setResponsePanel)
   const setResponse = useAppStore(s => s.setResponse)
   const stored = useAppStore(s => (s.activeId ? s.responses[s.activeId] : undefined))
@@ -447,7 +449,7 @@ export function ResponseViewer() {
                 aria-controls="response-content"
                 tabIndex={responsePanel === 'body' ? 0 : -1}
                 className={responsePanel === 'body' ? 'active' : ''}
-                onClick={() => setResponsePanel('body')}
+                onClick={() => activeId && setResponsePanel(activeId, 'body')}
               >
                 {t('response.tab.body')}
               </button>
@@ -459,7 +461,7 @@ export function ResponseViewer() {
                 aria-controls="response-content"
                 tabIndex={responsePanel === 'headers' ? 0 : -1}
                 className={responsePanel === 'headers' ? 'active' : ''}
-                onClick={() => setResponsePanel('headers')}
+                onClick={() => activeId && setResponsePanel(activeId, 'headers')}
               >
                 {t('response.tab.headers')} <span aria-hidden="true">{response.headers.length}</span>
                 <span className="sr-only">{plural('response.tab.returned', response.headers.length)}</span>

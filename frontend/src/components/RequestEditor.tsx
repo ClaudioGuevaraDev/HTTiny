@@ -6,7 +6,7 @@ import type { MessageKey } from '../i18n'
 import { useT } from '../language'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
-import { methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
+import { DEFAULT_REQUEST_PANEL, methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
 import type { KeyValueRow, RequestDocument } from '../types'
 import { requestBodyEditorId, requestTabId } from '../domIds'
 import { useRovingFocus } from '../useRovingFocus'
@@ -325,7 +325,10 @@ export function RequestEditor() {
   const { t, plural } = useT()
   const activeId = useAppStore(s => s.activeId)
   const request = useAppStore(s => (s.activeId ? s.documents[s.activeId] : undefined))
-  const requestPanel = useAppStore(s => s.requestPanel)
+  // Per request, so opening a tab you have never touched lands on Params rather than on
+  // whatever the tab before it was showing. A string, not a derived object, so the
+  // selector still compares equal between renders.
+  const requestPanel = useAppStore(s => (s.activeId ? s.requestPanels[s.activeId] : undefined) ?? DEFAULT_REQUEST_PANEL)
   const setRequestPanel = useAppStore(s => s.setRequestPanel)
   const updateDocument = useAppStore(s => s.updateDocument)
   const addNode = useAppStore(s => s.addNode)
@@ -455,7 +458,7 @@ export function RequestEditor() {
               aria-controls="request-panel"
               tabIndex={requestPanel === panel ? 0 : -1}
               className={requestPanel === panel ? 'active' : ''}
-              onClick={() => setRequestPanel(panel)}
+              onClick={() => setRequestPanel(activeId, panel)}
             >
               {t(PANEL_LABEL[panel])}
               {count !== null && (

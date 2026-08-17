@@ -201,6 +201,16 @@ export interface RequestExecutor {
   release?(id: string): Promise<void>
 }
 
+/**
+ * Which section of each half of the workspace is on screen. Both are **per request**,
+ * held as `requestPanels` / `responsePanels` in the store: which section you are editing
+ * is a property of the request you are looking at, not of the window. They live here
+ * rather than beside the store because `workspaceFile.ts` persists them too, and the
+ * union was previously written out three times.
+ */
+export type RequestPanel = 'params' | 'headers' | 'body' | 'auth'
+export type ResponsePanel = 'body' | 'headers'
+
 export type SplitOrientation = 'rows' | 'columns'
 
 /**
