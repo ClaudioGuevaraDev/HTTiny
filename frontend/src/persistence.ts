@@ -199,9 +199,9 @@ export async function hydrate(): Promise<void> {
       // Spread, not seventeen enumerated fields — and that is a correctness measure, not
       // brevity. `setState` takes a `Partial`, so a preference left out of the list was
       // saved correctly and loaded into nothing, with no type error anywhere: the comment
-      // this replaces warned about exactly that for `language`, and `codeTarget` and
-      // `redactSecrets` were then added and silently forgotten, resetting the code view on
-      // every launch. `PrefsState` is defined as "everything readPrefs returns is store
+      // this replaces warned about exactly that for `language`, and the code view's two
+      // preferences were then added and silently forgotten, resetting it on every
+      // launch. `PrefsState` is defined as "everything readPrefs returns is store
       // state", so a new preference now arrives by existing.
       ...layout,
       persistenceState: 'ready',

@@ -421,6 +421,9 @@ export const es: Catalog = {
   'settings.response.format.desc':
     'Con qué formato abre el visor un cuerpo. Automático lee como JSON un cuerpo JSON aunque el tipo de contenido diga otra cosa, y el formato que elijas en el visor manda para esa petición.',
   'settings.response.format.auto': 'Automático',
+  'settings.code.redact.label': 'Ocultar los secretos por defecto',
+  'settings.code.redact.desc':
+    'La vista de código se abre con los tokens y las contraseñas reemplazados por un marcador. Su propio interruptor los sigue mostrando durante esa visita.',
   'settings.language.label': 'Idioma',
   'settings.language.desc': 'Elige el idioma de la interfaz.',
 

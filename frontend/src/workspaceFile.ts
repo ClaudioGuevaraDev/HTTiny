@@ -97,6 +97,12 @@ export interface PrefsFile {
   codeFontSize: number
   /** `null` is "automatic" — the viewer reads the body, then falls back to Go's classification. */
   defaultBodyLanguage: BodyLanguage | null
+  /**
+   * Whether the code view opens with credentials masked. The *default* is what is stored,
+   * never the switch in the modal — that one is per visit, and a file older than this
+   * field may still carry its old `redactSecrets` key, which is simply not read.
+   */
+  defaultRedactSecrets: boolean
   /** Which language the code view was last showing. */
   codeTarget: SnippetTarget
 }
@@ -174,6 +180,7 @@ export const toPrefsFile = (state: {
   zoom: number
   codeFontSize: number
   defaultBodyLanguage: BodyLanguage | null
+  defaultRedactSecrets: boolean
   codeTarget: SnippetTarget
 }): PrefsFile => ({
   tabs: state.tabs,
@@ -194,6 +201,7 @@ export const toPrefsFile = (state: {
   zoom: state.zoom,
   codeFontSize: state.codeFontSize,
   defaultBodyLanguage: state.defaultBodyLanguage,
+  defaultRedactSecrets: state.defaultRedactSecrets,
   codeTarget: state.codeTarget,
 })
 
@@ -437,6 +445,7 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     // Not `oneOf`, for the same reason as `readBodyViews` above: the fallback is `null`,
     // which is not one of the allowed values.
     defaultBodyLanguage: BODY_LANGUAGES.find(candidate => candidate === raw.defaultBodyLanguage) ?? null,
+    defaultRedactSecrets: bool(raw.defaultRedactSecrets, false),
     codeTarget: oneOf(raw.codeTarget, SNIPPET_TARGET_IDS, DEFAULT_SNIPPET_TARGET),
   }
 }

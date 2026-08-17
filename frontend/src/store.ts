@@ -68,12 +68,21 @@ export const SETTINGS_DEFAULTS = {
   zoom: ZOOM.default,
   codeFontSize: CODE_FONT_SIZE.default,
   defaultBodyLanguage: null,
+  defaultRedactSecrets: false,
   splitOrientation: 'rows',
   sidebarWidth: SIDEBAR_WIDTH.default,
   splitRatio: SPLIT_RATIO.default,
 } as const satisfies Pick<
   AppState,
-  'theme' | 'language' | 'zoom' | 'codeFontSize' | 'defaultBodyLanguage' | 'splitOrientation' | 'sidebarWidth' | 'splitRatio'
+  | 'theme'
+  | 'language'
+  | 'zoom'
+  | 'codeFontSize'
+  | 'defaultBodyLanguage'
+  | 'defaultRedactSecrets'
+  | 'splitOrientation'
+  | 'sidebarWidth'
+  | 'splitRatio'
 >
 
 /**
@@ -164,6 +173,16 @@ interface AppState {
    * see `resolveLanguage`, which owns the precedence.
    */
   defaultBodyLanguage: BodyLanguage | null
+  /**
+   * What the code view opens its redaction switch on. A *default*, like the field above:
+   * the switch in the modal still overrides it, for that visit only.
+   *
+   * The switch itself was persisted once, which meant one click quietly changed what every
+   * later session showed — a control that rewrites a credential must not be able to stay on
+   * behind your back. Saying so in Settings is a different act: it is deliberate, it is
+   * visible, and it is somewhere you can find it again.
+   */
+  defaultRedactSecrets: boolean
 
   // Only open/closed lives here; the palette's query and highlighted index stay
   // local to the dialog, since they change on every keystroke and nothing outside
@@ -174,13 +193,12 @@ interface AppState {
   settingsOpen: boolean
 
   /**
-   * The code view. `codeOpen` is ephemeral like the other modals, and so is
-   * `redactSecrets`: only the chosen language is a preference worth remembering.
-   *
-   * `redactSecrets` is deliberately **not** persisted, so it is off at every launch and the
-   * snippet shows the real token — which is the whole point of copying one. It used to be
-   * stored, which meant flipping it once quietly changed what every future session showed;
-   * a control that rewrites a credential should not be able to stay on behind your back.
+   * The code view, and only what something outside the modal reads: whether it is open,
+   * and which language it is showing. Its redaction switch is not here — it is a
+   * `useState` in `CodeBody`, seeded from `defaultRedactSecrets` above, which is the rule
+   * the palette's query already follows: state nothing outside the dialog reads belongs
+   * to the dialog. The body only mounts while the dialog is open, so every opening
+   * re-seeds itself and no one has to remember to reset it on the way out.
    *
    * The generated snippet is in neither place. It is derived from the request and from
    * `Wire`'s answer, both of which can change on any keystroke, so holding it would mean
@@ -189,7 +207,6 @@ interface AppState {
    */
   codeOpen: boolean
   codeTarget: SnippetTarget
-  redactSecrets: boolean
 
   /**
    * The response viewer's search bar. Unlike the palette's query, this one lives in the
@@ -251,6 +268,7 @@ interface AppState {
   setLanguage: (language: Locale) => void
   resetSettings: () => void
   setDefaultBodyLanguage: (language: BodyLanguage | null) => void
+  setDefaultRedactSecrets: (redact: boolean) => void
   openPalette: (seed?: string) => void
   closePalette: () => void
   /** A patch, like `setBodyView`: callers change one field and leave the rest alone. */
@@ -263,7 +281,6 @@ interface AppState {
   openCode: () => void
   closeCode: () => void
   setCodeTarget: (target: SnippetTarget) => void
-  setRedactSecrets: (redact: boolean) => void
 }
 
 const mapTree = (nodes: TreeNode[], fn: (node: TreeNode) => TreeNode): TreeNode[] =>
@@ -438,7 +455,6 @@ export const useAppStore = create<AppState>(set => ({
   settingsOpen: false,
   codeOpen: false,
   codeTarget: DEFAULT_SNIPPET_TARGET,
-  redactSecrets: false,
   persistenceState: 'loading',
   saveState: 'idle',
   secretsAvailable: true,
@@ -669,6 +685,7 @@ export const useAppStore = create<AppState>(set => ({
   setTheme: theme => set({ theme }),
   setLanguage: language => set({ language }),
   setDefaultBodyLanguage: defaultBodyLanguage => set({ defaultBodyLanguage }),
+  setDefaultRedactSecrets: defaultRedactSecrets => set({ defaultRedactSecrets }),
   // One `set` is the whole feature: `initTheme`, `initLanguage`, `initZoom` and
   // `initCodeFontSize` are all subscribed and push their own field onto the document,
   // `App.tsx` reads the layout fields at render, and the autosave subscriber rewrites
@@ -697,7 +714,6 @@ export const useAppStore = create<AppState>(set => ({
   openCode: () => set({ codeOpen: true }),
   closeCode: () => set({ codeOpen: false }),
   setCodeTarget: codeTarget => set({ codeTarget }),
-  setRedactSecrets: redactSecrets => set({ redactSecrets }),
 }))
 
 /**

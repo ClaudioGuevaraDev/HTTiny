@@ -151,11 +151,17 @@ in one URL — so a value containing an apostrophe takes double quotes *when not
 would come alive*, and falls back otherwise. The unsafe sets differ per shell and the `$`
 in them is not hypothetical: an OData `?$filter=…` would interpolate.
 
-`redactSecrets` masks a documented list of credential-carrying header names — the toggle has
-to cover an `api-key` typed into the grid, not only `auth.token`, or it would not protect
-the common case. The placeholder is a marker, not a live read: single quotes are what stop
-`$API_KEY` expanding, and a redacted snippet that silently picked up the environment would
-be a different request from the one on screen.
+`redactWire` (`snippets/redact.ts`) masks a documented list of credential-carrying header
+names — the toggle has to cover an `api-key` typed into the grid, not only `auth.token`, or
+it would not protect the common case. The placeholder is a marker, not a live read: single
+quotes are what stop `$API_KEY` expanding, and a redacted snippet that silently picked up
+the environment would be a different request from the one on screen.
+
+The toggle driving it is a `useState` in `CodeBody`, not store state, and that is the whole
+design: it lasts one visit, and the durable answer is `defaultRedactSecrets` in Settings.
+Persisting the switch itself meant one click quietly changed what every later session
+showed, which is no way for a control that rewrites a credential to behave — saying so in
+Settings is deliberate, visible, and findable again.
 
 ### i18n
 

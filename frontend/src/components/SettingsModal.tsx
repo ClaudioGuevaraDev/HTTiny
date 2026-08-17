@@ -184,6 +184,7 @@ function GeneralSection() {
     <>
       <LanguageRow />
       <BodyLanguageRow />
+      <RedactSecretsRow />
     </>
   )
 }
@@ -565,6 +566,33 @@ function BodyLanguageRow() {
         onChange={next => setDefaultBodyLanguage(next === '' ? null : next)}
       />
     </div>
+  )
+}
+
+/**
+ * The other half of the code view's switch, and the only half that is remembered.
+ *
+ * That switch used to persist itself, so one click quietly changed what every later session
+ * showed — which is no way for a control that rewrites a credential to behave. It is now
+ * per visit, and this is where the durable answer is given: deliberately, in the one place
+ * you can go back and look at it.
+ *
+ * Labelled by what turning it *on* does, like `SplitOrientationRow`, and on means hidden —
+ * the same direction as the modal's own switch, so the two can never read as opposites.
+ */
+function RedactSecretsRow() {
+  const { t } = useT()
+  const redact = useAppStore(s => s.defaultRedactSecrets)
+  const setDefaultRedactSecrets = useAppStore(s => s.setDefaultRedactSecrets)
+
+  return (
+    <SwitchRow
+      id="settings-redact-secrets"
+      label="settings.code.redact.label"
+      description={t('settings.code.redact.desc')}
+      checked={redact}
+      onChange={setDefaultRedactSecrets}
+    />
   )
 }
 

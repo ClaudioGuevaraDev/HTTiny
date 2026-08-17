@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { Check, Code2, Copy, Eye, EyeOff, X } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
@@ -55,8 +55,13 @@ function CodeBody({ onDismiss }: { onDismiss: () => void }) {
   const request = useAppStore(s => (s.activeId ? s.documents[s.activeId] : undefined))
   const target = useAppStore(s => s.codeTarget)
   const setCodeTarget = useAppStore(s => s.setCodeTarget)
-  const redact = useAppStore(s => s.redactSecrets)
-  const setRedactSecrets = useAppStore(s => s.setRedactSecrets)
+  // Local, and seeded from the preference rather than read live: this body only mounts
+  // while the dialog is open, so every opening starts from what Settings says and the
+  // switch reaches no further than the visit. Persisting the switch itself is what the
+  // preference exists to replace — a control that rewrites a credential should only stay
+  // on because someone said so in Settings, where they can find it again.
+  const defaultRedact = useAppStore(s => s.defaultRedactSecrets)
+  const [redact, setRedact] = useState(defaultRedact)
   const { status: copyStatus, copy } = useCopy()
   const wire = useWire(request)
 
@@ -96,7 +101,7 @@ function CodeBody({ onDismiss }: { onDismiss: () => void }) {
           role="switch"
           aria-checked={redact}
           title={t('code.redact.desc')}
-          onClick={() => setRedactSecrets(!redact)}
+          onClick={() => setRedact(!redact)}
         >
           {redact ? <EyeOff size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
           {t(redact ? 'code.redact.on' : 'code.redact.off')}

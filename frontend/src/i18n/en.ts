@@ -470,6 +470,10 @@ export const en = {
   'settings.response.format.desc':
     'What the viewer opens a body as. Automatic reads a JSON body as JSON even when the content type says otherwise, and a format picked in the viewer wins for that request.',
   'settings.response.format.auto': 'Automatic',
+  // The durable half of the code view's switch, so the copy has to say that the switch
+  // itself still wins for the visit — otherwise this reads as a lock rather than a default.
+  'settings.code.redact.label': 'Hide secrets by default',
+  'settings.code.redact.desc': 'The code view opens with tokens and passwords replaced by a placeholder. Its own switch still shows them for that visit.',
   'settings.language.label': 'Language',
   'settings.language.desc': 'Choose the interface language.',
 
