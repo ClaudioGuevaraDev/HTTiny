@@ -146,6 +146,10 @@ export function useCommands(enabled: boolean): Command[] {
 
       const version = '9.9.9'
       const notes = 'A fake release, for looking at the dialog.\n\n- One bullet\n- Another one'
+      // First, because without it a preview is a one-way door: the fake update stays in
+      // the store for the rest of the session, and closing the modal only moves it to the
+      // sidebar footer, which then offers to install a version that does not exist.
+      preview('update-clear', 'Preview update · clear', { state: 'idle' })
       preview('update-available', 'Preview update · available', { state: 'available', version, notes })
       preview('update-downloading', 'Preview update · downloading', { state: 'downloading', version, received: 3_100_000, total: 7_200_000 })
       preview('update-preparing', 'Preview update · preparing', { state: 'preparing', version })
