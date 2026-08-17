@@ -298,28 +298,6 @@ func failure(code, text string) Result {
 	return Result{ErrorCode: code, ErrorText: text}
 }
 
-// parseTarget rejects anything that is not an absolute http(s) URL with a host.
-// The frontend deliberately does not use <input type="url">, so this is the only
-// validation the request gets.
-func parseTarget(raw string) (*url.URL, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return nil, errors.New("the URL is empty")
-	}
-	parsed, err := url.Parse(trimmed)
-	if err != nil {
-		return nil, err
-	}
-	scheme := strings.ToLower(parsed.Scheme)
-	if scheme != "http" && scheme != "https" {
-		return nil, fmt.Errorf("unsupported scheme %q", parsed.Scheme)
-	}
-	if parsed.Host == "" {
-		return nil, errors.New("the URL has no host")
-	}
-	return parsed, nil
-}
-
 // applyHeaders uses Set for the first occurrence of a name and Add afterwards,
 // so a user can legitimately send a repeated header without the last row
 // silently winning.
