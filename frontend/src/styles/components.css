@@ -857,10 +857,16 @@
     flex-direction: column;
   }
 
+  /* `align-items: center` is load-bearing, not tidying. Flex defaults to `stretch`, and
+   * `.url-input` was the one child of this row with no height of its own — so it took the
+   * bar's content box (56px less 9px of padding top and bottom = 38px) and sat 2px taller
+   * than the method picker, Send and the code button, which all declare 36px. The height of
+   * a control should not fall out of its container's padding. */
   .request-bar {
     height: var(--h-request-bar);
     padding: 9px 12px;
     display: flex;
+    align-items: center;
     gap: 7px;
     border-bottom: 1px solid var(--color-border-subtle);
   }
@@ -868,6 +874,8 @@
   .url-input {
     flex: 1;
     min-width: 0;
+    /* Declared, like every other control in the row, rather than inherited from the bar. */
+    height: var(--h-control-lg);
     padding: 0 11px;
     border: 1px solid var(--color-border-control);
     border-radius: var(--radius-md);
@@ -3393,12 +3401,30 @@
   }
 
   /* ── Code view ─────────────────────────────────────────────────────────── */
-  /* Same plate as the other three modals. Wider and taller than Settings, because
-   * what it holds is code at a width nobody chose: a Go snippet indents four levels
-   * and a bearer token is one very long word. */
+  /* Same plate as the other three modals. Wider than Settings, because what it holds is
+   * code at a width nobody chose: a Go snippet indents four levels and a bearer token is
+   * one very long word.
+   *
+   * The height is fixed on purpose: a dialog that resized itself as the language picker
+   * changed would jump under the pointer. So the only question is the number, and the
+   * arithmetic behind it is — at the default 13px code font a line is ~21px, and the
+   * toolbar plus the policy line take ~87px, so 600px leaves room for about
+   * twenty-four lines. That is every target for an ordinary request except Go, which
+   * runs to twenty-six and scrolls.
+   *
+   * Adjust here and nowhere else. The `vh` term is only a floor for a short window —
+   * `min` takes whichever is smaller, so at 900px of window height the px cap always
+   * wins. Some slack under a short snippet is the price of not scrolling the long ones. */
   .code-dialog {
+    /* Read by `editorTheme.ts`, so the code area is painted with the dialog's own plate
+     * instead of the panes' `--color-surface-1`. Without it the editor was a darker
+     * rectangle inside a lighter modal, with the toolbar and the policy line a third
+     * shade again — three surfaces stacked for no reason. The 1px borders separate the
+     * bands now, which is the app's rule anyway: colour reinforces, it never carries the
+     * meaning alone. */
+    --editor-surface: var(--color-surface-2);
     width: min(840px, calc(94vw / var(--zoom, 1)));
-    height: min(calc(80vh / var(--zoom, 1)), 620px);
+    height: min(calc(80vh / var(--zoom, 1)), 600px);
     margin: auto;
     padding: 0;
     border: 1px solid var(--color-border-strong);
@@ -3425,7 +3451,6 @@
     align-items: center;
     gap: 8px;
     border-bottom: 1px solid var(--color-border);
-    background: var(--color-surface-3);
   }
 
   .code-title {
@@ -3489,7 +3514,6 @@
     flex-direction: column;
     gap: 3px;
     border-top: 1px solid var(--color-border-subtle);
-    background: var(--color-surface-3);
     color: var(--color-text-subtle);
     font-size: var(--text-2xs);
   }

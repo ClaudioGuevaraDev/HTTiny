@@ -17,9 +17,21 @@ import { EditorView, type Extension } from '@uiw/react-codemirror'
  */
 const chrome = EditorView.theme(
   {
+    /*
+     * The background is a variable with a fallback, not a fixed token, because the same
+     * theme is used on two different plates: the request and response panes, which *are*
+     * `--color-surface-1`, and the code view's modal, which is `--color-surface-2` and
+     * where a surface-1 editor read as a darker rectangle pasted into the dialog.
+     *
+     * A custom property set on an ancestor is what makes that overridable at all.
+     * CodeMirror injects its own rules through StyleModule at runtime, unlayered, and
+     * unlayered CSS beats every `@layer` whatever the specificity — so a plain
+     * `.code-body .cm-editor { background: … }` in `@layer components` would silently do
+     * nothing. See the comment at the top of `styles/codemirror.css`.
+     */
     '&': {
       color: 'var(--color-text)',
-      backgroundColor: 'var(--color-surface-1)',
+      backgroundColor: 'var(--editor-surface, var(--color-surface-1))',
       fontSize: 'var(--text-code)',
     },
     '&.cm-editor': { height: '100%' },
@@ -43,7 +55,7 @@ const chrome = EditorView.theme(
     },
     '.cm-selectionMatch': { backgroundColor: 'var(--color-selection-match)' },
     '.cm-gutters': {
-      backgroundColor: 'var(--color-surface-1)',
+      backgroundColor: 'var(--editor-surface, var(--color-surface-1))',
       color: 'var(--color-text-faint)',
       border: 'none',
       borderRight: '1px solid var(--color-border-subtle)',

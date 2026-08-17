@@ -414,15 +414,24 @@ export function RequestEditor() {
           autoComplete="off"
           spellCheck={false}
         />
-        {/* Next to the URL because that is what it is about: the URL that will actually be
-            sent, which is not always the one in the field beside it.
+        {/* Send sits against the field it acts on — it is that field's Enter key — and the
+            code view follows as the secondary control. DOM order is tab order, so this is
+            also the order the keyboard walks them in.
 
-            There used to be a Save button here too, on the grounds that "did that save?" is
-            a real question and a button that answers it is worth one icon. It does not
+            There used to be a Save button in this row, on the grounds that "did that save?"
+            is a real question and a button that answers it is worth one icon. It did not
             answer it — the sidebar footer does, with Saving / Saved / Failed — and the only
             thing it did that autosave does not is write inside the 600 ms debounce instead
             of at the end of it. `Ctrl+S` and the command palette still do that, invisibly,
             for the reflex to press it. */}
+        <button
+          type="button"
+          className={`send-btn ${sending ? 'cancel' : ''}`}
+          title={sending ? t('editor.cancel.title', { keys: shortcutHint('cancel') }) : t('editor.send.title', { keys: shortcutHint('send') })}
+          onClick={() => toggleRequest(activeId)}
+        >
+          {sending ? <Square size={13} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} {sending ? t('editor.cancel') : t('editor.send')}
+        </button>
         <button
           type="button"
           className="icon-btn bar-btn"
@@ -431,14 +440,6 @@ export function RequestEditor() {
           onClick={openCode}
         >
           <Code2 size={16} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={`send-btn ${sending ? 'cancel' : ''}`}
-          title={sending ? t('editor.cancel.title', { keys: shortcutHint('cancel') }) : t('editor.send.title', { keys: shortcutHint('send') })}
-          onClick={() => toggleRequest(activeId)}
-        >
-          {sending ? <Square size={13} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} {sending ? t('editor.cancel') : t('editor.send')}
         </button>
       </div>
       <div className="panel-tabs" role="tablist" aria-label={t('editor.sections')} onKeyDown={onPanelKeyDown}>
