@@ -1950,6 +1950,7 @@
   .csv-table,
   .archive-body,
   .cookies-panel,
+  .timeline-panel,
   .sse-body {
     height: 100%;
     display: flex;
@@ -2047,6 +2048,225 @@
 
   .archive-grid tbody td {
     color: var(--color-text-muted);
+  }
+
+  /* ── Response · timeline ─────────────────────────────────────────────────────
+   *
+   * The first chart in the app, and it exists because it is finally built on
+   * something measured. Two earlier comments in this codebase — on `.skeleton` and on
+   * the elapsed counter — refuse to draw a bar out of a number nobody measured; these
+   * bars come from `httptrace`, so the objection does not apply.
+   *
+   * The geometry is inline on each bar rather than in a class, because the offset and
+   * the width *are* the measurement. A class could only ever hold a guess.
+   */
+
+  .timeline-scroller {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px 14px 20px;
+    user-select: text;
+  }
+
+  .timeline-bars {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  /* Shares the row grid so the total lands directly under the column of phase times,
+   * with the rule above it doing the work a "sum" caption would otherwise need. */
+  .timeline-row,
+  .timeline-total {
+    display: grid;
+    /* The label and the value columns are fixed so every bar starts and ends on the
+     * same two lines — otherwise a long phase name would shift its own track and the
+     * rows would stop being comparable, which is the entire point of a waterfall. */
+    grid-template-columns: 74px 1fr 64px;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  .timeline-label {
+    color: var(--color-text-muted);
+  }
+
+  .timeline-track {
+    height: 10px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    overflow: hidden;
+    display: flex;
+  }
+
+  .timeline-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+    /* The offset is a margin rather than a transform so it participates in the flex
+     * row: a translated bar would overflow its own track at the far end. */
+    flex: none;
+  }
+
+  .timeline-value {
+    color: var(--color-text-subtle);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A phase that did not happen keeps its row, so the five rows are the same five on
+   * every response and two of them can be compared at a glance. */
+  .timeline-row[data-absent='true'] .timeline-label,
+  .timeline-row[data-absent='true'] .timeline-value {
+    color: var(--color-text-faint);
+  }
+
+  .timeline-total {
+    margin: 6px 0 0;
+  }
+
+  .timeline-total .timeline-label {
+    color: var(--color-text-subtle);
+  }
+
+  .timeline-total .timeline-value {
+    padding-top: 5px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-strong);
+  }
+
+  .timeline-section {
+    margin-top: 18px;
+  }
+
+  .timeline-heading {
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .timeline-chip {
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-4);
+    color: var(--color-text-subtle);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .timeline-hops {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .timeline-hop {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  .timeline-hop[data-final='true'] {
+    background: var(--color-surface-accent);
+  }
+
+  .timeline-status {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .timeline-status[data-bucket='3xx'] {
+    color: var(--color-info);
+  }
+
+  .timeline-method {
+    flex: none;
+    color: var(--color-text-faint);
+  }
+
+  /* Each URL takes half of what is left, so a long one truncates instead of pushing
+   * the timing off the row. The whole thing is on the title. */
+  .timeline-url {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text);
+  }
+
+  .timeline-arrow {
+    flex: none;
+    color: var(--color-text-faint);
+  }
+
+  .timeline-hop .timeline-value {
+    flex: none;
+    margin-left: auto;
+  }
+
+  .timeline-facts {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 14px;
+    font-size: var(--text-2xs);
+  }
+
+  .timeline-fact {
+    display: contents;
+  }
+
+  .timeline-fact dt {
+    color: var(--color-text-subtle);
+  }
+
+  .timeline-fact dd {
+    margin: 0;
+    min-width: 0;
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+  }
+
+  .timeline-plaintext,
+  .timeline-names {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-subtle);
+    font-size: var(--text-2xs);
+  }
+
+  /* Plain HTTP is a finding, not an absence — the one row here that is worth a colour. */
+  .timeline-plaintext {
+    color: var(--color-warning);
+  }
+
+  .timeline-names {
+    margin-top: 8px;
+    overflow-wrap: anywhere;
   }
 
   /* ── Response · cookies ──────────────────────────────────────────────────────*/

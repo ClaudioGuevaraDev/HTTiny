@@ -235,7 +235,7 @@ const PANELS = ['params', 'headers', 'body', 'auth'] as const satisfies readonly
  * `readPanels` drops the unknown value, so the tab is left open, the app is restarted,
  * and it silently opens on Body instead.
  */
-const RESPONSE_PANELS = ['body', 'headers', 'cookies'] as const satisfies readonly ResponsePanel[]
+const RESPONSE_PANELS = ['body', 'headers', 'cookies', 'timeline'] as const satisfies readonly ResponsePanel[]
 
 /**
  * Dropped for requests that no longer exist, like `readBodyViews` below — and dropped

@@ -36,6 +36,32 @@ export interface Auth {
 }
 
 /**
+ * Hop is one redirect that was followed. The chain is otherwise invisible: the app
+ * follows redirects silently and only reports where it ended up.
+ */
+export interface Hop {
+    "status": number;
+
+    /**
+     * The URL that answered with this redirect.
+     */
+    "url": string;
+
+    /**
+     * Where it pointed, verbatim from the Location header — so a relative one shows as
+     * relative, which is what the server actually sent.
+     */
+    "location": string;
+
+    /**
+     * The method used for this hop. A 302 turns a POST into a GET, and seeing that is
+     * most of the value of a chain.
+     */
+    "method": string;
+    "ms": number;
+}
+
+/**
  * KeyValue is a header pair. The frontend's KeyValueRow carries `enabled`, `id`
  * and `description` too; those are editor concerns and are resolved away before
  * the request crosses the binding.
@@ -43,6 +69,22 @@ export interface Auth {
 export interface KeyValue {
     "key": string;
     "value": string;
+}
+
+/**
+ * Phase is one segment of the waterfall: where it starts and how long it lasts, both
+ * in milliseconds from the moment the send began.
+ * 
+ * An offset rather than a bare duration, because five durations side by side say
+ * nothing about what happened when. With offsets the five read as one timeline, and
+ * a gap between two of them is itself information.
+ * 
+ * Ms == 0 means the phase did not happen. That is not a fudge: a reused connection
+ * genuinely has no DNS, no TCP and no TLS, and Timings.Reused is what explains it.
+ */
+export interface Phase {
+    "at": number;
+    "ms": number;
 }
 
 /**
@@ -132,6 +174,23 @@ export interface Response {
     "archive": ArchiveEntry[] | null;
 
     /**
+     * Where the time went, as a waterfall. See trace.go.
+     */
+    "timings": Timings;
+
+    /**
+     * The connection the final response arrived on. Nil for http://.
+     */
+    "tls": TLSInfo | null;
+
+    /**
+     * The redirects that were followed, oldest first. Empty when there were none — and
+     * also, deliberately, when the chain was abandoned for being too long: that path
+     * returns a failure, which carries no Response. See the note in Send.
+     */
+    "redirects": Hop[] | null;
+
+    /**
      * see classify.go
      */
     "format": string;
@@ -202,6 +261,62 @@ export interface SaveResult {
     "path": string;
     "errorCode": string;
     "errorText": string;
+}
+
+/**
+ * TLSInfo describes the connection the final response arrived on. Nil for http://.
+ */
+export interface TLSInfo {
+    "version": string;
+    "cipherSuite": string;
+
+    /**
+     * The protocol ALPN settled on — "h2" or "http/1.1". Empty if none was negotiated.
+     */
+    "alpn": string;
+
+    /**
+     * The handshake was skipped by resuming an earlier session, which is the TLS-level
+     * twin of Reused above and explains a suspiciously quick negotiation.
+     */
+    "resumed": boolean;
+    "serverName": string;
+
+    /**
+     * The leaf certificate. Empty when the peer sent none, which cannot happen for a
+     * client but is cheap to be safe about.
+     */
+    "subject": string;
+    "issuer": string;
+    "notBefore": string;
+    "notAfter": string;
+    "dnsNames": string[] | null;
+}
+
+/**
+ * Timings is where the time went.
+ * 
+ * The five phases partition the total rather than overlapping, which is why TTFB here
+ * means the gap between the connection being ready and the first byte arriving —
+ * the server's own thinking time — and not the conventional "everything up to the
+ * first byte". It is what Chrome's waterfall labels "Waiting (TTFB)" for the same
+ * reason.
+ */
+export interface Timings {
+    "dns": Phase;
+    "connect": Phase;
+    "tls": Phase;
+    "ttfb": Phase;
+    "download": Phase;
+    "totalMs": number;
+
+    /**
+     * The connection came from the idle pool, so nothing was resolved, dialled or
+     * negotiated. The transport keeps 4 idle connections per host, which makes this
+     * the ordinary case for a second send to the same place — and three empty bars
+     * with no explanation read as a bug rather than as a fast request.
+     */
+    "reused": boolean;
 }
 
 export interface WireHeader {

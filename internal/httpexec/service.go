@@ -16,6 +16,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"strings"
@@ -123,9 +124,17 @@ type Response struct {
 	Filename string `json:"filename"`
 	// The entries of a zip response. Empty for every other format, and for an archive
 	// whose index could not be read.
-	Archive   []ArchiveEntry `json:"archive"`
-	Format    string         `json:"format"` // see classify.go
-	Truncated bool           `json:"truncated"`
+	Archive []ArchiveEntry `json:"archive"`
+	// Where the time went, as a waterfall. See trace.go.
+	Timings Timings `json:"timings"`
+	// The connection the final response arrived on. Nil for http://.
+	TLS *TLSInfo `json:"tls"`
+	// The redirects that were followed, oldest first. Empty when there were none — and
+	// also, deliberately, when the chain was abandoned for being too long: that path
+	// returns a failure, which carries no Response. See the note in Send.
+	Redirects []Hop  `json:"redirects"`
+	Format    string `json:"format"` // see classify.go
+	Truncated bool   `json:"truncated"`
 }
 
 // Result is an explicit success/failure union rather than a Go `error` return.
@@ -175,21 +184,37 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 		return failure(codeInvalidURL, err.Error())
 	}
 
-	client := &http.Client{
-		Transport: s.transport,
-		Timeout:   timeoutFor(req),
-		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) >= maxRedirects {
-				return errTooManyRedirects
-			}
-			return nil
-		},
-	}
-
 	// Timed around the response read, not just the round trip: a response is not
 	// "arrived" until its body is in hand, and reporting otherwise would flatter
 	// slow endpoints.
 	started := time.Now()
+
+	// Attached here rather than inside buildRequest, which Wire shares: a trace there
+	// would ride along on every request the code view builds, once per keystroke, for
+	// hooks that can never fire because Wire does no I/O.
+	//
+	// WithClientTrace stores the trace on the context, and net/http copies that context
+	// onto each redirect hop — so despite what ClientTrace's own documentation says
+	// about not spanning redirects, every hook below fires again on every hop. The
+	// collector is written for that.
+	trace := newTracer(started)
+	httpReq = httpReq.WithContext(httptrace.WithClientTrace(httpReq.Context(), trace.hooks()))
+
+	client := &http.Client{
+		Transport: s.transport,
+		Timeout:   timeoutFor(req),
+		CheckRedirect: func(next *http.Request, via []*http.Request) error {
+			if len(via) >= maxRedirects {
+				return errTooManyRedirects
+			}
+			// `next.Response` is the 3xx that caused this hop — guaranteed populated
+			// here, and the only place the chain is visible at all, since redirects are
+			// otherwise followed in silence.
+			trace.redirected(next)
+			return nil
+		},
+	}
+
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		code, text := classify(ctx, err)
@@ -202,7 +227,8 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 		code, text := classify(ctx, err)
 		return failure(code, text)
 	}
-	elapsed := time.Since(started)
+	finished := time.Now()
+	elapsed := finished.Sub(started)
 
 	// Before anything looks at the bytes: net/http negotiates and unwraps gzip on its
 	// own, and strips the header when it does, so a Content-Encoding still present
@@ -229,6 +255,9 @@ func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 		ContentType:     media,
 		ContentEncoding: contentEncoding,
 		FinalURL:        finalURL(resp, httpReq.URL),
+		Timings:         trace.timings(finished),
+		TLS:             tlsInfoOf(resp.TLS),
+		Redirects:       trace.redirects(),
 		Truncated:       truncated,
 	}
 

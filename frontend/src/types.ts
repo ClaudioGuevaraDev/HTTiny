@@ -152,6 +152,62 @@ export interface ResponseSearch {
   regexp: boolean
 }
 
+/**
+ * One segment of the timing waterfall: where it starts and how long it lasts, both in
+ * milliseconds from the moment the send began.
+ *
+ * `ms === 0` means the phase did not happen — a reused connection has no DNS, no TCP
+ * and no TLS — which `Timings.reused` is what explains.
+ */
+export interface Phase {
+  at: number
+  ms: number
+}
+
+/**
+ * Where the time went. The five phases partition the total rather than overlapping,
+ * which is why `ttfb` is the gap between the connection being ready and the first byte
+ * arriving — the server's own thinking — and not the conventional "everything up to
+ * the first byte".
+ */
+export interface Timings {
+  dns: Phase
+  connect: Phase
+  tls: Phase
+  ttfb: Phase
+  download: Phase
+  totalMs: number
+  /** The connection came from the pool, so nothing was resolved, dialled or negotiated. */
+  reused: boolean
+}
+
+/** The connection the final response arrived on. Null for `http://`. */
+export interface TlsInfo {
+  version: string
+  cipherSuite: string
+  alpn: string
+  resumed: boolean
+  serverName: string
+  subject: string
+  issuer: string
+  /** RFC 3339, or empty when the peer sent no certificate. */
+  notBefore: string
+  notAfter: string
+  dnsNames: string[]
+}
+
+/** One redirect that was followed. The chain is otherwise invisible. */
+export interface RedirectHop {
+  status: number
+  /** The URL that answered with this redirect. */
+  url: string
+  /** Verbatim from the Location header, so a relative one stays relative. */
+  location: string
+  /** A 302 turns a POST into a GET, and seeing that is most of the value of a chain. */
+  method: string
+  ms: number
+}
+
 export interface ArchiveEntry {
   name: string
   size: number
@@ -197,6 +253,15 @@ export type ResponseSnapshot =
       filename: string
       /** Populated for a zip response only; empty for everything else. */
       archive: ArchiveEntry[]
+      timings: Timings
+      /** Null for `http://`, and for a response that never reached a handshake. */
+      tls: TlsInfo | null
+      /**
+       * The redirects followed, oldest first. Empty when there were none — and also,
+       * deliberately, when the chain was abandoned for being too long: that path
+       * returns a failure, which carries no response at all.
+       */
+      redirects: RedirectHop[]
       format: ResponseFormat
       truncated: boolean
     }
@@ -252,7 +317,7 @@ export interface SaveBodyRequest {
  * union was previously written out three times.
  */
 export type RequestPanel = 'params' | 'headers' | 'body' | 'auth'
-export type ResponsePanel = 'body' | 'headers' | 'cookies'
+export type ResponsePanel = 'body' | 'headers' | 'cookies' | 'timeline'
 
 export type SplitOrientation = 'rows' | 'columns'
 

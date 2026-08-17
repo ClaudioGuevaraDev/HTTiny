@@ -162,6 +162,7 @@ export const en = {
   'response.tab.body': 'Body',
   'response.tab.headers': 'Headers',
   'response.tab.cookies': 'Cookies',
+  'response.tab.timeline': 'Timeline',
   'response.tab.returned.one': ', {count} returned',
   'response.tab.returned.other': ', {count} returned',
   'response.formatting': 'Body formatting',
@@ -280,6 +281,35 @@ export const en = {
   'response.noContent.desc': 'The server answered without a body, by design.',
   'response.emptyBody.title': 'Empty body',
   'response.emptyBody.desc': 'The response arrived with nothing in it.',
+  // ── Response · timeline ──────────────────────────────────────────────────────
+  // The phase names are the ones every network panel uses, so they stay recognisable
+  // between tools. TTFB here is the wait *after* the connection is ready, which is
+  // what makes the five bars partition the total instead of overlapping.
+  'response.timeline.dns': 'DNS',
+  'response.timeline.connect': 'Connect',
+  'response.timeline.tls': 'TLS',
+  'response.timeline.ttfb': 'Waiting',
+  'response.timeline.download': 'Download',
+  'response.timeline.absent': 'did not happen',
+  'response.timeline.total': 'Total',
+  'response.timeline.reused.desc': 'This request went out over a connection that was already open, so there was nothing to resolve, dial or negotiate.',
+  'response.timeline.redirects.one': '{count} redirect followed',
+  'response.timeline.redirects.other': '{count} redirects followed',
+  'response.timeline.final': 'Final',
+  'response.timeline.security': 'Connection',
+  'response.timeline.noTls': 'Sent over plain HTTP — nothing about this exchange was encrypted.',
+  'response.timeline.resumed': 'resumed',
+  // The values beside these are protocol tokens — TLS 1.3, h2, the cipher suite name —
+  // so only the labels are translated.
+  'response.timeline.tlsVersion': 'Protocol',
+  'response.timeline.cipher': 'Cipher',
+  'response.timeline.alpn': 'ALPN',
+  'response.timeline.subject': 'Certificate',
+  'response.timeline.issuer': 'Issued by',
+  'response.timeline.validUntil': 'Valid until',
+  'response.timeline.covers': 'Covers {names}',
+  'response.timeline.andMore': ' and {count} more',
+
   'response.cookies.caption': 'The cookies this response set',
   'response.cookies.name': 'Name',
   'response.cookies.value': 'Value',

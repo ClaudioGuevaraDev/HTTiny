@@ -1,9 +1,9 @@
 import { Call, CancelError } from '@wailsio/runtime'
 import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
-import type { KeyValue } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
+import type { KeyValue, TLSInfo } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import { RequestFailure } from './errors'
 import { BYTE_FORMATS, TEXT_FORMATS } from './types'
-import type { KeyValueRow, RequestExecutor, ResponseFormat } from './types'
+import type { KeyValueRow, RequestExecutor, ResponseFormat, TlsInfo } from './types'
 
 /**
  * Rows are an editor model: the checkbox and the blank trailing row exist so the
@@ -19,6 +19,14 @@ const toPairs = (rows: readonly KeyValueRow[]): KeyValue[] =>
  */
 const toRows = (pairs: readonly KeyValue[]): KeyValueRow[] =>
   pairs.map((pair, index) => ({ id: `${index}:${pair.key}`, enabled: true, key: pair.key, value: pair.value, description: '' }))
+
+/**
+ * A Go pointer crosses the binding as `T | null`, which is already the shape the panel
+ * wants — no TLS state means the request went out over plain http. The nested slice
+ * needs the same `?? []` every Go slice does, though, which is the whole reason this is
+ * a function rather than a `??` at the call site.
+ */
+const toTls = (tls: TLSInfo | null): TlsInfo | null => (tls ? { ...tls, dnsNames: tls.dnsNames ?? [] } : null)
 
 /**
  * Go's `format` is a bare string on the wire, so it is re-narrowed here rather than
@@ -99,6 +107,9 @@ export const goExecutor: RequestExecutor = {
       filename: response.filename,
       // Null for every format but zip, and for a zip whose directory would not read.
       archive: response.archive ?? [],
+      timings: response.timings,
+      tls: toTls(response.tls),
+      redirects: response.redirects ?? [],
       format: toFormat(response.format),
       truncated: response.truncated,
     }

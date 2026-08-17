@@ -41,7 +41,7 @@ import {
 import { parseCookies } from '../response/cookies'
 import { buildPattern, findMatches, segments, stepMatch } from '../response/search'
 import { isByteFormat } from '../types'
-import type { BodyLanguage, BodyMode, BodyView, KeyValueRow, ResponseFormat } from '../types'
+import type { BodyLanguage, BodyMode, BodyView, KeyValueRow, ResponseFormat, ResponsePanel } from '../types'
 import { cancelRequest, runRequest, saveResponseBody } from '../requestRunner'
 import { shortcuts } from '../shortcuts'
 import { DEFAULT_RESPONSE_PANEL, useAppStore } from '../store'
@@ -50,6 +50,7 @@ import { useSave } from '../useSave'
 import { useRovingFocus } from '../useRovingFocus'
 import { BodyPanel } from './response/BodyPanel'
 import { CookiesPanel } from './response/CookiesPanel'
+import { TimelinePanel } from './response/TimelinePanel'
 import { ResponseSearchBar } from './response/ResponseSearchBar'
 import { Placeholder, PlaceholderAction, SkeletonLines } from './Placeholder'
 import { ResponseStatus } from './ResponseStatus'
@@ -102,8 +103,15 @@ const FORMAT_LABEL: Record<ResponseFormat, string> = {
 
 /** Module scope, so the "no headers yet" case is one stable reference and not a new []. */
 const NO_HEADERS: KeyValueRow[] = []
-/** Same, for the panel that has no row-match model of its own — the body. */
+/** Same, for the panels that have no row-match model of their own. */
 const NO_ROWS: number[] = []
+
+/**
+ * The panels the find bar can traverse: the ones that are a table of strings. Listed
+ * rather than derived from "not the body", so a panel that is neither — Timeline is
+ * bars and facts — does not silently claim to be searchable.
+ */
+const SEARCHABLE_PANELS: ReadonlySet<ResponsePanel> = new Set<ResponsePanel>(['headers', 'cookies'])
 
 /**
  * Renders a cell with the search matches marked.
@@ -351,11 +359,16 @@ export function ResponseViewer() {
   // from. Passing `search` whole would rebuild it whenever the bar merely opened.
   const { query, caseSensitive, regexp } = search
   const pattern = useMemo(() => buildPattern(query, { caseSensitive, regexp }), [query, caseSensitive, regexp])
-  // Both tables can always be traversed — they are strings in cells. The body can only
-  // when it is the editor showing: the tree, the CSV table, the hex dump and the previews
-  // draw from their own models, and two of them render a window of rows rather than the
-  // whole document, so "scroll to the match" is a different feature there.
-  const searchable = response.state === 'success' && (!onBody || (textual && !hex && mode !== 'rich'))
+  // Named panels rather than "anything that is not the body". That shorthand held while
+  // every other panel was a table of strings, and stopped holding the moment one was not:
+  // Timeline would have inherited `!onBody`, promised the find bar it could be traversed,
+  // and then reported zero matches forever, because `activeRows` has nothing for it.
+  //
+  // The body can only be searched when it is the editor showing: the tree, the CSV table,
+  // the hex dump and the previews draw from their own models, and two of them render a
+  // window of rows rather than the whole document, so "scroll to the match" is a
+  // different feature there.
+  const searchable = response.state === 'success' && (onBody ? textual && !hex && mode !== 'rich' : SEARCHABLE_PANELS.has(responsePanel))
 
   const bodyMatches = useMemo(() => (searchable && onBody ? findMatches(bodyText, pattern) : []), [searchable, onBody, bodyText, pattern])
 
@@ -563,6 +576,21 @@ export function ResponseViewer() {
                 {t('response.tab.cookies')} <span aria-hidden="true">{cookies.length}</span>
                 <span className="sr-only">{plural('response.tab.returned', cookies.length)}</span>
               </button>
+              {/* No count badge. Headers and Cookies carry one because they count things;
+                  the only number here is the total time, and the status bar above already
+                  shows it — repeating it would be the redundant strip Cookies just lost. */}
+              <button
+                type="button"
+                role="tab"
+                id="response-tab-timeline"
+                aria-selected={responsePanel === 'timeline'}
+                aria-controls="response-content"
+                tabIndex={responsePanel === 'timeline' ? 0 : -1}
+                className={responsePanel === 'timeline' ? 'active' : ''}
+                onClick={() => activeId && setResponsePanel(activeId, 'timeline')}
+              >
+                {t('response.tab.timeline')}
+              </button>
             </div>
             {responsePanel === 'body' && (
               <div className="body-toolbar">
@@ -656,6 +684,8 @@ export function ResponseViewer() {
                 wrap={wrap}
                 match={search.open && onBody ? (bodyMatches[current] ?? null) : null}
               />
+            ) : responsePanel === 'timeline' ? (
+              <TimelinePanel timings={response.timings} tls={response.tls} redirects={response.redirects} finalUrl={response.finalUrl} />
             ) : responsePanel === 'cookies' ? (
               <CookiesPanel
                 cookies={cookies}
