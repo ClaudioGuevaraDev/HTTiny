@@ -2781,6 +2781,15 @@
     overflow: hidden;
   }
 
+  /* The dialog is focused on open only to park focus somewhere that is not a button
+   * (see UpdateModal). The base ring rule skips `[tabindex='-1']`, but the *browser's*
+   * default ring does not — and it renders as a pale halo, which on this dark plate
+   * reads as a stray white border. Suppressed here because this is a container rather
+   * than a control: every real button inside keeps its ring. */
+  .update-dialog:focus {
+    outline: none;
+  }
+
   .update-shell {
     position: relative;
     display: flex;
