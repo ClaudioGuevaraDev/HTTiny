@@ -512,7 +512,7 @@
     border-radius: var(--radius-sm);
     color: var(--color-accent);
     font-size: inherit;
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-semibold);
   }
 
   .sidebar-update:hover {
@@ -2926,6 +2926,14 @@
     align-items: center;
     justify-content: flex-end;
     gap: 0.5rem;
+  }
+
+  /* Scoped to the modal rather than changed on `.send-btn`, which is also the request
+   * bar's Send button — bold is deliberate there, since it is the application's primary
+   * action. Inside a dialog the weight only has to match the other accent buttons, so it
+   * follows `.placeholder-action.action-primary`. */
+  .update-actions .send-btn {
+    font-weight: var(--font-weight-semibold);
   }
 
   .update-later {
