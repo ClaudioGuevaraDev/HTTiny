@@ -88,6 +88,20 @@ export interface PrefsFile {
   redactSecrets: boolean
 }
 
+/**
+ * What `readPrefs` hands back: the prefs file minus the one field of it that is not
+ * store state.
+ *
+ * `collapsedNodeIds` is consumed earlier and separately, through `readCollapsed`, because
+ * the tree has to be built with it — the store keeps `expanded` on each node instead of a
+ * list of ids. Omitting it here is what lets `hydrate` apply this whole object with a
+ * spread, and *that* is the point: a preference added to `PrefsFile` and to `readPrefs`
+ * reaches the store by existing, rather than by someone remembering to add a line.
+ * Forgetting used to be silent — `setState` takes a `Partial`, so the field would save
+ * correctly and load into nothing.
+ */
+export type PrefsState = Omit<PrefsFile, 'collapsedNodeIds'>
+
 // ── Writing ────────────────────────────────────────────────────────────────────
 
 const collapsedIn = (nodes: TreeNode[], out: string[] = []): string[] => {
@@ -345,7 +359,7 @@ export function readWorkspace(payload: unknown, collapsedNodeIds: readonly strin
   return { tree, documents }
 }
 
-export function readPrefs(payload: unknown, documents: Record<string, RequestDocument>, tree: TreeNode[]): PrefsFile {
+export function readPrefs(payload: unknown, documents: Record<string, RequestDocument>, tree: TreeNode[]): PrefsState {
   const raw = isRecord(payload) ? payload : {}
   const ids = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [])
 
@@ -377,7 +391,6 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     selectedNodeId: selectedCandidate && nodeIds.has(selectedCandidate) ? selectedCandidate : null,
     activeCollectionId: collectionCandidate && collectionIds.includes(collectionCandidate) ? collectionCandidate : (collectionIds[0] ?? null),
     recentIds: ids(raw.recentIds).filter(id => documents[id]).slice(0, 12),
-    collapsedNodeIds: ids(raw.collapsedNodeIds),
     requestPanel: oneOf(raw.requestPanel, PANELS, 'params'),
     responsePanel: oneOf(raw.responsePanel, RESPONSE_PANELS, 'body'),
     bodyViews: readBodyViews(raw.bodyViews, documents),

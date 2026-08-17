@@ -196,26 +196,14 @@ export async function hydrate(): Promise<void> {
     useAppStore.setState({
       tree: loaded.tree,
       documents: loaded.documents,
-      tabs: layout.tabs,
-      activeId: layout.activeId,
-      selectedNodeId: layout.selectedNodeId,
-      activeCollectionId: layout.activeCollectionId,
-      recentIds: layout.recentIds,
-      requestPanel: layout.requestPanel,
-      responsePanel: layout.responsePanel,
-      bodyViews: layout.bodyViews,
-      sidebarWidth: layout.sidebarWidth,
-      sidebarCollapsed: layout.sidebarCollapsed,
-      splitOrientation: layout.splitOrientation,
-      splitRatio: layout.splitRatio,
-      theme: layout.theme,
-      // The one field here that no type error would catch if it were forgotten:
-      // `setState` takes a Partial, so the language would save correctly and load into
-      // nothing, resetting to English on every launch.
-      language: layout.language,
-      zoom: layout.zoom,
-      codeFontSize: layout.codeFontSize,
-      defaultBodyLanguage: layout.defaultBodyLanguage,
+      // Spread, not seventeen enumerated fields — and that is a correctness measure, not
+      // brevity. `setState` takes a `Partial`, so a preference left out of the list was
+      // saved correctly and loaded into nothing, with no type error anywhere: the comment
+      // this replaces warned about exactly that for `language`, and `codeTarget` and
+      // `redactSecrets` were then added and silently forgotten, resetting the code view on
+      // every launch. `PrefsState` is defined as "everything readPrefs returns is store
+      // state", so a new preference now arrives by existing.
+      ...layout,
       persistenceState: 'ready',
       secretsAvailable,
       quarantinedPath: workspace.quarantined || null,
