@@ -266,13 +266,6 @@ export const es: Catalog = {
   'code.redact.off': 'Secretos visibles',
   'code.redact.on': 'Secretos ocultos',
   'code.redact.desc': 'Reemplaza tokens, contraseñas y claves de API por una variable de entorno, para poder pegar el fragmento en un ticket.',
-  'code.policy.timeout': '{seconds} s de espera',
-  'code.policy.redirects': 'hasta {limit} redirecciones',
-  'code.policy.gzip': 'gzip negociado',
-  'code.policy.http2': 'HTTP/2 ofrecido',
-  'code.policy.tls': 'TLS verificado',
-  'code.policy.cap': 'lee hasta {size}',
-  'code.policy.added': 'HTTiny agrega: {headers}',
 
   // ── Tree row actions ─────────────────────────────────────────────────────────
   'tree.actions': 'Acciones para {name}',

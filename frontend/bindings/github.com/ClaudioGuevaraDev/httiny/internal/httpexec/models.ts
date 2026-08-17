@@ -158,14 +158,19 @@ export interface WireHeader {
 }
 
 /**
- * WirePolicy is what the client does that no request line shows — and what a generated
- * snippet has to opt into by hand to behave like this app does. Every field is read
- * from the constants Send uses, never restated as a literal.
+ * WirePolicy is what a generated snippet has to opt into by hand to behave like this app
+ * does. Every field is read from the constants Send uses, never restated as a literal,
+ * and every field has a reader in frontend/src/snippets.
+ * 
+ * It carried four more, printed as a caption under the snippet, and all four are gone
+ * with it. `http2` and `verifyTls` were literal `true`s — a field with only one possible
+ * value describes nothing. `maxBodyBytes` and `maxTextBytes` are real limits, but they
+ * are limits on the *response*, which is not what a code view is looking at; the response
+ * panel says so where it actually bites.
  */
 export interface WirePolicy {
     "timeoutMs": number;
     "maxRedirects": number;
-    "http2": boolean;
 
     /**
      * Whether the transport will negotiate and transparently undo gzip. False as soon
@@ -173,9 +178,6 @@ export interface WirePolicy {
      * transparent — see decompress.
      */
     "gzip": boolean;
-    "verifyTls": boolean;
-    "maxBodyBytes": number;
-    "maxTextBytes": number;
 }
 
 /**

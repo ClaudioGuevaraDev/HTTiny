@@ -3408,9 +3408,9 @@
    * The height is fixed on purpose: a dialog that resized itself as the language picker
    * changed would jump under the pointer. So the only question is the number, and the
    * arithmetic behind it is — at the default 13px code font a line is ~21px, and the
-   * toolbar plus the policy line take ~87px, so 600px leaves room for about
-   * twenty-four lines. That is every target for an ordinary request except Go, which
-   * runs to twenty-six and scrolls.
+   * toolbar takes 33px, so 600px leaves room for about twenty-six lines. That is every
+   * target for an ordinary request, Go's twenty-six included; the policy strip that used
+   * to sit under the code cost the last two of them.
    *
    * Adjust here and nowhere else. The `vh` term is only a floor for a short window —
    * `min` takes whichever is smaller, so at 900px of window height the px cap always
@@ -3418,13 +3418,13 @@
   .code-dialog {
     /* Read by `editorTheme.ts`, so the code area is painted with the dialog's own plate
      * instead of the panes' `--color-surface-1`. Without it the editor was a darker
-     * rectangle inside a lighter modal, with the toolbar and the policy line a third
-     * shade again — three surfaces stacked for no reason. The 1px borders separate the
-     * bands now, which is the app's rule anyway: colour reinforces, it never carries the
-     * meaning alone. */
+     * rectangle inside a lighter modal, with the chrome around it a third shade again —
+     * three surfaces stacked for no reason. The 1px border separates the bands now,
+     * which is the app's rule anyway: colour reinforces, it never carries the meaning
+     * alone. */
     --editor-surface: var(--color-surface-2);
     width: min(840px, calc(94vw / var(--zoom, 1)));
-    height: min(calc(80vh / var(--zoom, 1)), 600px);
+    height: min(calc(80vh / var(--zoom, 1)), 550px);
     margin: auto;
     padding: 0;
     border: 1px solid var(--color-border-strong);
@@ -3435,13 +3435,13 @@
     overflow: hidden;
   }
 
-  /* Rows rather than a fixed height per part: the toolbar and the policy line size
-   * themselves and the editor takes what is left, which is what keeps a fourteen-line
-   * snippet and a two-line one in the same frame. */
+  /* Rows rather than a fixed height per part: the toolbar sizes itself and the editor
+   * takes what is left, which is what keeps a fourteen-line snippet and a two-line one
+   * in the same frame. */
   .code-shell {
     height: 100%;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .code-toolbar {
@@ -3508,26 +3508,6 @@
 
   .code-body .cm-editor {
     height: 100%;
-  }
-
-  /* Facts about the client, not about the snippet — hence the muted treatment and the
-   * position under the code rather than in the toolbar. */
-  .code-policy {
-    padding: 8px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    border-top: 1px solid var(--color-border-subtle);
-    color: var(--color-text-subtle);
-    font-size: var(--text-2xs);
-  }
-
-  .code-policy p {
-    margin: 0;
-  }
-
-  .code-policy-added {
-    color: var(--color-text-faint);
   }
 
   /* ── Text selection ────────────────────────────────────────────────────── */

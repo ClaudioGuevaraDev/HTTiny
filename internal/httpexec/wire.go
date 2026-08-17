@@ -25,20 +25,22 @@ type WireHeader struct {
 	Source string `json:"source"`
 }
 
-// WirePolicy is what the client does that no request line shows — and what a generated
-// snippet has to opt into by hand to behave like this app does. Every field is read
-// from the constants Send uses, never restated as a literal.
+// WirePolicy is what a generated snippet has to opt into by hand to behave like this app
+// does. Every field is read from the constants Send uses, never restated as a literal,
+// and every field has a reader in frontend/src/snippets.
+//
+// It carried four more, printed as a caption under the snippet, and all four are gone
+// with it. `http2` and `verifyTls` were literal `true`s — a field with only one possible
+// value describes nothing. `maxBodyBytes` and `maxTextBytes` are real limits, but they
+// are limits on the *response*, which is not what a code view is looking at; the response
+// panel says so where it actually bites.
 type WirePolicy struct {
-	TimeoutMs    int  `json:"timeoutMs"`
-	MaxRedirects int  `json:"maxRedirects"`
-	HTTP2        bool `json:"http2"`
+	TimeoutMs    int `json:"timeoutMs"`
+	MaxRedirects int `json:"maxRedirects"`
 	// Whether the transport will negotiate and transparently undo gzip. False as soon
 	// as the user sets Accept-Encoding by hand, which is exactly when it stops being
 	// transparent — see decompress.
-	Gzip         bool `json:"gzip"`
-	VerifyTLS    bool `json:"verifyTls"`
-	MaxBodyBytes int  `json:"maxBodyBytes"`
-	MaxTextBytes int  `json:"maxTextBytes"`
+	Gzip bool `json:"gzip"`
 }
 
 // WireRequest is the request as it will leave this process.
@@ -120,11 +122,7 @@ func (s *HTTPService) Wire(req Request) WireResult {
 			Policy: WirePolicy{
 				TimeoutMs:    int(timeoutFor(req).Milliseconds()),
 				MaxRedirects: maxRedirects,
-				HTTP2:        true,
 				Gzip:         gzip,
-				VerifyTLS:    true,
-				MaxBodyBytes: maxBodyBytes,
-				MaxTextBytes: maxTextBytes,
 			},
 		},
 	}

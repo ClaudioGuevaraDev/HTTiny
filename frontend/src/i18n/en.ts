@@ -288,16 +288,6 @@ export const en = {
   'code.redact.off': 'Secrets shown',
   'code.redact.on': 'Secrets hidden',
   'code.redact.desc': 'Replace tokens, passwords and API keys with an environment variable, so the snippet is safe to paste into a ticket.',
-  // Facts about the client, read from Go's own constants rather than written here.
-  // Joined with a middot at the render site, so each one is a fragment and not a
-  // sentence — which is also why none of them ends in a full stop.
-  'code.policy.timeout': '{seconds}s timeout',
-  'code.policy.redirects': 'up to {limit} redirects',
-  'code.policy.gzip': 'gzip negotiated',
-  'code.policy.http2': 'HTTP/2 offered',
-  'code.policy.tls': 'TLS verified',
-  'code.policy.cap': 'reads up to {size}',
-  'code.policy.added': 'HTTiny adds: {headers}',
 
   // ── Tree row actions ─────────────────────────────────────────────────────────
   // The aria/title pair differs on purpose: the accessible name takes the bare name,
