@@ -156,8 +156,13 @@ interface AppState {
   settingsOpen: boolean
 
   /**
-   * The code view. `codeOpen` is ephemeral like the other modals; the two choices inside
-   * it are preferences and are persisted.
+   * The code view. `codeOpen` is ephemeral like the other modals, and so is
+   * `redactSecrets`: only the chosen language is a preference worth remembering.
+   *
+   * `redactSecrets` is deliberately **not** persisted, so it is off at every launch and the
+   * snippet shows the real token — which is the whole point of copying one. It used to be
+   * stored, which meant flipping it once quietly changed what every future session showed;
+   * a control that rewrites a credential should not be able to stay on behind your back.
    *
    * The generated snippet is in neither place. It is derived from the request and from
    * `Wire`'s answer, both of which can change on any keystroke, so holding it would mean

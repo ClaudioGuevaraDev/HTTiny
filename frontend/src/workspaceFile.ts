@@ -81,11 +81,6 @@ export interface PrefsFile {
   defaultBodyLanguage: BodyLanguage | null
   /** Which language the code view was last showing. */
   codeTarget: SnippetTarget
-  /**
-   * Whether the code view masks credentials. A preference and not a secret — the values
-   * it hides never reach this file, and neither does any generated snippet.
-   */
-  redactSecrets: boolean
 }
 
 /**
@@ -158,7 +153,6 @@ export const toPrefsFile = (state: {
   codeFontSize: number
   defaultBodyLanguage: BodyLanguage | null
   codeTarget: SnippetTarget
-  redactSecrets: boolean
 }): PrefsFile => ({
   tabs: state.tabs,
   activeId: state.activeId,
@@ -179,7 +173,6 @@ export const toPrefsFile = (state: {
   codeFontSize: state.codeFontSize,
   defaultBodyLanguage: state.defaultBodyLanguage,
   codeTarget: state.codeTarget,
-  redactSecrets: state.redactSecrets,
 })
 
 // ── Reading ────────────────────────────────────────────────────────────────────
@@ -406,7 +399,6 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
     // which is not one of the allowed values.
     defaultBodyLanguage: BODY_LANGUAGES.find(candidate => candidate === raw.defaultBodyLanguage) ?? null,
     codeTarget: oneOf(raw.codeTarget, SNIPPET_TARGET_IDS, DEFAULT_SNIPPET_TARGET),
-    redactSecrets: bool(raw.redactSecrets, false),
   }
 }
 

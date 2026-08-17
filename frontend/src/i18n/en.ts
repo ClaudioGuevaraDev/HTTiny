@@ -283,7 +283,10 @@ export const en = {
   'code.copied.live': 'Copied to clipboard',
   'code.copyFailed.live': 'Could not copy — clipboard access was denied',
   'code.close': 'Close code view',
-  'code.redact.label': 'Hide secrets',
+  // Labelled by state rather than by action, and paired with an icon, so "is it on?"
+  // never rests on telling one accent colour from a grey border.
+  'code.redact.off': 'Secrets shown',
+  'code.redact.on': 'Secrets hidden',
   'code.redact.desc': 'Replace tokens, passwords and API keys with an environment variable, so the snippet is safe to paste into a ticket.',
   // Facts about the client, read from Go's own constants rather than written here.
   // Joined with a middot at the render site, so each one is a fragment and not a

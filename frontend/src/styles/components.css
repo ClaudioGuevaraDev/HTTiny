@@ -3479,6 +3479,10 @@
   .code-redact {
     height: var(--h-control-sm);
     padding: 0 9px;
+    /* Icon plus label, so it needs to be a row rather than a bare text button. */
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: none;

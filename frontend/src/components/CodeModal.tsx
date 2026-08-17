@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
-import { Check, Code2, Copy, X } from 'lucide-react'
+import { Check, Code2, Copy, Eye, EyeOff, X } from 'lucide-react'
 import { httinyTheme } from '../editorTheme'
 import { errorCopy } from '../errors'
 import { formatBytes } from '../format'
@@ -81,8 +81,15 @@ function CodeBody({ onDismiss }: { onDismiss: () => void }) {
           options={SNIPPET_TARGETS.map(entry => ({ value: entry.id, label: entry.label }))}
           onChange={setCodeTarget}
         />
-        {/* A switch rather than a checkbox, and the same construction as the settings rows:
-            a `<button role="switch">` carrying an `.on` class. */}
+        {/* A `<button role="switch">` with an `.on` class, the construction the settings
+            rows use — but labelled by *state* rather than by action, and carrying an icon
+            that changes with it.
+
+            It used to read "Hide secrets" in both positions, which left the accent colour
+            as the only difference between showing a live token and showing a placeholder.
+            The footer's rule applies here more than anywhere: colour reinforces, it never
+            carries the meaning alone. The eye is the absolute indicator; `aria-checked`
+            says the same thing to a screen reader. */}
         <button
           type="button"
           className={`code-redact ${redact ? 'on' : ''}`}
@@ -91,7 +98,8 @@ function CodeBody({ onDismiss }: { onDismiss: () => void }) {
           title={t('code.redact.desc')}
           onClick={() => setRedactSecrets(!redact)}
         >
-          {t('code.redact.label')}
+          {redact ? <EyeOff size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
+          {t(redact ? 'code.redact.on' : 'code.redact.off')}
         </button>
         <button
           type="button"
