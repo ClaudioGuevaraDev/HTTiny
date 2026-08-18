@@ -35,6 +35,29 @@
     background: var(--color-surface-4);
   }
 
+  /* Four controls carry `.active` and none of them had a style. Wrap and Hex looked lit
+   * only because `.response-tabs button.active` reached into the row and lent them the
+   * tablist's selected-tab underline — so toggling one read as a tab losing its
+   * selection, and the marker hopped between them. The search bar's case-sensitive and
+   * regexp pair, outside that row, showed nothing at all.
+   *
+   * A plate rather than an underline, because these are toggles and not tabs, in the
+   * accent `.tree-row.selected` and `.select-option[data-active='true']` already use for
+   * "this is the one that is on". Declared after `:hover` and before `:disabled`, which
+   * is the order the three need: on beats hover, and unavailable dims whatever is under
+   * it. */
+  .icon-btn.active {
+    background: var(--color-surface-accent);
+    color: var(--color-accent);
+  }
+
+  /* The rule above hides `.icon-btn:hover`'s grey plate, so hover has to be restated or
+   * a toggle that is on would stop answering the pointer. */
+  .icon-btn.active:hover {
+    background: color-mix(in oklab, var(--color-accent) 18%, var(--color-surface-accent));
+    color: var(--color-accent-hover);
+  }
+
   /* Controls that draw their own 1px border, focused *on* that border rather than
    * around it. Pulling the ring in by exactly its own width makes it land on the
    * border instead of outside it, so the control reads as one green-edged box.
@@ -76,6 +99,13 @@
   .icon-btn:disabled:hover {
     color: var(--color-text-subtle);
     background: transparent;
+  }
+
+  /* The rule above cancels the hover plate with a blanket `transparent`, which would take
+   * the on-state with it — and an unavailable toggle still has to say whether it is on.
+   * The dimming is `opacity`, so the plate goes with it and nothing here re-lights. */
+  .icon-btn.active:disabled:hover {
+    background: var(--color-surface-accent);
   }
 
   /* Destructive icon buttons stay neutral at rest — a row of icons all shouting is a
@@ -958,7 +988,7 @@
   }
 
   .panel-tabs button,
-  .response-tabs button {
+  .response-tablist button {
     min-width: 65px;
     padding: 0 9px;
     border: 0;
@@ -974,18 +1004,18 @@
   }
 
   .panel-tabs button:hover,
-  .response-tabs button:hover {
+  .response-tablist button:hover {
     color: var(--color-text);
   }
 
   .panel-tabs button.active,
-  .response-tabs button.active {
+  .response-tablist button.active {
     color: var(--color-text-strong);
     border-color: var(--color-accent);
   }
 
   .panel-tabs button span,
-  .response-tabs button span {
+  .response-tablist button span {
     margin-left: 5px;
     padding: 1px 4px;
     border-radius: var(--radius-lg);
@@ -1394,29 +1424,6 @@
     display: flex;
     align-items: center;
     gap: 6px;
-  }
-
-  /* `.response-tabs button` gives every button in this row a 65px floor and an
-   * underline slot for the selected-tab indicator. Neither belongs on a segment. */
-  .body-controls .segmented button {
-    min-width: 0;
-    border-bottom: 0;
-  }
-
-  /* The language picker's trigger is a button in this row too, so it needs the same
-   * escape — plus one the segments do not: `.response-tabs button span` turns any span
-   * inside one of these buttons into a count badge, and the trigger's value is a span. */
-  .body-controls .select-trigger {
-    min-width: 0;
-  }
-
-  .body-controls .select-trigger span {
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-    background: none;
-    color: inherit;
-    font-size: inherit;
   }
 
   .body-controls .segmented button:disabled {
@@ -3988,7 +3995,7 @@
   }
 
   .panel-tabs button,
-  .response-tabs button {
+  .response-tablist button {
     transition:
       color var(--duration-fast) var(--ease-standard),
       border-color var(--duration-fast) var(--ease-standard);

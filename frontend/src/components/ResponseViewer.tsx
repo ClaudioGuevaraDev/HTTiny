@@ -281,9 +281,6 @@ export function ResponseViewer() {
   // at *this* payload, not a preference.
   const [hexFor, setHexFor] = useState<string | null>(null)
   const hex = hexFor !== null && hexFor === activeId
-  // A view preference rather than a per-request one, like the theme: whether long lines
-  // wrap is about the width of the panel you are looking at, not about the endpoint.
-  const [wrap, setWrap] = useState(true)
 
   // Hooks cannot sit inside the success branch, so the inputs are read defensively and
   // the memo runs against an empty body the rest of the time — which costs nothing.
@@ -344,11 +341,6 @@ export function ResponseViewer() {
       : response.state === 'success' && response.encoding !== ''
         ? t('response.save.transcoded', { charset: response.encoding })
         : t('response.save.title')
-
-  // Whether lines are actually wrapping, which is not the same as whether the preference
-  // is set: a hex dump has fixed-width rows and wraps nothing. The distinction is what
-  // keeps the wrap toggle and the hex toggle from being lit at the same time.
-  const wrapping = wrap && !hex
 
   // ── Search ────────────────────────────────────────────────────────────────────
   //
@@ -630,46 +622,44 @@ export function ResponseViewer() {
                     keyboard event — and that panel could not reach the headers tab and
                     ignored the theme. `ResponseSearchBar` replaces both, and Ctrl+F now
                     answers from anywhere in the window. */}
+                {/* These two are one two-way switch, not two independent toggles: wrapped
+                    text and a hex dump are two ways of looking at the same bytes, so
+                    exactly one of them is lit and pressing the lit one does nothing.
+                    "Neither" was never a state worth reaching — it left the row with no
+                    mark on it at all — and "both" read as two views being on at once. */}
                 <button
                   type="button"
-                  /* Reads "are the lines wrapping", not "is the setting stored". Nothing
-                     wraps in a hex dump, so this draws unpressed there — otherwise it and
-                     the hex toggle are both lit at once and the row looks like two views
-                     are on, `active` meaning "this setting is applied" on one button and
-                     "this view is showing" on the next. */
-                  className={wrapping ? 'icon-btn xs active' : 'icon-btn xs'}
-                  disabled={!editorReachable}
-                  aria-pressed={wrapping}
+                  className={hex ? 'icon-btn' : 'icon-btn active'}
+                  /* Never dead while the hex view is showing: this is the way back out of
+                     it, whatever the payload is. Off in the hex view it would be a dead
+                     end for every body CodeMirror does not take — an image, a PDF, a JSON
+                     tree — which is the trap the hex toggle itself used to be. */
+                  disabled={!editorReachable && !hex}
+                  aria-pressed={!hex}
                   aria-label={t('response.wrap.aria')}
-                  title={editorReachable ? t('response.wrap.title') : t('response.wrap.unavailable')}
-                  onClick={() => {
-                    // From the hex view this is a request — "show me the text, wrapped" —
-                    // rather than a toggle. Toggling would flip a value the button is not
-                    // currently displaying, so pressing a control that looks off would turn
-                    // wrapping off, which is the opposite of what pressing it asks for.
-                    if (hex) {
-                      leaveHex()
-                      setWrap(true)
-                      return
-                    }
-                    setWrap(current => !current)
-                  }}
+                  title={editorReachable || hex ? t('response.wrap.title') : t('response.wrap.unavailable')}
+                  /* `leaveHex` alone is the no-op when this is already the one showing:
+                     `setHexFor(null)` against a state that is already null, which React
+                     bails out of without a render. */
+                  onClick={leaveHex}
                 >
-                  <WrapText size={13} aria-hidden="true" />
+                  <WrapText size={15} aria-hidden="true" />
                 </button>
                 {/* Offered for every payload, not just the ones nothing else can show:
                     "what are the first sixteen bytes" is a fair question of a JSON body
                     that will not parse, and of a PNG that renders as nothing. */}
                 <button
                   type="button"
-                  className={hex ? 'icon-btn xs active' : 'icon-btn xs'}
+                  className={hex ? 'icon-btn active' : 'icon-btn'}
                   disabled={!hasPayload}
                   aria-pressed={hex}
                   aria-label={t('response.hex.toggle.aria')}
                   title={hasPayload ? t('response.hex.toggle.title') : t('response.hex.toggle.unavailable')}
-                  onClick={() => setHexFor(hex ? null : activeId)}
+                  /* Also a no-op when it is the one showing: `setHexFor` writes the same id
+                     back. Leaving is the other button's job. */
+                  onClick={() => setHexFor(activeId)}
                 >
-                  <Binary size={13} aria-hidden="true" />
+                  <Binary size={15} aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -699,7 +689,11 @@ export function ResponseViewer() {
                 text={bodyText}
                 formatFailed={formatFailed}
                 hex={hex}
-                wrap={wrap}
+                /* Always: the text view is now one half of a two-way switch rather than a
+                   setting with an off position, so there is no unwrapped text view left to
+                   ask for. `BodyPanel` still takes the prop — it passes `false` for NDJSON,
+                   whose lines are records and are meant to be counted. */
+                wrap
                 match={search.open && onBody ? (bodyMatches[current] ?? null) : null}
               />
             ) : responsePanel === 'timeline' ? (
