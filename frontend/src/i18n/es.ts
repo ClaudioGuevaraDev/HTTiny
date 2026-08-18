@@ -135,7 +135,6 @@ export const es: Catalog = {
   'response.region': 'Respuesta',
   'response.metric.time': 'Tiempo',
   'response.metric.size': 'Tamaño',
-  'response.metric.headers': 'Cabeceras',
   'response.metric.elapsed': 'Transcurrido',
   'response.metric.code': 'Código',
   'response.pill.sending': 'Enviando…',

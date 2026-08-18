@@ -149,7 +149,6 @@ export const en = {
   'response.region': 'Response',
   'response.metric.time': 'Time',
   'response.metric.size': 'Size',
-  'response.metric.headers': 'Headers',
   'response.metric.elapsed': 'Elapsed',
   'response.metric.code': 'Code',
   'response.pill.sending': 'Sending…',

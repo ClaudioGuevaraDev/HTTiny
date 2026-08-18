@@ -30,7 +30,6 @@ export function ResponseStatus({ response, elapsed, children }: { response: Resp
           <>
             <Metric label={t('response.metric.time')} value={formatDuration(response.time, locale)} />
             <Metric label={t('response.metric.size')} value={formatBytes(response.sizeBytes, locale)} />
-            <Metric label={t('response.metric.headers')} value={String(response.headers.length)} />
           </>
         )}
         {response.state === 'loading' && <Metric label={t('response.metric.elapsed')} value={formatDuration(elapsed, locale)} />}
