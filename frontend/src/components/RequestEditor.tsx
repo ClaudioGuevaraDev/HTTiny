@@ -1,40 +1,17 @@
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { Check, Code2, FileX2, Plus, Search, Send, Square, Trash2 } from 'lucide-react'
-import { httinyTheme } from '../editorTheme'
+import { Code2, Search, Send, Square } from 'lucide-react'
 import type { MessageKey } from '../i18n'
 import { useT } from '../language'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
-import { DEFAULT_REQUEST_PANEL, methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
+import { DEFAULT_REQUEST_PANEL, freshRow, methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
 import type { KeyValueRow, RequestDocument } from '../types'
-import { requestBodyEditorId, requestTabId } from '../domIds'
+import { requestTabId } from '../domIds'
 import { useRovingFocus } from '../useRovingFocus'
+import { KeyValueGrid } from './KeyValueGrid'
 import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction } from './Placeholder'
 import { Select } from './Select'
-
-const freshRow = (): KeyValueRow => ({ id: crypto.randomUUID(), enabled: true, key: '', value: '', description: '' })
-
-type Field = 'key' | 'value' | 'description'
-
-const FIELD_LABEL = {
-  key: 'editor.kv.key',
-  value: 'editor.kv.value',
-  description: 'editor.kv.description',
-} as const satisfies Record<Field, MessageKey>
-
-/**
- * Deliberately generic rather than worked examples. The example-pattern rule is for
- * single-purpose fields whose format is not obvious — the URL and the bearer token get
- * one. In a repeating grid any example is arbitrary, and it repeats down every empty
- * row, where two greyed "page…" cells read as duplicated data rather than as a hint.
- */
-const PLACEHOLDER = {
-  key: 'editor.kv.keyPlaceholder',
-  value: 'editor.kv.valuePlaceholder',
-  description: 'editor.kv.descriptionPlaceholder',
-} as const satisfies Record<Field, MessageKey>
+import { BodyEditor } from './request/BodyEditor'
 
 type AuthType = RequestDocument['auth']['type']
 
@@ -70,132 +47,27 @@ const PANEL_LABEL = {
 /** Two roots, not one: the count renders under Params (m.) and Headers (f.), and Spanish agrees. */
 const PANEL_COUNT = { params: 'editor.panel.paramsEnabled', headers: 'editor.panel.headersEnabled' } as const
 
-function KeyValueEditor({ request, field }: { request: RequestDocument; field: 'params' | 'headers' }) {
-  const { t } = useT()
+/**
+ * Params and Headers, over the shared grid.
+ *
+ * The one thing these two do that the URL-encoded body does not is keep the URL in step:
+ * editing a param row rewrites the query string through `replaceQuery`. That is why the
+ * grid takes a commit callback rather than a field name — the callback is where the
+ * difference lives.
+ */
+function RequestRows({ request, field }: { request: RequestDocument; field: 'params' | 'headers' }) {
   const setRows = useAppStore(s => s.setRows)
   const updateDocument = useAppStore(s => s.updateDocument)
-  const rows = request[field]
-  const commit = (next: KeyValueRow[]) => {
-    setRows(request.id, field, next)
-    if (field === 'params') updateDocument(request.id, { url: replaceQuery(request.url, next) })
-  }
   return (
-    <div className="kv-wrap">
-      <div className="kv-header">
-        <span />
-        {/* Sentence case in the catalogue; `.kv-header` does the uppercasing, so a
-            Spanish accent is never lost to a hand-typed capital. */}
-        <span>{t('editor.kv.key')}</span>
-        <span>{t('editor.kv.value')}</span>
-        <span>{t('editor.kv.description')}</span>
-        <span />
-      </div>
-      {rows.map(row => (
-        <div className="kv-row" key={row.id}>
-          <button
-            type="button"
-            className={`row-check ${row.enabled ? 'on' : ''}`}
-            role="switch"
-            aria-checked={row.enabled}
-            aria-label={row.key ? t('editor.kv.enableNamed', { name: row.key }) : t('editor.kv.enableRow')}
-            onClick={() => commit(rows.map(r => (r.id === row.id ? { ...r, enabled: !r.enabled } : r)))}
-          >
-            {row.enabled && <Check size={11} aria-hidden="true" />}
-          </button>
-          {(['key', 'value', 'description'] as const).map(key => (
-            <input
-              key={key}
-              className="technical-input"
-              value={row[key]}
-              name={`${field}-${key}`}
-              aria-label={t(FIELD_LABEL[key])}
-              placeholder={t(PLACEHOLDER[key])}
-              // Header names and values are code tokens, not prose: a password manager
-              // offering to fill them, or a red squiggle under `X-Api-Key`, is noise.
-              autoComplete="off"
-              spellCheck={key === 'description'}
-              onChange={e => commit(rows.map(r => (r.id === row.id ? { ...r, [key]: e.target.value } : r)))}
-            />
-          ))}
-          <button
-            type="button"
-            className="icon-btn xs row-delete"
-            aria-label={t('editor.kv.deleteRow')}
-            onClick={() => commit(rows.filter(r => r.id !== row.id))}
-          >
-            <Trash2 size={13} aria-hidden="true" />
-          </button>
-        </div>
-      ))}
-      <button type="button" className="add-row" onClick={() => commit([...rows, freshRow()])}>
-        <Plus size={13} aria-hidden="true" />
-        {/* One whole message per field rather than "Add" plus a noun: the article and
-            the gender travel with the noun in Spanish. */}
-        {field === 'params' ? t('editor.kv.addParam') : t('editor.kv.addHeader')}
-      </button>
-    </div>
-  )
-}
-
-function BodyEditor({ request }: { request: RequestDocument }) {
-  const { t } = useT()
-  const updateDocument = useAppStore(s => s.updateDocument)
-  const onSegmentKeyDown = useRovingFocus('[role="radio"]')
-  const setBody = (patch: Partial<RequestDocument['body']>) => updateDocument(request.id, { body: { ...request.body, ...patch } })
-  return (
-    <div className="body-editor">
-      <div className="editor-toolbar">
-        {/* A radiogroup rather than a tablist: these pick what the body *is*, they do not
-            switch between panels. Arrow keys move within it, per the ARIA radio pattern. */}
-        <div className="segmented" role="radiogroup" aria-label={t('editor.body.type')} onKeyDown={onSegmentKeyDown}>
-          {(['none', 'json', 'text'] as const).map(type => (
-            <button
-              type="button"
-              key={type}
-              role="radio"
-              aria-checked={request.body.type === type}
-              tabIndex={request.body.type === type ? 0 : -1}
-              className={request.body.type === type ? 'active' : ''}
-              onClick={() => setBody({ type })}
-            >
-              {type === 'none' ? t('editor.body.none') : type.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        {request.body.type === 'json' && (
-          <button
-            type="button"
-            className="text-action"
-            onClick={() => {
-              try {
-                setBody({ content: JSON.stringify(JSON.parse(request.body.content), null, 2) })
-              } catch {
-                /* Leave malformed JSON alone rather than destroying what was typed. */
-              }
-            }}
-          >
-            {t('editor.body.formatJson')}
-          </button>
-        )}
-      </div>
-      {request.body.type === 'none' ? (
-        <Placeholder icon={<FileX2 size={20} />} title={t('editor.body.emptyTitle')} description={t('editor.body.emptyDesc')} />
-      ) : (
-        <CodeMirror
-          /* Marks this editor for `useGlobalShortcuts`, which otherwise sends Ctrl+F to
-             the response viewer's find bar. This one keeps CodeMirror's own search
-             panel — searching the body you are editing is its own thing. */
-          id={requestBodyEditorId}
-          value={request.body.content}
-          height="100%"
-          theme={httinyTheme}
-          extensions={request.body.type === 'json' ? [json()] : []}
-          onChange={content => setBody({ content })}
-          basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: true }}
-          aria-label={t('editor.body.aria', { type: request.body.type.toUpperCase() })}
-        />
-      )}
-    </div>
+    <KeyValueGrid
+      rows={request[field]}
+      name={field}
+      addLabel={field === 'params' ? 'editor.kv.addParam' : 'editor.kv.addHeader'}
+      onChange={next => {
+        setRows(request.id, field, next)
+        if (field === 'params') updateDocument(request.id, { url: replaceQuery(request.url, next) })
+      }}
+    />
   )
 }
 
@@ -472,8 +344,8 @@ export function RequestEditor() {
         })}
       </div>
       <div className="request-panel" id="request-panel" role="tabpanel" aria-labelledby={`request-panel-tab-${requestPanel}`} tabIndex={-1}>
-        {requestPanel === 'params' && <KeyValueEditor request={request} field="params" />}
-        {requestPanel === 'headers' && <KeyValueEditor request={request} field="headers" />}
+        {requestPanel === 'params' && <RequestRows request={request} field="params" />}
+        {requestPanel === 'headers' && <RequestRows request={request} field="headers" />}
         {requestPanel === 'body' && <BodyEditor request={request} />}
         {requestPanel === 'auth' && <AuthEditor request={request} />}
       </div>

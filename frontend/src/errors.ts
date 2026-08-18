@@ -11,7 +11,20 @@ import type { RedirectHop } from './types'
  * switch of language retranslate a failure that is already on screen. `ResponseSnapshot`
  * keeps the code and the raw diagnostic; the prose lives here.
  */
-const KNOWN = ['INVALID_URL', 'TIMEOUT', 'DNS_ERROR', 'CONNECTION_REFUSED', 'TLS_ERROR', 'TOO_MANY_REDIRECTS', 'NETWORK_ERROR', 'BACKEND_UNAVAILABLE'] as const
+const KNOWN = [
+  'INVALID_URL',
+  'TIMEOUT',
+  'DNS_ERROR',
+  'CONNECTION_REFUSED',
+  'TLS_ERROR',
+  'TOO_MANY_REDIRECTS',
+  'NETWORK_ERROR',
+  'BACKEND_UNAVAILABLE',
+  // The two ways a body made of files fails before a socket is ever opened. Both come
+  // out of `resolveBody`, so both can reach the code view as well as the response pane.
+  'FILE_UNREADABLE',
+  'BODY_TOO_LARGE',
+] as const
 
 type KnownCode = (typeof KNOWN)[number]
 
@@ -31,7 +44,10 @@ const DEV_COMMAND = 'wails3 task dev'
  * is listening on that host and port" cannot — and because the value of a diagnostic is
  * that it can be pasted into a search box verbatim.
  */
-const PROSE_CODES = new Set<string>(['INVALID_URL', 'TOO_MANY_REDIRECTS'])
+const PROSE_CODES = new Set<string>(['INVALID_URL', 'TOO_MANY_REDIRECTS', 'BODY_TOO_LARGE'])
+
+/** Mirrors maxUploadBytes in internal/httpexec — only ever used to word the copy. */
+export const MAX_UPLOAD_MB = 64
 
 export function errorCopy(t: Translate, code: string, diagnostic = ''): { title: string; detail: string } {
   if (!isKnown(code)) return { title: t('error.UNKNOWN.title'), detail: diagnostic || t('error.UNKNOWN.detail') }
@@ -41,7 +57,9 @@ export function errorCopy(t: Translate, code: string, diagnostic = ''): { title:
       ? t('error.TOO_MANY_REDIRECTS.detail', { limit: MAX_REDIRECTS })
       : code === 'BACKEND_UNAVAILABLE'
         ? t('error.BACKEND_UNAVAILABLE.detail', { command: DEV_COMMAND })
-        : t(`error.${code}.detail`)
+        : code === 'BODY_TOO_LARGE'
+          ? t('error.BODY_TOO_LARGE.detail', { limit: MAX_UPLOAD_MB })
+          : t(`error.${code}.detail`)
 
   return { title: t(`error.${code}.title`), detail: PROSE_CODES.has(code) ? curated : diagnostic || curated }
 }

@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -35,6 +36,12 @@ const (
 	codeTooManyRedirects  = "TOO_MANY_REDIRECTS"
 	codeNetwork           = "NETWORK_ERROR"
 	codeCancelled         = "CANCELLED"
+	// The two failures a body made of files can have before a socket is ever opened.
+	// FILE_UNREADABLE is the likely one rather than the exotic one: a workspace holds
+	// a path, and the file it names can be moved, renamed or deleted between one
+	// session and the next.
+	codeFileUnreadable = "FILE_UNREADABLE"
+	codeBodyTooLarge   = "BODY_TOO_LARGE"
 )
 
 const (
@@ -49,7 +56,13 @@ const (
 	// Text above this is truncated rather than shipped across the binding and into a
 	// CodeMirror document. The response viewer reports the truncation.
 	maxTextBytes = 5 << 20 // 5 MiB
-	maxRedirects = 10
+	// The ceiling on the body this app *sends*, which is a different question from the
+	// two above: those bound what an unknown server can push at us, this one bounds
+	// what the user deliberately attached. It exists because the outgoing body is
+	// assembled in memory rather than streamed — see resolveBody for why that is the
+	// right trade — so an attachment is held whole for the length of the request.
+	maxUploadBytes = 64 << 20 // 64 MiB
+	maxRedirects   = 10
 	// Only used when the request does not carry its own timeout.
 	defaultTimeout = 30 * time.Second
 	// Deliberately unversioned: AGENTS.md requires every manifest carrying the app
@@ -75,20 +88,49 @@ type Auth struct {
 	Password string `json:"password"`
 }
 
+// FormPart is one part of a multipart/form-data body.
+//
+// A file part carries a Path and never its bytes. That is the whole shape of the
+// feature: the webview cannot read a path out of an <input type="file"> and base64
+// across the binding was rejected for response bodies for reasons that apply just as
+// well going out, so the document holds a path, the native dialog produces it, and
+// this process is the only one that ever opens the file. See body.go.
+type FormPart struct {
+	Kind  string `json:"kind"` // text | file
+	Name  string `json:"name"`
+	Value string `json:"value"` // text parts
+	Path  string `json:"path"`  // file parts, absolute
+	// Overrides the part's Content-Type. Empty means "derive it": from the extension
+	// for a file part, and omitted entirely for a text one.
+	ContentType string `json:"contentType"`
+}
+
+// FileBody is a whole request body read from one file — the `binary` body type.
+type FileBody struct {
+	Path        string `json:"path"`
+	ContentType string `json:"contentType"`
+}
+
 // Request mirrors the frontend's RequestDocument minus everything the network does
 // not care about. `params` is deliberately absent: store.replaceQuery keeps the
 // query string inside `url`, so sending the rows as well would double-encode them.
 type Request struct {
 	// Identifies the request whose bytes are being held, so a byte-backed response
 	// can be found again on the asset route. It is the frontend's request id, and it
-	// is only ever used as a map key — see bodystore.go.
+	// is only ever used as a map key — see bodystore.go. It is also what seeds the
+	// multipart boundary, which is why that boundary is stable across calls.
 	ID       string     `json:"id"`
 	Method   string     `json:"method"`
 	URL      string     `json:"url"`
 	Headers  []KeyValue `json:"headers"`
-	BodyType string     `json:"bodyType"` // none | json | text
-	Body     string     `json:"body"`
-	Auth     Auth       `json:"auth"`
+	BodyType string     `json:"bodyType"` // none | json | text | form | urlencoded | binary
+	// The payload for the `json` and `text` types. The other three carry theirs in
+	// one of the three fields below, and exactly one of them is read — see resolveBody.
+	Body       string     `json:"body"`
+	Form       []FormPart `json:"form"`       // form
+	Urlencoded []KeyValue `json:"urlencoded"` // urlencoded
+	File       FileBody   `json:"file"`       // binary
+	Auth       Auth       `json:"auth"`
 	// Overrides the default timeout when positive.
 	TimeoutMs int `json:"timeoutMs"`
 }
@@ -183,11 +225,12 @@ func newTransport() http.RoundTripper {
 func (s *HTTPService) Send(ctx context.Context, req Request) Result {
 	// Every field of the outgoing request is resolved in buildRequest, which the code
 	// view reads back through Wire. Nothing about the wire format is decided here.
-	httpReq, err := buildRequest(ctx, req)
+	httpReq, err := buildRequest(ctx, req, true)
 	if err != nil {
 		// The only failure with no chain to report: nothing has been sent yet, and the
-		// tracer below does not exist.
-		return failure(codeInvalidURL, err.Error(), nil)
+		// tracer below does not exist. The code comes off the error rather than being
+		// assumed to be INVALID_URL, which is what it used to be for every cause.
+		return failure(codeOf(err), err.Error(), nil)
 	}
 
 	// Timed around the response read, not just the round trip: a response is not
@@ -361,19 +404,33 @@ func applyHeaders(req *http.Request, rows []KeyValue) {
 	}
 }
 
-// applyBodyDefaults supplies a Content-Type only when the user has not, so typing
-// an explicit header still wins. Without this, a JSON body is sent with no content
-// type at all and most servers reject it.
-func applyBodyDefaults(req *http.Request, request Request) {
-	if req.Body == nil || req.Header.Get("Content-Type") != "" {
+// applyContentType supplies a Content-Type only when the user has not, so typing an
+// explicit header still wins. Without this, a JSON body is sent with no content type
+// at all and most servers reject it.
+//
+// Multipart is the one exception to "the typed header wins", and it is not a matter
+// of taste: the boundary in the header has to be the boundary in the body. A hand
+// typed `multipart/form-data` keeps its media type and any other parameters, but its
+// boundary is replaced with ours. A typed header that is not multipart at all — or
+// does not parse — loses outright, because there is no reading of it that produces a
+// request a server can parse.
+func applyContentType(req *http.Request, spec bodySpec) {
+	if spec.kind == kindNone || spec.contentType == "" {
 		return
 	}
-	switch request.BodyType {
-	case "json":
-		req.Header.Set("Content-Type", "application/json")
-	case "text":
-		req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+	typed := req.Header.Get("Content-Type")
+	if spec.boundary == "" {
+		if typed == "" {
+			req.Header.Set("Content-Type", spec.contentType)
+		}
+		return
 	}
+	if media, params, err := mime.ParseMediaType(typed); err == nil && strings.HasPrefix(media, "multipart/") {
+		params["boundary"] = spec.boundary
+		req.Header.Set("Content-Type", mime.FormatMediaType(media, params))
+		return
+	}
+	req.Header.Set("Content-Type", spec.contentType)
 }
 
 func applyAuth(req *http.Request, auth Auth) {

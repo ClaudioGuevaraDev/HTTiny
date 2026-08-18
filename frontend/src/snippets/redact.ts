@@ -41,13 +41,26 @@ const SECRET_HEADERS: Record<string, string> = {
  * placeholder concept in all thirteen generators, to make a *redacted* snippet runnable —
  * which is not what it is for.
  *
- * The body is deliberately untouched. A password can appear in a JSON payload, but
- * finding it would mean guessing at the shape of someone else's schema.
+ * A **text part of a form** is masked against the same list, for the reason the list
+ * covers `api-key` typed into the headers grid and not only `auth.token`: a credential
+ * posted as a form field is the same credential. Names are matched with underscores
+ * folded to hyphens, because `api_key` is how the same field is spelled in a form.
+ *
+ * A file part is not touched. Its value is a path, and a path is not a secret — it is
+ * what the request is, and a snippet that redacted it would not run.
+ *
+ * The textual body is deliberately untouched too. A password can appear in a JSON
+ * payload, but finding it would mean guessing at the shape of someone else's schema.
  */
 export const redactWire = (wire: Wire): Wire => ({
   ...wire,
   headers: wire.headers.map(header => {
     const variable = SECRET_HEADERS[header.key.toLowerCase()]
     return variable ? { ...header, value: `$${variable}` } : header
+  }),
+  parts: wire.parts.map(part => {
+    if (part.kind === 'file') return part
+    const variable = SECRET_HEADERS[part.name.toLowerCase().split('_').join('-')]
+    return variable ? { ...part, value: `$${variable}` } : part
   }),
 })

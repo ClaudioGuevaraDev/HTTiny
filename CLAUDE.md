@@ -86,6 +86,75 @@ The store starts genuinely empty (`tree: []`, `documents: {}`, `activeId: null`)
 
 `ResponseSnapshot` is a discriminated union on `state` (`idle | loading | error | success`) — branch on it exhaustively rather than checking for optional fields. Cancellation lives in `requestRunner`'s `AbortController` registry, and the global Escape shortcut is handled in `useGlobalShortcuts.ts`.
 
+### Request bodies
+
+Six types — `none json text form urlencoded binary` — declared as `BodyType` in `types.ts`,
+mirrored by the `switch` in `resolveBody` (`internal/httpexec/body.go`) and by `BODY_TYPES` in
+`workspaceFile.ts`. Three lists that have to agree, the same hazard `TEXT_FORMATS` has against
+`byteBacked`. The document keeps all four payload fields (`content`, `form`, `urlencoded`,
+`file`) whatever the type says, so switching type and back returns what was there — which is
+what `content` has always done between json and text. `urlencoded` uses `KeyValueRow` rather
+than `FormRow` deliberately: it is the params grid pointed at the body and cannot carry a
+file, so sharing one array with `form` would only raise the question of what a file row means
+in a body with no way to send one.
+
+**An attachment is a path, never bytes.** A webview cannot read a filesystem path out of an
+`<input type="file">` at all, so the file chooser is `HTTPService.PickFiles` in
+`internal/httpexec/pick.go` — the `SaveBody` pattern, including the rule that an empty result
+means cancelled whatever `err` says, because Windows reports a dismissed dialog as an error.
+The path goes into `workspace.json` in the clear and the contents never do: a path is what the
+request *is*, it has to survive a restart, and it is what a snippet would print anyway, so the
+file stays as safe to copy as `auth` makes it. The editor never stores a name or a size beside
+the path — those come from `StatFiles` on each render (`useAttachments`), which is also what
+lets the grid mark a missing attachment in red *before* a send fails.
+
+**`resolveBody` and `materialise` are two steps, and that split is load-bearing.** `useWire`
+re-asks `Wire` on every keystroke while the code view is open; if resolving a body read its
+files, typing one character with a 48 MiB attachment would re-read 48 MiB. So `resolveBody`
+does `os.Stat` and nothing else — enough for the Content-Type, the boundary, the part list and
+the length — and `buildRequest(ctx, req, materialised)` takes `false` from `Wire` and `true`
+from `Send`. `hasBody` is gone with it: all three of its callers now hold a `bodySpec`.
+
+**The body is assembled in memory, not streamed.** `http.NewRequest` recognises a
+`*bytes.Reader` and fills in both `ContentLength` and `GetBody`; `GetBody` is what replays the
+body across a 307/308, and `Send` follows up to ten of them, so a pipe would turn every
+redirected upload into a silent truncation. A known length also keeps the request off
+`Transfer-Encoding: chunked`, which a fair number of upload endpoints refuse. The cost is
+holding the attachment, and `maxUploadBytes` (64 MiB) is what bounds it — a third cap, and a
+different question from `maxBodyBytes`/`maxTextBytes`, which bound what comes *in*.
+`multipartLength` predicts the envelope exactly so an oversized form is refused before
+anything is read; it mirrors `writePart` line for line and the only thing keeping the two
+honest is that they sit together.
+
+**The multipart boundary is derived from the request id**, not invented per writer. A random
+one would change on every keystroke and make the `Content-Type` header and the Raw HTTP view
+rewrite their own boundary as you type — the complaint `wireHeaders` already documents about
+lines that reshuffle themselves. It is also what lets `raw.ts` reconstruct the envelope and be
+right. Parts are written with `CreatePart` and an explicit `textproto.MIMEHeader`, because
+`CreateFormFile` hard-codes `application/octet-stream` and offers no way to set a per-part
+type — which is exactly what an API that validates an upload reads.
+
+`applyBodyDefaults` is now `applyContentType`, and multipart is its one exception to "a typed
+header wins": the boundary in the header has to be the boundary in the body, so a hand-typed
+`multipart/…` keeps its media type and loses its boundary to ours, and a typed header that is
+not multipart at all loses outright. `buildRequest`'s errors are coded now (`codedError` /
+`codeOf`) instead of every failure reaching the frontend as `INVALID_URL`; `FILE_UNREADABLE`
+and `BODY_TOO_LARGE` both have copy in `errors.ts`.
+
+**Twelve of the fourteen snippet targets must *not* be given the resolved `Content-Type`.**
+`curl -F`, `FormData`, `requests(files=)`, `MultipartFormDataContent` and every other form
+builder invents its own boundary, so pinning ours means the server looks for a boundary that
+appears nowhere in the body and finds no parts — hence `snippetHeaders` withholds it and
+`allSnippetHeaders` is what the two exceptions use: `raw`, which claims to be the bytes, and
+`java`, whose JDK client has no form builder and assembles the envelope around that exact
+boundary. `urlencoded` reaches the generators as an already-encoded string in `wire.body`, so
+it cost them nothing. Three more findings from running the output: curl's `-F` reads a value
+starting with `@` or `<` as a filename, so a text part uses `--form-string` (and falls back to
+`-F` only when it carries a type, which `--form-string` cannot express); a file's path is
+double-quoted *inside* the `-F` argument because curl splits on `;` and `=`; and wget cannot
+send multipart at all, so that target prints why instead of a command that would post the
+field names as text.
+
 ### Response formats
 
 `format` is decided in Go (`internal/httpexec/classify.go`) and splits into two families, declared as `TEXT_FORMATS` and `BYTE_FORMATS` in `types.ts` and mirrored by the `byteBacked` map in Go. **Which family a format is in decides everything downstream**, so the two lists disagreeing is the bug to watch for:
@@ -331,8 +400,9 @@ duplicate drafts. Linux must be `ubuntu-24.04` (GTK4/WebKitGTK 6.0), the AppImag
 
 - Skills live in `.agents/skills/` (the real directories, tracked in git); `.claude/skills/*` are relative symlinks into them, and `skills-lock.json` records each upstream source. Add or edit skills under `.agents/skills/`, then symlink them: `ln -s ../../.agents/skills/<name> .claude/skills/<name>`. A skill without that symlink is invisible to Claude Code and cannot be invoked — that is how `conventional-commit` was unreachable despite AGENTS.md depending on it.
 - Manual error-state testing now needs real endpoints, since nothing is simulated. One URL per code: `http://localhost:9/` → `CONNECTION_REFUSED`, `https://nope.invalid/` → `DNS_ERROR`, `https://expired.badssl.com/` → `TLS_ERROR`, `https://httpbin.org/delay/10` with a low timeout → `TIMEOUT`, `ftp://x` or an empty URL → `INVALID_URL`. Copy for each code lives in `errorCopy` (`frontend/src/errors.ts`); a code Go emits without an entry there degrades to the generic fallback rather than breaking.
+- Manual body testing needs a real endpoint and a real file. `https://httpbin.org/post` echoes `form` and `files` separately, which is what checks a multipart request part by part; the same URL with a URL-encoded body puts the fields in `form` and leaves `data` empty, and `PUT /put` with a `binary` body puts the bytes in `data` with the derived `Content-Type` in `headers`. `FILE_UNREADABLE` is produced by attaching a file and then deleting it — the grid marks the row before the send does. And the snippets are verified the way the four findings in `snippets/` were found: by running them. curl on both shells, `python requests` and `node fetch` against `/post`, comparing the echoed `files`/`form` with what the app got.
 - Manual format testing needs real endpoints too, and there is no substitute for actually looking at them. One URL per family: `https://httpbin.org/image/png` · `/image/webp` · `/image/svg` · `/html` · `/xml` · `/gzip` · `/brotli` · `/robots.txt` · `/status/204`, plus `https://www.w3.org/TR/PNG/iso_8859-1.txt` for a non-UTF-8 charset, any public `.pdf`, and a `.woff2` from a font CDN. The gzip-by-hand case needs `Accept-Encoding: gzip` typed into the headers grid. Under `pnpm run dev` in a plain browser every send fails with `BACKEND_UNAVAILABLE` and the byte route does not exist at all — use `wails3 task dev`.
-- Two caps in `internal/httpexec`, and they are different things. `maxBodyBytes` (32 MiB) is how much of any response is read at all — media has to clear a far higher bar than text, and the cap has to apply before the format is known, because a response with no `Content-Type` is classified by sniffing bytes we already hold. `maxTextBytes` (5 MiB) is what a textual body is trimmed to before it crosses the binding into a CodeMirror document. `truncated` covers either, and when it is set `sizeBytes` reports the server's figure rather than what is on screen.
+- Three caps in `internal/httpexec`, and they are different things. Two bound what comes *in*; `maxUploadBytes` (64 MiB) bounds what goes *out*, and is documented under Request bodies above. `maxBodyBytes` (32 MiB) is how much of any response is read at all — media has to clear a far higher bar than text, and the cap has to apply before the format is known, because a response with no `Content-Type` is classified by sniffing bytes we already hold. `maxTextBytes` (5 MiB) is what a textual body is trimmed to before it crosses the binding into a CodeMirror document. `truncated` covers either, and when it is set `sizeBytes` reports the server's figure rather than what is on screen.
 - Byte-backed bodies still never cross the binding — base64 would inflate them by a third, hold them twice and give up Range requests. They go over the asset route instead; see "The byte route" above.
 - `trimPartialRune` exists because slicing at a fixed byte offset lands mid-rune on any body with non-ASCII text, `utf8.Valid` then failed, and a large but perfectly valid JSON response was reported as `binary` with an empty body. The truncation itself caused the downgrade. Do not remove it.
 - Non-UTF-8 charsets are transcoded via `golang.org/x/text` and reported in `encoding`. Before that, a plain `text/html; charset=ISO-8859-1` page with accents failed the UTF-8 veto and was shown as binary.

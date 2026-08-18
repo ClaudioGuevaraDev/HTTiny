@@ -1,5 +1,6 @@
 import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import type { WireResult } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
+import { toBodyDTO } from './requestDTO'
 import { fromResult, snippetFor } from './snippets'
 import type { RequestDocument } from './types'
 
@@ -21,8 +22,7 @@ export const wireFor = (request: RequestDocument): Promise<WireResult> =>
     // Rows are an editor model: the enable checkbox and the blank trailing row are there
     // so the grid is editable, and neither belongs on the wire.
     headers: request.headers.filter(row => row.enabled && row.key.trim()).map(row => ({ key: row.key.trim(), value: row.value })),
-    bodyType: request.body.type,
-    body: request.body.content,
+    ...toBodyDTO(request.body),
     auth: request.auth,
     timeoutMs: 0,
   })

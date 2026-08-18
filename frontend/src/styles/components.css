@@ -1188,6 +1188,178 @@
     border-color: var(--color-border-control);
   }
 
+  /* Two buttons where the other grids have one, so they share a row rather than
+   * stacking — "add a field" and "add a file" are the same decision, taken twice. */
+  .add-row-group {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .add-row-group .add-row + .add-row {
+    margin-left: 0;
+  }
+
+  /* ── Form-data grid ────────────────────────────────────────────────────── */
+  /* Six columns instead of five, and the extra one is the part type rather than a
+   * wider field: a row has to say what it *is* before anything else about it makes
+   * sense. The last column is CONTENT-TYPE, which is what this grid spends its
+   * optional column on — see FormGrid for why it is not a description. */
+  .form-grid .kv-header,
+  .form-grid .kv-row {
+    grid-template-columns: var(--h-control-xs) 92px minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 1fr) var(--h-control-xs);
+  }
+
+  @container (max-width: 560px) {
+    /* The nth-child rules above hide column 4, which here is the value — exactly the
+     * wrong one. Reinstated, and the Content-Type column dropped instead. */
+    .form-grid .kv-header > :nth-child(4),
+    .form-grid .kv-row > :nth-child(4) {
+      display: revert;
+    }
+
+    .form-grid .kv-header > :nth-child(5),
+    .form-grid .kv-row > :nth-child(5) {
+      display: none;
+    }
+
+    .form-grid .kv-header,
+    .form-grid .kv-row {
+      grid-template-columns: var(--h-control-xs) 92px minmax(0, 1fr) minmax(0, 1.3fr) var(--h-control-xs);
+    }
+  }
+
+  /* `.select` is `display: contents`, so the trigger *is* the grid cell. The `inline`
+   * variant already brings the right look — 24px, no fill, mono at 11px — and what is
+   * left is to make it fill its cell like every other control in the row rather than
+   * float at its own natural size inside one. */
+  .form-grid .kv-row .select-trigger[data-variant='inline'] {
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0 6px 0 9px;
+    border: 0;
+    /* Shapes the inset focus ring, as `.technical-input` does — this cell paints no box
+     * of its own either, and a positive `outline-offset` would be clipped by the
+     * scrolling panel around it. */
+    border-radius: var(--radius-xs);
+  }
+
+  .form-grid .kv-row .select-trigger:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 var(--focus-ring-width) var(--color-focus);
+  }
+
+  /* ── Attached file ─────────────────────────────────────────────────────── */
+  /* The whole chip is the control: clicking it reopens the chooser. There is one thing
+   * to do to an attachment other than removing it, and a grid cell has no room for a
+   * label and a button both. */
+  .file-chip {
+    width: 100%;
+    height: 100%;
+    padding: 0 9px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .file-chip:hover {
+    color: var(--color-accent-hover);
+  }
+
+  .file-chip:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 var(--focus-ring-width) var(--color-focus);
+  }
+
+  .file-chip.empty {
+    color: var(--color-text-faint);
+  }
+
+  .file-chip.missing,
+  .file-chip.missing:hover {
+    color: var(--color-danger);
+  }
+
+  /* The name is what gets cut when the cell is narrow; the size never is, because a
+   * truncated byte count is worse than none. */
+  .file-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-chip-meta {
+    flex: none;
+    margin-left: auto;
+    color: var(--color-text-faint);
+    font-size: var(--text-2xs);
+  }
+
+  .file-chip.missing .file-chip-meta {
+    color: inherit;
+  }
+
+  /* ── Binary body ───────────────────────────────────────────────────────── */
+  .binary-body {
+    max-width: 610px;
+    padding: 18px;
+    display: grid;
+    gap: 15px;
+  }
+
+  /* `.placeholder` centres itself with `flex: 1` and `justify-content: center`, which
+   * needs a flex parent that fills the panel — neither of which the padded grid above
+   * is. So the empty state drops the grid entirely rather than trying to centre a child
+   * inside a 610px track pinned to the left. */
+  .binary-body.empty {
+    max-width: none;
+    height: 100%;
+    padding: 0;
+    display: flex;
+  }
+
+  .binary-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--h-row-kv);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-sm);
+    padding-right: 6px;
+  }
+
+  .binary-type {
+    display: grid;
+    gap: 6px;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+
+  .binary-type input {
+    height: var(--h-control-md);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-3);
+  }
+
+  /* The placeholder's own actions row lays the chip out as a button rather than as a
+   * grid cell, so it needs a box of its own. */
+  .placeholder-actions .file-chip {
+    width: auto;
+    height: var(--h-control-md);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-3);
+  }
+
   /* ── Body editor ───────────────────────────────────────────────────────── */
   .body-editor {
     height: 100%;
@@ -1196,15 +1368,19 @@
   }
 
   .editor-toolbar {
-    height: var(--h-panel-tabs);
+    min-height: var(--h-panel-tabs);
     padding: 0 9px;
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
+  /* Six members now rather than three, which is more than fits a narrow editor at the
+   * old padding. Wrapping keeps every option reachable instead of clipping the last
+   * two, and the toolbar grows a row rather than a scrollbar. */
   .segmented {
     display: flex;
+    flex-wrap: wrap;
     gap: 2px;
   }
 

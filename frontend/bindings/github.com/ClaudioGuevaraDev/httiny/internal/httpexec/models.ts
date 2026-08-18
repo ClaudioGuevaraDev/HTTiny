@@ -36,6 +36,63 @@ export interface Auth {
 }
 
 /**
+ * FileBody is a whole request body read from one file — the `binary` body type.
+ */
+export interface FileBody {
+    "path": string;
+    "contentType": string;
+}
+
+/**
+ * FileStat is what the editor needs to draw an attachment it did not just choose.
+ * 
+ * The document stores a path and nothing else — a name and a size copied into it
+ * would be a second, staler answer the moment the file changed on disk — so the grid
+ * asks for these each time it renders a set of paths. Exists is the interesting one:
+ * it is what puts a missing attachment in front of the user before they send, rather
+ * than after.
+ */
+export interface FileStat {
+    "path": string;
+    "name": string;
+    "exists": boolean;
+    "size": number;
+}
+
+/**
+ * FormPart is one part of a multipart/form-data body.
+ * 
+ * A file part carries a Path and never its bytes. That is the whole shape of the
+ * feature: the webview cannot read a path out of an <input type="file"> and base64
+ * across the binding was rejected for response bodies for reasons that apply just as
+ * well going out, so the document holds a path, the native dialog produces it, and
+ * this process is the only one that ever opens the file. See body.go.
+ */
+export interface FormPart {
+    /**
+     * text | file
+     */
+    "kind": string;
+    "name": string;
+
+    /**
+     * text parts
+     */
+    "value": string;
+
+    /**
+     * file parts, absolute
+     */
+    "path": string;
+
+    /**
+     * Overrides the part's Content-Type. Empty means "derive it": from the extension
+     * for a file part, and omitted entirely for a text one.
+     */
+    "contentType": string;
+}
+
+/**
  * Hop is one redirect that was followed. The chain is otherwise invisible: the app
  * follows redirects silently and only reports where it ended up.
  */
@@ -88,6 +145,37 @@ export interface Phase {
 }
 
 /**
+ * PickRequest asks for the native file chooser.
+ */
+export interface PickRequest {
+    /**
+     * The dialog's title. It comes from the frontend because it is translated copy and
+     * the catalogue lives there; Go has no way to read it.
+     */
+    "title": string;
+
+    /**
+     * Whether several files can be chosen at once. The form grid's "add file" button
+     * sets it — picking three files there should produce three rows — while replacing
+     * the file on an existing row does not.
+     */
+    "multiple": boolean;
+}
+
+/**
+ * PickResult reports what happened, on the same terms as SaveResult: Cancelled is its
+ * own field rather than an error code, because dismissing a file dialog is the most
+ * ordinary thing a person can do with one and the interface must not be able to render
+ * it as a failure.
+ */
+export interface PickResult {
+    "paths": string[] | null;
+    "cancelled": boolean;
+    "errorCode": string;
+    "errorText": string;
+}
+
+/**
  * Request mirrors the frontend's RequestDocument minus everything the network does
  * not care about. `params` is deliberately absent: store.replaceQuery keeps the
  * query string inside `url`, so sending the rows as well would double-encode them.
@@ -96,7 +184,8 @@ export interface Request {
     /**
      * Identifies the request whose bytes are being held, so a byte-backed response
      * can be found again on the asset route. It is the frontend's request id, and it
-     * is only ever used as a map key — see bodystore.go.
+     * is only ever used as a map key — see bodystore.go. It is also what seeds the
+     * multipart boundary, which is why that boundary is stable across calls.
      */
     "id": string;
     "method": string;
@@ -104,10 +193,30 @@ export interface Request {
     "headers": KeyValue[] | null;
 
     /**
-     * none | json | text
+     * none | json | text | form | urlencoded | binary
      */
     "bodyType": string;
+
+    /**
+     * The payload for the `json` and `text` types. The other three carry theirs in
+     * one of the three fields below, and exactly one of them is read — see resolveBody.
+     */
     "body": string;
+
+    /**
+     * form
+     */
+    "form": FormPart[] | null;
+
+    /**
+     * urlencoded
+     */
+    "urlencoded": KeyValue[] | null;
+
+    /**
+     * binary
+     */
+    "file": FileBody;
     "auth": Auth;
 
     /**
@@ -323,6 +432,16 @@ export interface Timings {
     "reused": boolean;
 }
 
+/**
+ * WireFile is the whole body for the `binary` type, on the same terms as WirePart.
+ */
+export interface WireFile {
+    "path": string;
+    "filename": string;
+    "contentType": string;
+    "size": number;
+}
+
 export interface WireHeader {
     "key": string;
     "value": string;
@@ -332,6 +451,27 @@ export interface WireHeader {
      * the real *http.Request, so a mislabelled row still reports what is actually sent.
      */
     "source": string;
+}
+
+/**
+ * WirePart is one part of a multipart body, as the code view and the snippet
+ * generators see it.
+ * 
+ * A file part reports its Path and its Size but never its bytes: the generators need
+ * the path — that is what a snippet opens — and nothing about a code view wants a
+ * megabyte of image inlined into it.
+ */
+export interface WirePart {
+    /**
+     * text | file
+     */
+    "kind": string;
+    "name": string;
+    "value": string;
+    "path": string;
+    "filename": string;
+    "contentType": string;
+    "size": number;
 }
 
 /**
@@ -387,8 +527,29 @@ export interface WireRequest {
      */
     "hostOverride": boolean;
     "headers": WireHeader[] | null;
+
+    /**
+     * The body as text. Populated for json, text and urlencoded — the last one in its
+     * already-encoded form, which is exactly what a generator would have to build
+     * anyway, and is why urlencoded costs the fourteen generators nothing. Empty for
+     * form and binary, whose payloads are not text and are described below instead.
+     */
     "body": string;
+
+    /**
+     * Which of the three shapes below to read: "" | text | form | binary. Every
+     * generator branches on this rather than on whether Body happens to be empty.
+     */
+    "bodyKind": string;
     "hasBody": boolean;
+
+    /**
+     * Multipart only. Stable across calls — it is derived from the request id — which
+     * is what stops the Raw HTTP view rewriting its own boundary as you type.
+     */
+    "boundary": string;
+    "parts": WirePart[] | null;
+    "file": WireFile;
     "policy": WirePolicy;
 }
 

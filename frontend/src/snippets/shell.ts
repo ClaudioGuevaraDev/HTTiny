@@ -1,5 +1,5 @@
 import { posix, powershell, windowsArg } from './quote'
-import { bodyOf, seconds, snippetHeaders, type Wire } from './types'
+import { bodyOf, fileOf, isTextBody, partsOf, seconds, snippetHeaders, type Wire, type WirePart } from './types'
 
 /**
  * The shell targets.
@@ -51,11 +51,53 @@ const policyFlags = (wire: Wire, seconds: number): string[] => [
 ]
 
 /**
- * curl for a POSIX shell.
+ * One `-F` argument for a multipart part, as curl's own mini-language rather than as a
+ * shell string — the shell quoting is applied on top by the caller.
  *
- * `--data-raw` rather than `-d`: `-d @foo` reads a *file*, so a body that happens to
- * start with an `@` would be silently replaced by whatever that path holds. `--data-raw`
- * turns that off and sends the string.
+ * Two details, both of which decide whether the snippet runs:
+ *
+ * - A text part uses `--form-string`, not `-F`. Under `-F` a value beginning with `@`
+ *   names a *file to read* and one beginning with `<` names a file to read the value
+ *   from, so `-F 'note=@home'` would send the contents of a file called `home`, or fail.
+ *   `--form-string` turns all of that off. The exception is a text part carrying an
+ *   explicit `Content-Type`, which `--form-string` has no syntax for; there `-F` is the
+ *   only option and the `@` caveat comes back with it.
+ * - A file's path is wrapped in **double quotes inside** the argument. curl splits `-F`
+ *   on `;` and `=` to find its `type=` and `filename=` parameters, so an unquoted path
+ *   containing either would be parsed as one. curl strips the quotes itself.
+ */
+const formArg = (part: WirePart): { flag: string; value: string } => {
+  if (part.kind === 'file') {
+    const type = part.contentType ? `;type=${part.contentType}` : ''
+    return { flag: '-F', value: `${part.name}=@"${part.path}"${type}` }
+  }
+  if (part.contentType) return { flag: '-F', value: `${part.name}=${part.value};type=${part.contentType}` }
+  return { flag: '--form-string', value: `${part.name}=${part.value}` }
+}
+
+/**
+ * The body flags, for all three body shapes.
+ *
+ * `--data-raw` rather than `-d` for text: `-d @foo` reads a *file*, so a body that happens
+ * to start with an `@` would be silently replaced by whatever that path holds.
+ * `--data-raw` turns that off and sends the string. A `binary` body is the opposite case
+ * — the `@` is wanted — and `--data-binary` is what keeps curl from stripping newlines
+ * the way `-d` does.
+ */
+const bodyFlags = (wire: Wire, quote: (value: string) => string): string[] => {
+  const file = fileOf(wire)
+  if (file) return [`--data-binary ${quote(`@${file.path}`)}`]
+  const parts = partsOf(wire)
+  if (parts.length)
+    return parts.map(part => {
+      const arg = formArg(part)
+      return `${arg.flag} ${quote(arg.value)}`
+    })
+  return isTextBody(wire) ? [`--data-raw ${quote(bodyOf(wire))}`] : []
+}
+
+/**
+ * curl for a POSIX shell.
  *
  * `--compressed` stands in for the `Accept-Encoding` the transport adds. Sending the
  * header by hand instead would leave curl printing gzip bytes, which is the same trap
@@ -64,8 +106,7 @@ const policyFlags = (wire: Wire, seconds: number): string[] => [
 export const curl = (wire: Wire): string => {
   const parts = [`curl ${posix(wire.url)}`, ...methodFlag(wire)]
   for (const header of snippetHeaders(wire)) parts.push(`-H ${posix(`${header.key}: ${header.value}`)}`)
-  if (wire.hasBody) parts.push(`--data-raw ${posix(bodyOf(wire))}`)
-  parts.push(...urlFlags(wire), ...policyFlags(wire, seconds(wire)))
+  parts.push(...bodyFlags(wire, posix), ...urlFlags(wire), ...policyFlags(wire, seconds(wire)))
   return parts.join(' \\\n  ')
 }
 
@@ -81,15 +122,15 @@ export const curl = (wire: Wire): string => {
  * Every argument goes through `windowsArg` as well as `powershell`: two layers, because
  * two things parse it. PowerShell reads the single-quoted string, then hands it to a
  * native executable *without* escaping the quotes inside it — see `quote.windowsArg` for
- * what that silently does to a JSON body, and for why this is not paranoia.
+ * what that silently does to a JSON body, and for why this is not paranoia. It is also
+ * what carries a Windows path's backslashes through to curl intact.
  */
 const psArg = (value: string): string => powershell(windowsArg(value))
 
 export const curlPowerShell = (wire: Wire): string => {
   const parts = [`curl.exe ${psArg(wire.url)}`, ...methodFlag(wire)]
   for (const header of snippetHeaders(wire)) parts.push(`-H ${psArg(`${header.key}: ${header.value}`)}`)
-  if (wire.hasBody) parts.push(`--data-raw ${psArg(bodyOf(wire))}`)
-  parts.push(...urlFlags(wire), ...policyFlags(wire, seconds(wire)))
+  parts.push(...bodyFlags(wire, psArg), ...urlFlags(wire), ...policyFlags(wire, seconds(wire)))
   return parts.join(' `\n  ')
 }
 
@@ -99,14 +140,27 @@ export const curlPowerShell = (wire: Wire): string => {
  * Its headers are bare `Name:value` arguments, and a raw body arrives on stdin — hence
  * the `echo` prefix, which is also why the body is quoted for the shell and not for
  * HTTPie. `--follow` is not the default, so it is spelled out to match the app.
+ *
+ * `--form` switches it into multipart mode, where `name=value` is a field and `name@path`
+ * is a file; `;type=` after the path sets that part's content type. A `binary` body is a
+ * stdin redirect from the file, which is HTTPie's way of saying "this file *is* the body".
  */
 export const httpie = (wire: Wire): string => {
   const parts = [`http ${wire.method} ${posix(wire.url)}`]
+  const form = partsOf(wire)
+  if (form.length) parts.push('--form')
   for (const header of snippetHeaders(wire)) parts.push(posix(`${header.key}:${header.value}`))
+  for (const part of form) {
+    if (part.kind === 'file') parts.push(posix(`${part.name}@${part.path}${part.contentType ? `;type=${part.contentType}` : ''}`))
+    else parts.push(posix(`${part.name}=${part.value}`))
+  }
   if (wire.policy.maxRedirects > 0) parts.push(`--follow --max-redirects=${wire.policy.maxRedirects}`)
   parts.push(`--timeout=${seconds(wire)}`)
   const command = parts.join(' \\\n  ')
-  return wire.hasBody ? `echo ${posix(bodyOf(wire))} \\\n  | ${command}` : command
+
+  const file = fileOf(wire)
+  if (file) return `${command} \\\n  < ${posix(file.path)}`
+  return isTextBody(wire) ? `echo ${posix(bodyOf(wire))} \\\n  | ${command}` : command
 }
 
 /**
@@ -115,11 +169,26 @@ export const httpie = (wire: Wire): string => {
  * `-qO-` writes the body to stdout and drops the progress meter, which is the closest
  * thing to what the response panel shows. `--method` is what lets the same shape serve
  * every verb, and it is also what `--body-data` requires.
+ *
+ * It is the one target here that cannot express a multipart body at all: wget has no
+ * equivalent of `curl --form`, and `--body-data` sends a single flat string. Saying so is
+ * the only honest output — a wget command that posted the field names as text would run,
+ * return 200 from a lenient server, and be the wrong request.
  */
 export const wget = (wire: Wire): string => {
+  if (partsOf(wire).length) {
+    return [
+      '# wget cannot send a multipart/form-data body: it has no equivalent of',
+      "# curl's --form, and --body-data sends one flat string with no parts.",
+      '# Use the curl or HTTPie target for this request.',
+    ].join('\n')
+  }
+
   const parts = [`wget -qO- ${posix(wire.url)}`, `--method=${wire.method}`]
   for (const header of snippetHeaders(wire)) parts.push(`--header=${posix(`${header.key}: ${header.value}`)}`)
-  if (wire.hasBody) parts.push(`--body-data=${posix(bodyOf(wire))}`)
+  const file = fileOf(wire)
+  if (file) parts.push(`--body-file=${posix(file.path)}`)
+  else if (isTextBody(wire)) parts.push(`--body-data=${posix(bodyOf(wire))}`)
   parts.push(`--max-redirect=${wire.policy.maxRedirects}`, `--timeout=${seconds(wire)}`)
   return parts.join(' \\\n  ')
 }

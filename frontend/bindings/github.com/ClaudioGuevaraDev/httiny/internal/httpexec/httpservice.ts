@@ -10,6 +10,18 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * PickFiles opens the native file chooser and reports what was selected.
+ * 
+ * The dialog is opened here rather than from the frontend for the reason SaveBody
+ * documents from the other direction, and one more: a webview cannot get a filesystem
+ * path out of an <input type="file"> at all. Without this method the whole feature is
+ * bytes over the binding in base64, which is what the response side already rejected.
+ */
+export function PickFiles(req: $models.PickRequest): $CancellablePromise<$models.PickResult> {
+    return $Call.ByID(4033437997, req);
+}
+
+/**
  * Release lets the frontend drop a retained body when its tab closes or its response
  * is cleared. Nothing breaks if it is never called — the store has its own ceiling —
  * but a user who has just closed a tab has no reason to still be holding 30 MB of it.
@@ -45,6 +57,17 @@ export function SaveBody(req: $models.SaveRequest): $CancellablePromise<$models.
  */
 export function Send(req: $models.Request): $CancellablePromise<$models.Result> {
     return $Call.ByID(2288105761, req);
+}
+
+/**
+ * StatFiles reports the name, size and existence of each path, in the order given.
+ * 
+ * Deliberately tolerant: a path that cannot be stat'd comes back with Exists false
+ * rather than as an error, because that is not a failure of this call — it is the
+ * answer, and it is the one the grid renders in red.
+ */
+export function StatFiles(paths: string[] | null): $CancellablePromise<$models.FileStat[] | null> {
+    return $Call.ByID(1436664840, paths);
 }
 
 /**

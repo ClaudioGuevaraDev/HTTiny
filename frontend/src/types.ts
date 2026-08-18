@@ -35,6 +35,48 @@ export interface KeyValueRow {
   value: string
   description: string
 }
+/**
+ * What a request body *is*. Six members, and the split between them decides which of
+ * the four payload fields on `body` is read — see `RequestDocument.body`.
+ *
+ * Mirrored by the `switch` in `resolveBody` (`internal/httpexec/body.go`) and by
+ * `BODY_TYPES` in `workspaceFile.ts`; the three lists disagreeing is the bug to watch
+ * for, the same way `TEXT_FORMATS` and `byteBacked` have to agree.
+ */
+export type BodyType = 'none' | 'json' | 'text' | 'form' | 'urlencoded' | 'binary'
+/**
+ * One part of a `multipart/form-data` body.
+ *
+ * A file part carries a **path**, never bytes. That is not a shortcut: a webview cannot
+ * read a filesystem path out of an `<input type="file">`, and shipping the contents
+ * across the binding in base64 was rejected for response bodies for reasons that apply
+ * just as well going the other way. So the document holds a path, `HTTPService.PickFiles`
+ * is what produces one, and the Go process is the only thing that ever opens the file.
+ *
+ * `kind` is derived from `PART_KINDS` rather than written out beside it, for the reason
+ * `TextFormat` is derived from `TEXT_FORMATS`: the grid's picker and the file reader in
+ * `workspaceFile.ts` both walk the list, and a member added to a hand-written union but
+ * not to the list would be silently unreachable in one and unreadable in the other.
+ *
+ * There is no `description` — unlike `KeyValueRow`, whose grid has a column for one.
+ * The form grid spends that column on `contentType` instead, which is what an API that
+ * validates the type of an upload actually needs. Empty means "derive it": from the
+ * file's extension for a file part, and omitted entirely for a text one.
+ */
+export const PART_KINDS = ['text', 'file'] as const
+export type PartKind = (typeof PART_KINDS)[number]
+
+export interface FormRow {
+  id: string
+  enabled: boolean
+  kind: PartKind
+  key: string
+  /** The value, for a `text` part. Unused by a `file` one. */
+  value: string
+  /** An absolute path, for a `file` part. Unused by a `text` one. */
+  path: string
+  contentType: string
+}
 export interface RequestDocument {
   id: string
   kind: 'http'
@@ -43,7 +85,26 @@ export interface RequestDocument {
   url: string
   params: KeyValueRow[]
   headers: KeyValueRow[]
-  body: { type: 'none' | 'json' | 'text'; content: string }
+  /**
+   * Exactly one of `content`, `form`, `urlencoded` and `file` is read, and `type`
+   * decides which: `content` for json and text, `form` for form, and so on. The other
+   * three are kept rather than cleared, so switching body type and switching back
+   * returns what was there — which is what `content` has always done between json and
+   * text.
+   *
+   * `urlencoded` uses `KeyValueRow` rather than `FormRow` on purpose. It is the params
+   * grid pointed at the body: it cannot carry a file, so it needs neither `kind` nor
+   * `contentType`, and sharing one array with `form` would only raise the question of
+   * what a file row means in a body that has no way to send one.
+   */
+  body: {
+    type: BodyType
+    content: string
+    form: FormRow[]
+    urlencoded: KeyValueRow[]
+    /** The `binary` body: one file sent as the whole payload, with an optional type override. */
+    file: { path: string; contentType: string }
+  }
   /**
    * `token` and `password` are the only fields that never reach the workspace file:
    * they are written to the OS credential store and merged back in on load, so a

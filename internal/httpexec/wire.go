@@ -43,6 +43,30 @@ type WirePolicy struct {
 	Gzip bool `json:"gzip"`
 }
 
+// WirePart is one part of a multipart body, as the code view and the snippet
+// generators see it.
+//
+// A file part reports its Path and its Size but never its bytes: the generators need
+// the path — that is what a snippet opens — and nothing about a code view wants a
+// megabyte of image inlined into it.
+type WirePart struct {
+	Kind        string `json:"kind"` // text | file
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Path        string `json:"path"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"contentType"`
+	Size        int64  `json:"size"`
+}
+
+// WireFile is the whole body for the `binary` type, on the same terms as WirePart.
+type WireFile struct {
+	Path        string `json:"path"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"contentType"`
+	Size        int64  `json:"size"`
+}
+
 // WireRequest is the request as it will leave this process.
 type WireRequest struct {
 	Method string `json:"method"`
@@ -59,9 +83,21 @@ type WireRequest struct {
 	// invisible in every snippet.
 	HostOverride bool         `json:"hostOverride"`
 	Headers      []WireHeader `json:"headers"`
-	Body         string       `json:"body"`
-	HasBody      bool         `json:"hasBody"`
-	Policy       WirePolicy   `json:"policy"`
+	// The body as text. Populated for json, text and urlencoded — the last one in its
+	// already-encoded form, which is exactly what a generator would have to build
+	// anyway, and is why urlencoded costs the fourteen generators nothing. Empty for
+	// form and binary, whose payloads are not text and are described below instead.
+	Body string `json:"body"`
+	// Which of the three shapes below to read: "" | text | form | binary. Every
+	// generator branches on this rather than on whether Body happens to be empty.
+	BodyKind string `json:"bodyKind"`
+	HasBody  bool   `json:"hasBody"`
+	// Multipart only. Stable across calls — it is derived from the request id — which
+	// is what stops the Raw HTTP view rewriting its own boundary as you type.
+	Boundary string     `json:"boundary"`
+	Parts    []WirePart `json:"parts"`
+	File     WireFile   `json:"file"`
+	Policy   WirePolicy `json:"policy"`
 }
 
 // WireResult is a success/failure union for the same reason Result is one: the frontend
@@ -83,9 +119,19 @@ type WireResult struct {
 // deriving them a second time: this is the same object, produced by the same code, that
 // a Send would hand to the transport.
 func (s *HTTPService) Wire(req Request) WireResult {
-	httpReq, err := buildRequest(context.Background(), req)
+	// False: this must not read the attachments. useWire re-asks on every keystroke,
+	// and buildRequest resolves the body either way, so everything reported below —
+	// the multipart Content-Type included — is known without opening a file.
+	httpReq, err := buildRequest(context.Background(), req, false)
 	if err != nil {
-		return WireResult{ErrorCode: codeInvalidURL, ErrorText: err.Error()}
+		return WireResult{ErrorCode: codeOf(err), ErrorText: err.Error()}
+	}
+	// Resolved a second time rather than threaded out of buildRequest, which returns
+	// an *http.Request and nothing else. It is a handful of os.Stat calls, and the
+	// alternative is a second return value that only this caller reads.
+	spec, err := resolveBody(req)
+	if err != nil {
+		return WireResult{ErrorCode: codeOf(err), ErrorText: err.Error()}
 	}
 
 	// http.Request.Host wins over the URL when set, which is precisely how applyHeaders
@@ -100,7 +146,7 @@ func (s *HTTPService) Wire(req Request) WireResult {
 	override := host != httpReq.URL.Host
 
 	gzip := negotiatesGzip(httpReq)
-	headers := wireHeaders(httpReq, req)
+	headers := wireHeaders(httpReq, req, spec)
 	if gzip {
 		// Not in httpReq.Header: http.Transport adds this itself, on the way out. Leaving
 		// it out would make the view lie by omission — and would leave no explanation for
@@ -117,8 +163,12 @@ func (s *HTTPService) Wire(req Request) WireResult {
 			Host:         host,
 			HostOverride: override,
 			Headers:      headers,
-			Body:         req.Body,
-			HasBody:      hasBody(req),
+			Body:         wireBody(spec),
+			BodyKind:     spec.kind,
+			HasBody:      spec.kind != kindNone,
+			Boundary:     spec.boundary,
+			Parts:        wireParts(spec),
+			File:         wireFile(spec),
 			Policy: WirePolicy{
 				TimeoutMs:    int(timeoutFor(req).Milliseconds()),
 				MaxRedirects: maxRedirects,
@@ -141,12 +191,12 @@ func negotiatesGzip(httpReq *http.Request) bool {
 // The map has no order, so the rows are sorted by name to keep the view stable between
 // two calls describing the same request — a code snippet that reshuffles its own lines
 // on every keystroke reads as a bug.
-func wireHeaders(httpReq *http.Request, req Request) []WireHeader {
+func wireHeaders(httpReq *http.Request, req Request, spec bodySpec) []WireHeader {
 	typed := typedHeaders(req.Headers)
 	rows := make([]WireHeader, 0, len(httpReq.Header))
 	for name, values := range httpReq.Header {
 		for _, value := range values {
-			rows = append(rows, WireHeader{Key: name, Value: value, Source: sourceOf(name, typed, req)})
+			rows = append(rows, WireHeader{Key: name, Value: value, Source: sourceOf(name, typed, req, spec)})
 		}
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Key < rows[j].Key })
@@ -171,15 +221,56 @@ func typedHeaders(rows []KeyValue) map[string]bool {
 // the second resolver this whole design exists to avoid. The label is presentation, so
 // the cost of a wrong guess in some unforeseen case is a wrong caption, never a wrong
 // request.
-func sourceOf(name string, typed map[string]bool, req Request) string {
+func sourceOf(name string, typed map[string]bool, req Request, spec bodySpec) string {
 	switch {
 	case name == "Authorization" && req.Auth.Type != "" && req.Auth.Type != "none":
 		return sourceAuth
+	// Before `typed`, unlike every other rule here: a multipart Content-Type is
+	// rewritten by applyContentType even when the user typed one, because the
+	// boundary has to match the body. Attributing it to the grid would credit a row
+	// whose value is not what goes out.
+	case name == "Content-Type" && spec.boundary != "":
+		return sourceBody
 	case typed[name]:
 		return sourceRequest
-	case name == "Content-Type" && hasBody(req):
+	case name == "Content-Type" && spec.kind != kindNone:
 		return sourceBody
 	default:
 		return sourceClient
 	}
+}
+
+// wireBody is the payload as text, and empty for the two kinds that have none. The
+// generators are told to branch on HasBody and BodyKind, never on this being empty.
+func wireBody(spec bodySpec) string {
+	if spec.kind == kindText {
+		return spec.text
+	}
+	return ""
+}
+
+func wireParts(spec bodySpec) []WirePart {
+	if spec.kind != kindForm {
+		return nil
+	}
+	parts := make([]WirePart, 0, len(spec.parts))
+	for _, part := range spec.parts {
+		parts = append(parts, WirePart{
+			Kind:        part.kind,
+			Name:        part.name,
+			Value:       part.value,
+			Path:        part.path,
+			Filename:    part.filename,
+			ContentType: part.contentType,
+			Size:        part.size,
+		})
+	}
+	return parts
+}
+
+func wireFile(spec bodySpec) WireFile {
+	if spec.kind != kindBinary {
+		return WireFile{}
+	}
+	return WireFile{Path: spec.file.path, Filename: spec.file.filename, ContentType: spec.file.contentType, Size: spec.file.size}
 }

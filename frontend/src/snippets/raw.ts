@@ -1,4 +1,4 @@
-import type { Wire } from './types'
+import { fileOf, fileStandIn, partDisposition, partsOf, type Wire } from './types'
 
 /**
  * The request as HTTP/1.1 bytes.
@@ -20,8 +20,37 @@ import type { Wire } from './types'
 export const raw = (wire: Wire): string => {
   const lines = [`${wire.method} ${wire.target} HTTP/1.1`, `Host: ${wire.host}`]
   // Every header, `Accept-Encoding` included: unlike a language snippet, this claims to
-  // be the bytes, and the transport's own header is one of them.
+  // be the bytes, and the transport's own header is one of them. The multipart
+  // `Content-Type` is among them too, and its boundary is the one written below —
+  // which is only true because that boundary is derived from the request id rather than
+  // invented per call.
   for (const header of wire.headers) lines.push(`${header.key}: ${header.value}`)
   // The blank line terminates the head whether or not a body follows it.
-  return `${lines.join('\n')}\n\n${wire.hasBody ? wire.body : ''}`
+  return `${lines.join('\n')}\n\n${bodyBytes(wire)}`
+}
+
+/**
+ * The body, with a stand-in wherever a file's contents would be.
+ *
+ * A multipart envelope is reconstructed rather than fetched: the parts, their order and
+ * the boundary all come from Go, so what is drawn here is what will be written — right
+ * down to the CRLF line endings, which are what the wire uses and what `multipartLength`
+ * counts. The file bytes are the one thing deliberately not shown, because a code view
+ * with a megabyte of PNG in it is not a code view.
+ */
+const bodyBytes = (wire: Wire): string => {
+  const file = fileOf(wire)
+  if (file) return fileStandIn(file.filename, file.size)
+
+  const parts = partsOf(wire)
+  if (!parts.length) return wire.bodyKind === 'text' ? wire.body : ''
+
+  const out: string[] = []
+  for (const part of parts) {
+    out.push(`--${wire.boundary}`, `Content-Disposition: ${partDisposition(part)}`)
+    if (part.contentType) out.push(`Content-Type: ${part.contentType}`)
+    out.push('', part.kind === 'file' ? fileStandIn(part.filename, part.size) : part.value)
+  }
+  out.push(`--${wire.boundary}--`, '')
+  return out.join('\r\n')
 }

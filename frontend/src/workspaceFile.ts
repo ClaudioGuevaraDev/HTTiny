@@ -1,6 +1,7 @@
 import { BODY_LANGUAGES } from './responseBody'
 import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
-import type { BodyLanguage, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
+import { PART_KINDS } from './types'
+import type { BodyLanguage, BodyType, FormRow, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
 
 /**
  * The on-disk schema.
@@ -27,6 +28,13 @@ export const PREFS_VERSION = 1
  *
  * `auth.token` and `auth.password` are also absent by construction — they go to the
  * OS credential store, never to this file. See internal/secrets.
+ *
+ * An attachment's **path** is written here in the clear, and its **contents** never
+ * are. A path is not a credential: it is what the request is, it has to survive a
+ * restart for the request to still mean anything, and it is exactly what a snippet
+ * would print anyway. The bytes stay on disk where they already were, so this file —
+ * and its `.bak` and quarantine copies — is still safe to copy or attach to a bug
+ * report, which is the property `auth` is protecting.
  */
 interface StoredAuth {
   type: RequestDocument['auth']['type']
@@ -196,7 +204,8 @@ const clamped = (v: unknown, range: { min: number; max: number; default: number 
 const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
   typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : fallback
 
-const BODY_TYPES = ['none', 'json', 'text'] as const
+/** `satisfies` so a type with no branch in the editor cannot be listed here as readable. */
+const BODY_TYPES = ['none', 'json', 'text', 'form', 'urlencoded', 'binary'] as const satisfies readonly BodyType[]
 const AUTH_TYPES = ['none', 'bearer', 'basic'] as const
 const ORIENTATIONS = ['rows', 'columns'] as const
 const THEMES = ['system', 'light', 'dark'] as const
@@ -216,6 +225,36 @@ const readRows = (value: unknown, prefix: string): KeyValueRow[] => {
   }))
 }
 
+/**
+ * The form-data rows, on the same defensive terms as `readRows`: the id is always
+ * regenerated from the position rather than trusted, because a missing or duplicated
+ * one collides as a React key.
+ *
+ * `kind` falls back to `'text'`, which is the safe direction — a row whose kind did not
+ * survive becomes an editable field rather than a file reference to nowhere.
+ */
+const readFormRows = (value: unknown, prefix: string): FormRow[] => {
+  const rows = Array.isArray(value) ? value.filter(isRecord) : []
+  // Never a bare column header, which is the rule `parseParams` states for the params
+  // grid: there has to be somewhere to start typing. It matters more here, because every
+  // request written before form bodies existed has no rows at all.
+  if (!rows.length) return [{ id: `${prefix}-0`, enabled: true, kind: 'text', key: '', value: '', path: '', contentType: '' }]
+  return rows.map((row, index) => ({
+    id: str(row.id) || `${prefix}-${index}`,
+    enabled: bool(row.enabled, true),
+    kind: oneOf(row.kind, PART_KINDS, 'text'),
+    key: str(row.key),
+    value: str(row.value),
+    path: str(row.path),
+    contentType: str(row.contentType),
+  }))
+}
+
+const readFileBody = (value: unknown): RequestDocument['body']['file'] => {
+  const file = isRecord(value) ? value : {}
+  return { path: str(file.path), contentType: str(file.contentType) }
+}
+
 const readDocument = (value: unknown, id: string): RequestDocument | null => {
   if (!isRecord(value)) return null
   const body = isRecord(value.body) ? value.body : {}
@@ -228,7 +267,17 @@ const readDocument = (value: unknown, id: string): RequestDocument | null => {
     url: str(value.url),
     params: readRows(value.params, `${id}-p`),
     headers: readRows(value.headers, `${id}-h`),
-    body: { type: oneOf(body.type, BODY_TYPES, 'none'), content: str(body.content) },
+    // Every payload field is read whatever the type says, so a body saved as `form` and
+    // opened by a build that does not know the member still has its rows once the type
+    // is set again — the `oneOf` fallback loses the mode, and there is no reason for it
+    // to take the content with it.
+    body: {
+      type: oneOf(body.type, BODY_TYPES, 'none'),
+      content: str(body.content),
+      form: readFormRows(body.form, `${id}-f`),
+      urlencoded: readRows(body.urlencoded, `${id}-u`),
+      file: readFileBody(body.file),
+    },
     // Credentials are restored separately from the OS credential store; a
     // workspace opened on another machine simply has none.
     auth: { type: oneOf(auth.type, AUTH_TYPES, 'none'), token: '', username: str(auth.username), password: '' },

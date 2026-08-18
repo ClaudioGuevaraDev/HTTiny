@@ -254,6 +254,7 @@ interface AppState {
   setSecretsAvailable: (available: boolean) => void
   updateDocument: (id: string, patch: Partial<RequestDocument>) => void
   setRows: (id: string, key: 'params' | 'headers', rows: KeyValueRow[]) => void
+  setBody: (id: string, patch: Partial<RequestDocument['body']>) => void
   toggleNode: (nodeId: string) => void
   addNode: (type: 'collection' | 'folder' | 'request', parentId?: string, name?: string) => void
   renameNode: (nodeId: string, name: string) => void
@@ -525,6 +526,12 @@ export const useAppStore = create<AppState>(set => ({
 
   setRows: (id, key, rows) => set(s => ({ documents: { ...s.documents, [id]: { ...s.documents[id], [key]: rows } } })),
 
+  // A body is now four payload fields under one `type`, so the merge that used to sit
+  // loose inside the editor is an action. `updateDocument(id, { body: { ...body, ...patch } })`
+  // spelled out at every call site is one forgotten spread away from clearing the rows
+  // of whichever body type is not being edited.
+  setBody: (id, patch) => set(s => ({ documents: { ...s.documents, [id]: { ...s.documents[id], body: { ...s.documents[id].body, ...patch } } } })),
+
   toggleNode: nodeId => set(s => ({ tree: mapTree(s.tree, n => (n.id === nodeId && n.type !== 'request' ? { ...n, expanded: !n.expanded } : n)) })),
 
   addNode: (type, parentId, name) =>
@@ -562,7 +569,17 @@ export const useAppStore = create<AppState>(set => ({
           url: '',
           params: [{ id: `${requestId}-p`, enabled: true, key: '', value: '', description: '' }],
           headers: [{ id: `${requestId}-h`, enabled: true, key: '', value: '', description: '' }],
-          body: { type: 'none', content: '' },
+          // One blank row in each grid, for the same reason params and headers get one:
+          // there has to be somewhere to start typing. A form row starts as `text`
+          // because that is the half of it that can be filled in without a dialog; the
+          // toggle in the row turns it into a file.
+          body: {
+            type: 'none',
+            content: '',
+            form: [{ id: `${requestId}-f`, enabled: true, kind: 'text', key: '', value: '', path: '', contentType: '' }],
+            urlencoded: [{ id: `${requestId}-u`, enabled: true, key: '', value: '', description: '' }],
+            file: { path: '', contentType: '' },
+          },
           auth: { type: 'none', token: '', username: '', password: '' },
         }
         return {
@@ -748,5 +765,12 @@ export const replaceQuery = (url: string, rows: KeyValueRow[]) => {
     .join('&')
   return `${base}${query ? `?${query}` : ''}${hash}`
 }
+
+/**
+ * A blank grid row. Here rather than beside the grid that renders one, because a file
+ * that exports both a component and a helper breaks Fast Refresh for everything
+ * importing it.
+ */
+export const freshRow = (): KeyValueRow => ({ id: crypto.randomUUID(), enabled: true, key: '', value: '', description: '' })
 
 export const methodOptions: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']

@@ -3,6 +3,7 @@ import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/int
 import type { KeyValue, TLSInfo } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import { RequestFailure } from './errors'
 import { BYTE_FORMATS, TEXT_FORMATS } from './types'
+import { toBodyDTO } from './requestDTO'
 import type { KeyValueRow, RequestExecutor, ResponseFormat, TlsInfo } from './types'
 
 /**
@@ -68,8 +69,7 @@ export const goExecutor: RequestExecutor = {
         method: request.method,
         url: request.url,
         headers: toPairs(request.headers),
-        bodyType: request.body.type,
-        body: request.body.content,
+        ...toBodyDTO(request.body),
         auth: request.auth,
         timeoutMs: 0,
       }).cancelOn(signal)
