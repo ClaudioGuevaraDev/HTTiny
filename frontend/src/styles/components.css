@@ -632,6 +632,16 @@
     background: var(--color-surface-accent);
   }
 
+  /* The primitive's hover plate is `--color-surface-4`, a desaturated grey a step up the
+   * dark ladder. That is right everywhere else an `.icon-btn` renders, because everywhere
+   * else is grey — but here it would land on the selection's green and read as a hole
+   * punched out of it. So the row's own plate stays and hover is carried by colour alone,
+   * which the primitive already provides: the icon goes `--color-text-muted` →
+   * `--color-text`, and delete additionally turns `--color-danger`. */
+  .tree-row.selected .icon-btn:hover {
+    background: transparent;
+  }
+
   .tree-row:hover .tree-actions,
   .tree-row:focus-visible .tree-actions,
   .tree-row:focus-within .tree-actions {
