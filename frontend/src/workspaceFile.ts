@@ -1,7 +1,20 @@
 import { BODY_LANGUAGES } from './responseBody'
 import { CODE_FONT_SIZE, SIDEBAR_WIDTH, SPLIT_RATIO, ZOOM, methodOptions } from './store'
 import { PART_KINDS } from './types'
-import type { BodyLanguage, BodyType, FormRow, HttpMethod, KeyValueRow, Locale, RequestDocument, SplitOrientation, ThemePreference, TreeNode } from './types'
+import type {
+  BodyLanguage,
+  BodyType,
+  Environment,
+  EnvironmentVariable,
+  FormRow,
+  HttpMethod,
+  KeyValueRow,
+  Locale,
+  RequestDocument,
+  SplitOrientation,
+  ThemePreference,
+  TreeNode,
+} from './types'
 
 /**
  * The on-disk schema.
@@ -27,7 +40,9 @@ export const PREFS_VERSION = 1
  *   (see types.ts); on disk it is a field that can disagree with itself.
  *
  * `auth.token` and `auth.password` are also absent by construction — they go to the
- * OS credential store, never to this file. See internal/secrets.
+ * OS credential store, never to this file. See internal/secrets. A variable marked
+ * `secret` is the second case and works the same way: `StoredVariable` has no field to
+ * put its value in.
  *
  * An attachment's **path** is written here in the clear, and its **contents** never
  * are. A path is not a credential: it is what the request is, it has to survive a
@@ -54,9 +69,44 @@ type StoredNode =
   | { id: string; type: 'collection' | 'folder'; name: string; children: StoredNode[] }
   | { id: string; type: 'request'; requestId: string }
 
+/**
+ * A union rather than one shape with a blankable `value`, so a secret variable has
+ * nowhere to put one: writing a credential into this file is a compile error, which is
+ * the same construction `StoredAuth` uses one type up.
+ *
+ * No `id`. `readRows` already establishes that a row's id is regenerated from its
+ * position rather than trusted, so storing one is churn in a file meant to be diffed by
+ * hand — and it is why the credential-store key is built from the variable's **key**
+ * and never from its id, which would move whenever a row was inserted above it.
+ */
+type StoredVariable =
+  | { key: string; enabled: boolean; secret: false; value: string }
+  | { key: string; enabled: boolean; secret: true }
+
+interface StoredEnvironment {
+  id: string
+  name: string
+  variables: StoredVariable[]
+}
+
 export interface WorkspaceFile {
   tree: StoredNode[]
   documents: Record<string, StoredDocument>
+  environments: StoredEnvironment[]
+}
+
+/**
+ * Exactly the store fields that belong in `workspace.json`.
+ *
+ * Named rather than written inline on `toWorkspaceFile` so that `persistence.ts` can
+ * check its dirty-guard against it: that guard compares references field by field, and
+ * a field added here but forgotten there would be serialised faithfully and never
+ * written, silently and with nothing to catch it.
+ */
+export interface WorkspaceState {
+  tree: TreeNode[]
+  documents: Record<string, RequestDocument>
+  environments: Environment[]
 }
 
 export interface PrefsFile {
@@ -64,6 +114,14 @@ export interface PrefsFile {
   activeId: string | null
   selectedNodeId: string | null
   activeCollectionId: string | null
+  /**
+   * Which environment each collection's `{{variables}}` resolve against, keyed by
+   * collection id. An absent key is "no environment".
+   *
+   * The only `Record` in this file. `documents` on `WorkspaceFile` is the precedent for
+   * reading one, and `readPrefs` below follows it.
+   */
+  environmentByCollection: Record<string, string>
   recentIds: string[]
   collapsedNodeIds: string[]
   sidebarWidth: number
@@ -143,9 +201,21 @@ const toStoredDocument = (doc: RequestDocument): StoredDocument => ({
   auth: { type: doc.auth.type, username: doc.auth.username },
 })
 
-export const toWorkspaceFile = (state: { tree: TreeNode[]; documents: Record<string, RequestDocument> }): WorkspaceFile => ({
+const toStoredVariable = (variable: EnvironmentVariable): StoredVariable =>
+  variable.secret
+    ? { key: variable.key, enabled: variable.enabled, secret: true }
+    : { key: variable.key, enabled: variable.enabled, secret: false, value: variable.value }
+
+const toStoredEnvironment = (env: Environment): StoredEnvironment => ({
+  id: env.id,
+  name: env.name,
+  variables: env.variables.map(toStoredVariable),
+})
+
+export const toWorkspaceFile = (state: WorkspaceState): WorkspaceFile => ({
   tree: state.tree.map(toStoredNode),
   documents: Object.fromEntries(Object.entries(state.documents).map(([id, doc]) => [id, toStoredDocument(doc)])),
+  environments: state.environments.map(toStoredEnvironment),
 })
 
 export const toPrefsFile = (state: {
@@ -154,6 +224,7 @@ export const toPrefsFile = (state: {
   activeId: string | null
   selectedNodeId: string | null
   activeCollectionId: string | null
+  environmentByCollection: Record<string, string>
   recentIds: string[]
   sidebarWidth: number
   sidebarCollapsed: boolean
@@ -170,6 +241,7 @@ export const toPrefsFile = (state: {
   activeId: state.activeId,
   selectedNodeId: state.selectedNodeId,
   activeCollectionId: state.activeCollectionId,
+  environmentByCollection: state.environmentByCollection,
   recentIds: state.recentIds,
   collapsedNodeIds: collapsedIn(state.tree),
   sidebarWidth: state.sidebarWidth,
@@ -248,6 +320,46 @@ const readFormRows = (value: unknown, prefix: string): FormRow[] => {
     path: str(row.path),
     contentType: str(row.contentType),
   }))
+}
+
+/**
+ * An environment's variables, on the same defensive terms as `readRows`: the id is
+ * regenerated from the position rather than trusted, because a missing or duplicated
+ * one collides as a React key.
+ *
+ * A secret's value is forced empty even when the file carries one. A hand edit that put
+ * a credential into `workspace.json` must not be loaded and then written straight back
+ * out — the value comes from the credential store or from nowhere.
+ */
+const readVariables = (value: unknown, prefix: string): EnvironmentVariable[] => {
+  const rows = Array.isArray(value) ? value.filter(isRecord) : []
+  // Never a bare column header, the rule `readFormRows` above states.
+  if (!rows.length) return [{ id: `${prefix}-0`, enabled: true, key: '', value: '', secret: false }]
+  return rows.map((row, index) => {
+    const secret = bool(row.secret, false)
+    return {
+      id: str(row.id) || `${prefix}-${index}`,
+      enabled: bool(row.enabled, true),
+      key: str(row.key),
+      value: secret ? '' : str(row.value),
+      secret,
+    }
+  })
+}
+
+/** Ids have to be unique — they key the credential store — so a duplicate is dropped the way `readTree` drops one. */
+const readEnvironments = (value: unknown): Environment[] => {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const out: Environment[] = []
+  for (const raw of value) {
+    if (!isRecord(raw)) continue
+    const id = str(raw.id)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push({ id, name: str(raw.name, 'Environment'), variables: readVariables(raw.variables, `${id}-v`) })
+  }
+  return out
 }
 
 const readFileBody = (value: unknown): RequestDocument['body']['file'] => {
@@ -352,10 +464,11 @@ const adopt = (nodes: TreeNode[]): TreeNode[] => {
 export interface LoadedWorkspace {
   tree: TreeNode[]
   documents: Record<string, RequestDocument>
+  environments: Environment[]
 }
 
 export function readWorkspace(payload: unknown, collapsedNodeIds: readonly string[]): LoadedWorkspace {
-  if (!isRecord(payload)) return { tree: [], documents: {} }
+  if (!isRecord(payload)) return { tree: [], documents: {}, environments: [] }
 
   const documents: Record<string, RequestDocument> = {}
   if (isRecord(payload.documents)) {
@@ -374,10 +487,19 @@ export function readWorkspace(payload: unknown, collapsedNodeIds: readonly strin
     if (!live.has(id)) delete documents[id]
   }
 
-  return { tree, documents }
+  // Environments hang off nothing, so there is no `reachable`/`adopt` sweep to run over
+  // them. A variable with no key is kept: it is the blank editing row, and every consumer
+  // filters it out by the same `key.trim()` test the grids use.
+  return { tree, documents, environments: readEnvironments(payload.environments) }
 }
 
-export function readPrefs(payload: unknown, documents: Record<string, RequestDocument>, tree: TreeNode[]): PrefsState {
+/**
+ * `workspace` rather than the two pieces of it this used to take positionally: the
+ * cross-file validations below need a third now, and a fourth parameter would be the
+ * point at which nobody could read the call site.
+ */
+export function readPrefs(payload: unknown, workspace: LoadedWorkspace): PrefsState {
+  const { documents, tree } = workspace
   const raw = isRecord(payload) ? payload : {}
   const ids = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [])
 
@@ -403,11 +525,53 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
   const collectionIds = tree.filter(node => node.type === 'collection').map(node => node.id)
   const collectionCandidate = typeof raw.activeCollectionId === 'string' ? raw.activeCollectionId : null
 
+  const environmentIds = workspace.environments.map(env => env.id)
+
+  /**
+   * The per-collection picks, read the way `readWorkspace` reads `documents` — the only
+   * other `Record` that crosses this boundary: guard the shape, validate every entry,
+   * build a fresh object, and keep only the keys whose ids survived.
+   *
+   * Both halves of an entry are a reference, so an entry survives only if **both** ends
+   * do: a collection deleted on another machine, an environment deleted here. Nothing is
+   * promoted when one is missing, for the reason `deleteEnvironment` gives — activating
+   * an environment nobody chose would point the next request at another server's
+   * credentials. That is also why this fallback is `{}` while the one above it is
+   * `collectionIds[0]`: an empty panel on a workspace that plainly has collections is
+   * worse than a guess, and a guessed environment is worse than none.
+   */
+  const environmentByCollection: Record<string, string> = {}
+  if (isRecord(raw.environmentByCollection)) {
+    for (const [collectionId, value] of Object.entries(raw.environmentByCollection)) {
+      const environmentId = str(value)
+      if (!collectionIds.includes(collectionId) || !environmentIds.includes(environmentId)) continue
+      environmentByCollection[collectionId] = environmentId
+    }
+  }
+
+  /*
+   * The scalar this replaced, absorbed rather than dropped.
+   *
+   * Seeding *every* surviving collection with it reproduces exactly what one
+   * workspace-wide environment did, so a file written before the selection became
+   * per-collection opens where it left off.
+   *
+   * Keyed on the new field being **absent** and not merely empty: a file written by this
+   * build can legitimately carry an empty map — someone turned every collection's
+   * environment off — while still holding the old key until the next write, and an
+   * emptiness test would switch them all back on for one launch.
+   */
+  const legacyEnvironmentId = str(raw.activeEnvironmentId)
+  if (!isRecord(raw.environmentByCollection) && environmentIds.includes(legacyEnvironmentId)) {
+    for (const collectionId of collectionIds) environmentByCollection[collectionId] = legacyEnvironmentId
+  }
+
   return {
     tabs,
     activeId,
     selectedNodeId: selectedCandidate && nodeIds.has(selectedCandidate) ? selectedCandidate : null,
     activeCollectionId: collectionCandidate && collectionIds.includes(collectionCandidate) ? collectionCandidate : (collectionIds[0] ?? null),
+    environmentByCollection,
     recentIds: ids(raw.recentIds).filter(id => documents[id]).slice(0, 12),
     sidebarWidth: clamped(raw.sidebarWidth, SIDEBAR_WIDTH),
     sidebarCollapsed: bool(raw.sidebarCollapsed, false),

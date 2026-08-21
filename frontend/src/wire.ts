@@ -1,6 +1,7 @@
 import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import type { WireResult } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
-import { toBodyDTO } from './requestDTO'
+import { resolveFor, secretsFor } from './environments'
+import { toRequestDTO } from './requestDTO'
 import { fromResult, snippetFor } from './snippets'
 import type { RequestDocument } from './types'
 
@@ -14,18 +15,7 @@ import type { RequestDocument } from './types'
  * Lives outside React because two callers need it and only one of them is a component —
  * the palette's "Copy as curl" runs from a command, with nowhere to hang a hook.
  */
-export const wireFor = (request: RequestDocument): Promise<WireResult> =>
-  HTTPService.Wire({
-    id: request.id,
-    method: request.method,
-    url: request.url,
-    // Rows are an editor model: the enable checkbox and the blank trailing row are there
-    // so the grid is editable, and neither belongs on the wire.
-    headers: request.headers.filter(row => row.enabled && row.key.trim()).map(row => ({ key: row.key.trim(), value: row.value })),
-    ...toBodyDTO(request.body),
-    auth: request.auth,
-    timeoutMs: 0,
-  })
+export const wireFor = (request: RequestDocument): Promise<WireResult> => HTTPService.Wire(toRequestDTO(request, resolveFor(request.id)))
 
 /**
  * Puts one target's snippet on the clipboard without opening the code view.
@@ -41,7 +31,7 @@ export const copySnippet = async (request: RequestDocument, target: Parameters<t
   try {
     const answer = await wireFor(request)
     if (!answer.ok) return
-    await navigator.clipboard.writeText(snippetFor(target, fromResult(answer), false))
+    await navigator.clipboard.writeText(snippetFor(target, fromResult(answer), false, secretsFor(request.id)))
   } catch (error) {
     console.warn('Could not copy the request as a snippet', error)
   }

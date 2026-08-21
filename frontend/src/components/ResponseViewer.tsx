@@ -23,6 +23,7 @@ import {
   WrapText,
   X,
 } from 'lucide-react'
+import { requestUrlFieldId } from '../domIds'
 import { errorCopy } from '../errors'
 import { formatDuration } from '../format'
 import { useLocale, useT } from '../language'
@@ -514,7 +515,7 @@ export function ResponseViewer() {
               <RotateCcw size={13} aria-hidden="true" /> {t('response.error.retry')}
             </PlaceholderAction>
             {response.code === 'INVALID_URL' && (
-              <PlaceholderAction variant="secondary" onClick={() => document.getElementById('request-url')?.focus()}>
+              <PlaceholderAction variant="secondary" onClick={() => document.getElementById(requestUrlFieldId)?.focus()}>
                 {t('response.error.fixUrl')}
               </PlaceholderAction>
             )}

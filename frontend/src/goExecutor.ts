@@ -2,16 +2,10 @@ import { Call, CancelError } from '@wailsio/runtime'
 import { HTTPService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import type { KeyValue, TLSInfo } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/httpexec'
 import { RequestFailure } from './errors'
+import { resolveFor } from './environments'
+import { toRequestDTO } from './requestDTO'
 import { BYTE_FORMATS, TEXT_FORMATS } from './types'
-import { toBodyDTO } from './requestDTO'
 import type { KeyValueRow, RequestExecutor, ResponseFormat, TlsInfo } from './types'
-
-/**
- * Rows are an editor model: the checkbox and the blank trailing row exist so the
- * grid is editable, and neither belongs on the wire.
- */
-const toPairs = (rows: readonly KeyValueRow[]): KeyValue[] =>
-  rows.filter(row => row.enabled && row.key.trim()).map(row => ({ key: row.key.trim(), value: row.value }))
 
 /**
  * Response headers are display-only, but they still need React keys. The name
@@ -49,7 +43,7 @@ const toFormat = (value: string): ResponseFormat => (FORMATS.has(value) ? (value
  * timeout policy — so this module is only a translation between the editor's row
  * model and the binding's DTOs.
  *
- * `params` are deliberately not sent: `replaceQuery` keeps the query string inside
+ * `params` are deliberately not sent: `replaceQuery` (`template.ts`) keeps the query string inside
  * `url` as rows are edited, so shipping both would double-encode them.
  */
 export const goExecutor: RequestExecutor = {
@@ -61,18 +55,12 @@ export const goExecutor: RequestExecutor = {
       // `cancelOn` is the runtime's own AbortSignal bridge: it cancels the call,
       // which cancels the Go context, which aborts the socket. Aborting here is a
       // real network cancellation, not just the UI looking away.
-      result = await HTTPService.Send({
-        // Keys the bytes Go retains for a byte-backed response, so `bodyUrl` can
-        // point back at them. It is the document id, which is what `responses` and
-        // `bodyViews` are keyed by too — not the tree node id.
-        id: request.id,
-        method: request.method,
-        url: request.url,
-        headers: toPairs(request.headers),
-        ...toBodyDTO(request.body),
-        auth: request.auth,
-        timeoutMs: 0,
-      }).cancelOn(signal)
+      // The DTO is built in `requestDTO.ts` and `{{variables}}` are resolved on the
+      // way, so this and the code view cannot describe different requests. `id` in it
+      // keys the bytes Go retains for a byte-backed response, so `bodyUrl` can point
+      // back at them — the document id, which is what `responses` and `bodyViews` are
+      // keyed by too, not the tree node id.
+      result = await HTTPService.Send(toRequestDTO(request, resolveFor(request.id))).cancelOn(signal)
     } catch (error) {
       // `runRequest` discards results for an aborted controller, so a cancellation
       // just needs to stop unwinding here.

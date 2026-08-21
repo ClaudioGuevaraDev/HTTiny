@@ -36,6 +36,44 @@ export interface KeyValueRow {
   description: string
 }
 /**
+ * One variable in an environment: the key/value row plus a lock.
+ *
+ * Not `KeyValueRow`, and not an interface extending it, for the reason `FormRow` is
+ * neither: this row is persisted by its own reader and it spends a column the
+ * key/value grid does not have. The decisive part is `KeyValueGrid`'s signature —
+ * its `onChange` hands back `KeyValueRow[]`, and narrowing that to this type would
+ * take an `as`. The grid cannot be shared whichever way the type is declared, so the
+ * declaration may as well be the one that keeps a column added to `KeyValueRow` from
+ * silently landing in the workspace file's environment section.
+ *
+ * There is no `description`. A variable's key *is* its documentation, and the column
+ * it would take is spent on `secret` instead — the same trade `FormRow` makes for
+ * `contentType`.
+ *
+ * `secret` decides where the value lives, not how it is drawn: a secret's value goes
+ * to the OS credential store and is absent from `workspace.json` by construction,
+ * exactly as `auth.token` and `auth.password` are. Empty means the credential store
+ * had nothing for it — or could not be reached at all.
+ */
+export interface EnvironmentVariable {
+  id: string
+  enabled: boolean
+  key: string
+  value: string
+  secret: boolean
+}
+/**
+ * A named set of variables, workspace-global, with one active at a time.
+ *
+ * An array rather than a `Record` for the reason `tree` is one: the order is what the
+ * picker lists, and it is the user's.
+ */
+export interface Environment {
+  id: string
+  name: string
+  variables: EnvironmentVariable[]
+}
+/**
  * What a request body *is*. Six members, and the split between them decides which of
  * the four payload fields on `body` is read — see `RequestDocument.body`.
  *

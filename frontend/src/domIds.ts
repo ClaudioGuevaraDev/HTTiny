@@ -17,3 +17,14 @@ export const requestTabId = (id: string) => `request-tab-${id}`
  * the file — wiring behaviour to a CSS class is how Ctrl+Enter silently broke once.
  */
 export const requestBodyEditorId = 'request-body-editor'
+
+/**
+ * The URL field.
+ *
+ * The response pane's INVALID_URL placeholder focuses it, and the field is a CodeMirror
+ * rather than an `<input>` — the id is on the wrapper, which answers `.focus()` at
+ * `tabindex="-1"` and hands focus on to the contenteditable inside. That indirection is
+ * why this is a named contract between two files rather than a string in each, the same
+ * argument `requestBodyEditorId` makes about classes.
+ */
+export const requestUrlFieldId = 'request-url'

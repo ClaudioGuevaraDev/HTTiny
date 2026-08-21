@@ -19,6 +19,15 @@ export function useGlobalShortcuts(): void {
     const handle = (event: KeyboardEvent) => {
       const state = useAppStore.getState()
 
+      // A handler nearer the event already claimed this key. CodeMirror's keymap and
+      // `Select`'s listbox both `preventDefault` without stopping propagation, so
+      // without this an Escape that closed a completion — or a menu — would also abort
+      // the in-flight request below. That was latent while the only such key was inside
+      // the body editor's search panel; the variable completions open on every `{{`,
+      // which makes it routine. Same class of bug the Ctrl+F guard below fixes by hand,
+      // said once.
+      if (event.defaultPrevented) return
+
       if (matchesCombo(event, 'mod+k')) {
         event.preventDefault()
         if (state.paletteOpen) state.closePalette()
@@ -37,6 +46,13 @@ export function useGlobalShortcuts(): void {
         event.preventDefault()
         if (state.codeOpen) state.closeCode()
         else state.openCode()
+        return
+      }
+
+      if (matchesCombo(event, 'mod+e')) {
+        event.preventDefault()
+        if (state.environmentsOpen) state.closeEnvironments()
+        else state.openEnvironments()
         return
       }
 
@@ -70,7 +86,7 @@ export function useGlobalShortcuts(): void {
       // and not `update.state`: a postponed update stays in the store so the sidebar
       // can offer it, and testing the state alone would leave the keyboard locked out
       // for the rest of the session.
-      if (state.paletteOpen || state.settingsOpen || state.codeOpen || isUpdateModalOpen(state.update, state.updateDismissed)) return
+      if (state.paletteOpen || state.settingsOpen || state.codeOpen || state.environmentsOpen || isUpdateModalOpen(state.update, state.updateDismissed)) return
 
       const id = state.activeId
 

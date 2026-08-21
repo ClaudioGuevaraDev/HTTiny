@@ -2,6 +2,8 @@ import { useRef } from 'react'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { CommandPalette } from './components/CommandPalette'
 import { CodeModal } from './components/CodeModal'
+import { EnvironmentPicker } from './components/EnvironmentPicker'
+import { EnvironmentsModal } from './components/EnvironmentsModal'
 import { SettingsModal } from './components/SettingsModal'
 import { UpdateModal } from './components/UpdateModal'
 import { RequestEditor } from './components/RequestEditor'
@@ -94,6 +96,7 @@ export function App() {
             {collapsed ? <PanelLeftOpen size={15} aria-hidden="true" /> : <PanelLeftClose size={15} aria-hidden="true" />}
           </button>
           <RequestTabs />
+          <EnvironmentPicker />
           <WorkspaceActions />
         </div>
         <div className="editor-split" ref={splitRef} data-orientation={splitOrientation} style={splitStyle}>
@@ -115,6 +118,7 @@ export function App() {
       </main>
       <CommandPalette />
       <SettingsModal />
+      <EnvironmentsModal />
       <CodeModal />
       <UpdateModal />
     </div>

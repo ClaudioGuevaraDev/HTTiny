@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
 import { documentKeywords, flattenRequests, type Command } from './commands'
+import { applicableEnvironmentId } from './environments'
 import type { PlainMessageKey } from './i18n'
 import { useT } from './language'
 import { flushNow } from './persistence'
 import { cancelRequest, runRequest, saveResponseBody, toggleRequest } from './requestRunner'
 import { shortcuts } from './shortcuts'
-import { methodOptions, useAppStore } from './store'
+import { collectionInPlay, methodOptions, useAppStore } from './store'
 import { isByteFormat } from './types'
 import { copySnippet } from './wire'
 
@@ -27,6 +28,13 @@ export function useCommands(enabled: boolean): Command[] {
   const tabs = useAppStore(s => s.tabs)
   const recentIds = useAppStore(s => s.recentIds)
   const activeId = useAppStore(s => s.activeId)
+  const environments = useAppStore(s => s.environments)
+  const applicable = useAppStore(applicableEnvironmentId)
+  // Which collection the rows act on. Needed for the subtitle *and* as the gate: with no
+  // collections `setActiveEnvironment` is a no-op, and a palette row that does nothing is
+  // worse than an absent one — the same reason the picker is disabled there.
+  const scope = useAppStore(collectionInPlay)
+  const scopeName = useAppStore(s => (scope ? (s.tree.find(node => node.id === scope)?.name ?? '') : ''))
   const sending = useAppStore(s => (s.activeId ? s.responses[s.activeId]?.state === 'loading' : false))
 
   return useMemo(() => {
@@ -139,6 +147,45 @@ export function useCommands(enabled: boolean): Command[] {
       shortcuts.toggleSplit,
     )
     action('settings', 'command.settings.title', 'command.settings.keywords', () => useAppStore.getState().openSettings(), shortcuts.settings)
+    action(
+      'environments',
+      'command.environments.title',
+      'command.environments.keywords',
+      () => useAppStore.getState().openEnvironments(),
+      shortcuts.environments,
+    )
+
+    // One row per environment, the shape the method loop above uses — skipping the one
+    // already applying to the collection in play, and offering "no environment" only when
+    // there is one to turn off. Group `'action'` rather than a group of their own: a new
+    // `CommandGroup` means touching four other places, which the seven method rows earn
+    // and two or three environments do not, and `'action'` is what the `>` filter
+    // searches.
+    //
+    // The collection goes in the `subtitle`, which is where the navigation and request
+    // rows already put "which thing this is" — no palette row names the thing it acts on
+    // in its *title* (`command.setMethod.title` is 'Set method to {method}'), and the
+    // `action` helper takes a `PlainMessageKey`, so a slot in `command.noEnvironment.title`
+    // would break that call at compile time. It goes in `keywords` too, so typing a
+    // collection surfaces the environments you can point it at.
+    if (scope) {
+      for (const env of environments) {
+        if (env.id === applicable) continue
+        commands.push({
+          id: `env:${env.id}`,
+          group: 'action',
+          title: t('command.useEnvironment.title', { name: env.name }),
+          subtitle: scopeName,
+          keywords: `${t('command.useEnvironment.keywords', { name: env.name })} ${scopeName}`.toLowerCase(),
+          run: () => useAppStore.getState().setActiveEnvironment(env.id),
+        })
+      }
+      if (applicable) {
+        action('no-environment', 'command.noEnvironment.title', 'command.noEnvironment.keywords', () =>
+          useAppStore.getState().setActiveEnvironment(null),
+        )
+      }
+    }
     action('zoom-in', 'command.zoomIn.title', 'command.zoomIn.keywords', () => useAppStore.getState().zoomIn(), shortcuts.zoomIn)
     action('zoom-out', 'command.zoomOut.title', 'command.zoomOut.keywords', () => useAppStore.getState().zoomOut(), shortcuts.zoomOut)
     action('zoom-reset', 'command.zoomReset.title', 'command.zoomReset.keywords', () => useAppStore.getState().resetZoom(), shortcuts.zoomReset)
@@ -159,5 +206,5 @@ export function useCommands(enabled: boolean): Command[] {
     }
 
     return commands
-  }, [enabled, tree, documents, tabs, recentIds, activeId, sending, t])
+  }, [enabled, tree, documents, tabs, recentIds, activeId, environments, applicable, scope, scopeName, sending, t])
 }
