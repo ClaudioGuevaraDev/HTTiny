@@ -247,19 +247,6 @@ export async function hydrate(): Promise<void> {
       if (swept.error) console.warn('[persistence] credential store:', swept.error)
     }
 
-    /*
-     * Reveal the active request, the way every other writer of `activeId` does.
-     *
-     * `readPrefs` validates `activeId`, `selectedNodeId` and `activeCollectionId` one at
-     * a time, against the tree and the documents — each is a live id, and the three
-     * together can still disagree, because `selectCollection` moves the rail without
-     * touching the active tab and both fields are persisted. Hydration was the one
-     * writer of `activeId` that did not apply `revealPatch`, so a launch could show the
-     * rail on one collection while the active tab belonged to another, with no row
-     * selected.
-     */
-    const revealed = revealPatch(loaded.tree, layout.activeId, layout.selectedNodeId, layout.activeCollectionId)
-
     useAppStore.setState({
       documents: loaded.documents,
       // Spread, not seventeen enumerated fields — and that is a correctness measure, not
@@ -270,9 +257,9 @@ export async function hydrate(): Promise<void> {
       // launch. `PrefsState` is defined as "everything readPrefs returns is store
       // state", so a new preference now arrives by existing.
       ...layout,
-      // After `layout`, so the reveal wins over the three fields it recomputes — and it
-      // carries `tree` too, which is why that is not spread above.
-      ...revealed,
+      // `tree` is explicit rather than arriving with the reveal, which now runs after
+      // the autosave subscriber is listening — see the end of this function.
+      tree: loaded.tree,
       persistenceState: 'ready',
       secretsAvailable,
       quarantinedPath: workspace.quarantined || null,
@@ -285,6 +272,32 @@ export async function hydrate(): Promise<void> {
   }
 
   installAutosave()
+
+  /*
+   * Reveal the active request, the way every other writer of `activeId` does — and
+   * deliberately *after* `installAutosave`.
+   *
+   * `readPrefs` validates `activeId`, `selectedNodeId` and `activeCollectionId` one at a
+   * time, against the tree and the documents. Each is a live id, and the three together
+   * can still disagree: `selectCollection` moves the rail without touching the active
+   * tab, and both fields are persisted. So a launch could show the rail on one
+   * collection while the active tab belonged to another, with no row selected.
+   *
+   * Reconciling them inside the hydration `setState` fixed the screen and nothing else.
+   * `installAutosave` seeds `lastPrefs` from the state it finds, so a repair folded into
+   * the load was already the baseline and the subscriber saw no change: the file kept its
+   * contradiction until some unrelated preference happened to trigger a write, and it is
+   * why the wrong collection came back on the next launch and not the one after. Here the
+   * repair is a transition the subscriber observes, so it reaches disk. Reading the store
+   * rather than the local `loaded`/`layout` copies is the other half — there is then one
+   * tree and one `activeId` in play, the pair actually committed.
+   *
+   * Still before `createRoot`, so nothing ever paints the unreconciled state, and a
+   * workspace with no restored tab comes back from `revealPatch` unchanged and schedules
+   * no write.
+   */
+  const hydrated = useAppStore.getState()
+  useAppStore.setState(revealPatch(hydrated.tree, hydrated.activeId, hydrated.selectedNodeId, hydrated.activeCollectionId))
 
   // Best effort, not a guarantee: the IPC message is usually delivered before
   // teardown, but nothing promises the reply arrives. The 2s ceiling above is the
