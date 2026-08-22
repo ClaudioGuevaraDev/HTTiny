@@ -3,8 +3,7 @@ import type { MessageKey } from '../i18n'
 import { useT } from '../language'
 import { toggleRequest } from '../requestRunner'
 import { shortcutHint, shortcuts } from '../shortcuts'
-import { DEFAULT_REQUEST_PANEL, freshRow, methodOptions, splitUrl, useAppStore } from '../store'
-import { replaceQuery } from '../template'
+import { DEFAULT_REQUEST_PANEL, freshRow, methodOptions, replaceQuery, splitUrl, useAppStore } from '../store'
 import type { KeyValueRow, RequestDocument } from '../types'
 import { requestTabId, requestUrlFieldId } from '../domIds'
 import { useRovingFocus } from '../useRovingFocus'
@@ -12,7 +11,6 @@ import { KeyValueGrid } from './KeyValueGrid'
 import { MethodChip } from './MethodChip'
 import { Placeholder, PlaceholderAction } from './Placeholder'
 import { Select } from './Select'
-import { TemplateInput } from './TemplateInput'
 import { BodyEditor } from './request/BodyEditor'
 
 type AuthType = RequestDocument['auth']['type']
@@ -190,11 +188,7 @@ const parseParams = (url: string, existing: KeyValueRow[]): KeyValueRow[] => {
 
   // Never a bare header. The previous blank row is reused rather than replaced, so its
   // id — and anything already typed into it — survives every keystroke that leaves the
-  // query empty, instead of remounting the row's cells each time.
-  //
-  // That was a nicety while the cells were `<input>`s. Two of the three are
-  // `TemplateInput`s now, so an unstable React key would destroy and rebuild an
-  // `EditorView` on every keystroke.
+  // query empty, instead of remounting three inputs each time.
   const next = [...derived, ...kept]
   return next.length ? next : [existing.find(row => !row.key.trim()) ?? freshRow()]
 }
@@ -268,35 +262,41 @@ export function RequestEditor() {
           onChange={method => updateDocument(activeId, { method })}
         />
         {/* A stable id, so the INVALID_URL placeholder can focus this field without
-            reaching for a class selector the way Ctrl+Enter used to. It is a named
-            contract in `domIds.ts` now, because the field is a CodeMirror and the id
-            lands on a wrapper that forwards `.focus()` to the contenteditable inside.
+            reaching for a class selector the way Ctrl+Enter used to. It is `domIds`'
+            constant rather than a literal here and a literal there, the rule
+            `requestBodyEditorId` already sets for the other cross-component focus.
 
             `inputMode` but deliberately not `type="url"`: the URL is validated once, in
-            Go, and template variables such as `{{baseUrl}}/users` are here now — native
-            URL validation would reject those and would be a second, disagreeing
-            validator besides. It rides on `EditorView.contentAttributes`, since a
-            contenteditable has no `type`. `name` is gone with the `<input>`: there is no
-            `<form>` in this app and the attribute was inert. */}
-        <TemplateInput
+            Go, and native URL validation would be a second, disagreeing validator
+            besides — one that rejects the `localhost:8069` a person actually types. */}
+        <input
           id={requestUrlFieldId}
-          variant="url"
-          ariaLabel={t('editor.url')}
+          name="request-url"
+          aria-label={t('editor.url')}
+          className="url-input"
           value={request.url}
           // Re-derives the rows as you type rather than on blur, which is what
           // made a pasted query string only show up in the Params tab once
           // something else stole the focus. There is no feedback loop: the other
           // direction (editing a row rewrites the URL through `replaceQuery`)
-          // updates the store programmatically, and `TemplateInput` annotates that
-          // dispatch so it never comes back through here.
-          onChange={url => {
+          // updates the store programmatically and never fires this handler.
+          onChange={e => {
+            const url = e.target.value
             updateDocument(activeId, { url })
             useAppStore.getState().setRows(activeId, 'params', parseParams(url, request.params))
           }}
-          // The field's Enter key, which is what the Send button beside it already
-          // claims to be.
-          onSubmit={() => void toggleRequest(activeId)}
+          // Enter sends, the way it does in a browser's address bar and in every other
+          // client. Ctrl+Enter is the global one and works from anywhere; this is the
+          // one that is in the finger memory of whoever just finished typing a URL.
+          onKeyDown={e => {
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            void toggleRequest(activeId)
+          }}
           placeholder="https://api.example.com/users…"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
         />
         {/* Send sits against the field it acts on — it is that field's Enter key — and the
             code view follows as the secondary control. DOM order is tab order, so this is

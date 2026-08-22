@@ -18,9 +18,6 @@ export const shortcuts = {
   // the first is `toggleComment` in CodeMirror's default keymap, so it belongs to the body
   // editor, and the second opens the webview's element inspector.
   code: ['Ctrl', "'"],
-  // Free against CodeMirror's default keymap and against WebView2, which has no
-  // address bar for Ctrl+E to open.
-  environments: ['Ctrl', 'E'],
   // `+` rather than `=`, because that is the key the user is aiming for even though the
   // event arrives as `=` unshifted. `useGlobalShortcuts` accepts both.
   zoomIn: ['Ctrl', '+'],

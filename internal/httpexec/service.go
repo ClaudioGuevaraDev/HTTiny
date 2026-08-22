@@ -112,7 +112,7 @@ type FileBody struct {
 }
 
 // Request mirrors the frontend's RequestDocument minus everything the network does
-// not care about. `params` is deliberately absent: replaceQuery (template.ts) keeps the
+// not care about. `params` is deliberately absent: store.replaceQuery keeps the
 // query string inside `url`, so sending the rows as well would double-encode them.
 type Request struct {
 	// Identifies the request whose bytes are being held, so a byte-backed response

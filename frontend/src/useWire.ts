@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Call } from '@wailsio/runtime'
-import { environmentIdFor } from './environments'
 import { fromResult, type Wire } from './snippets'
-import { useAppStore } from './store'
 import type { RequestDocument } from './types'
 import { wireFor } from './wire'
 
@@ -22,17 +20,6 @@ export type WireState = { state: 'loading' } | { state: 'ready'; wire: Wire } | 
 
 export function useWire(request: RequestDocument | undefined): WireState {
   const [result, setResult] = useState<WireState>({ state: 'loading' })
-  // `{{variables}}` are resolved inside `wireFor`, and neither of these is part of
-  // `request` — so without them in the dependency list the code view would keep showing
-  // the previous environment's snippet until the next keystroke.
-  //
-  // Keyed by **this request**, not by whatever is active: `wireFor` resolves through
-  // `resolveFor(request.id)`, so the dependency has to ask the same question the resolver
-  // does or the two would disagree about which collection's environment is in force.
-  // Both are stable: the array only changes identity when an environment is edited, and
-  // the id is a string.
-  const environments = useAppStore(s => s.environments)
-  const environmentId = useAppStore(s => environmentIdFor(s, request?.id))
 
   // Re-resolved on every edit to the request, so the snippet follows the URL bar as it is
   // typed. `request` is a fresh object per store update, so identity is the right trigger.
@@ -57,7 +44,7 @@ export function useWire(request: RequestDocument | undefined): WireState {
     return () => {
       live = false
     }
-  }, [request, environments, environmentId])
+  }, [request])
 
   return request ? result : { state: 'loading' }
 }

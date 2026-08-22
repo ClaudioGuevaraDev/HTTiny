@@ -1,9 +1,8 @@
 import { Service as WorkspaceService } from '../bindings/github.com/ClaudioGuevaraDev/httiny/internal/workspace'
-import { environmentSecretKey } from './environments'
 import { revealPatch, useAppStore } from './store'
-import type { Environment, RequestDocument } from './types'
+import type { RequestDocument } from './types'
 import type { WorkspaceState } from './workspaceFile'
-import { PREFS_VERSION, WORKSPACE_VERSION, readCollapsed, readPrefs, readWorkspace, toPrefsFile, toWorkspaceFile } from './workspaceFile'
+import { PREFS_VERSION, WORKSPACE_VERSION, legacySecretKeys, readCollapsed, readPrefs, readWorkspace, toPrefsFile, toWorkspaceFile } from './workspaceFile'
 
 /**
  * Disk persistence: hydrate once at startup, then autosave.
@@ -72,47 +71,6 @@ const secretsOf = (documents: Record<string, RequestDocument>) =>
     .filter(doc => doc.auth.type !== 'none' && (doc.auth.token || doc.auth.password))
     .map(doc => ({ id: doc.id, token: doc.auth.token, password: doc.auth.password }))
 
-/**
- * The same, for environment variables the user locked.
- *
- * One entry per variable rather than one blob per environment: `secrets.Set` rejects a
- * marshalled entry over 2560 bytes, and a blob would be doubly encoded, so a single
- * oversized value would fail the write for every secret in that environment at once —
- * reported only in `SecretsResult.error`. Per variable, the cap is spent on one
- * credential and a failure is isolated.
- *
- * The value goes in `token` and `password` stays empty. `Entry.Empty()` is both fields
- * blank, so clearing a value deletes the entry without Go needing to know what this is.
- *
- * A `Map`, so two rows typed with the same key write one entry instead of racing. Last
- * wins, which is the rule `resolverFor` applies to the same collision.
- */
-const environmentSecretsOf = (environments: readonly Environment[]) => {
-  const entries = new Map<string, { id: string; token: string; password: string }>()
-  for (const env of environments) {
-    for (const variable of env.variables) {
-      const key = variable.key.trim()
-      if (!variable.secret || !key || !variable.value) continue
-      const id = environmentSecretKey(env.id, key)
-      entries.set(id, { id, token: variable.value, password: '' })
-    }
-  }
-  return [...entries.values()]
-}
-
-/**
- * Every id the credential store should be reconciled against.
- *
- * Every variable that has a key, **not only the locked ones** — the same way the
- * documents half is `Object.keys(documents)` and not "documents with auth". An entry is
- * deleted by appearing here and not in the entries list, so a variable whose lock was
- * just taken off is cleared from the OS store precisely because it is still named here.
- */
-const secretKeysOf = (documents: Record<string, RequestDocument>, environments: readonly Environment[]) => [
-  ...Object.keys(documents),
-  ...environments.flatMap(env => env.variables.filter(v => v.key.trim()).map(v => environmentSecretKey(env.id, v.key.trim()))),
-]
-
 let secretsTimer: number | undefined
 let lastSecrets = ''
 /**
@@ -120,9 +78,8 @@ let lastSecrets = ''
  *
  * `SaveSecrets` iterates `keep` and deletes the ids in it that were not written; it
  * never enumerates the store, because `go-keyring` has no cross-platform way to. So an
- * id that leaves both lists at once — a deleted request, a renamed or removed variable —
- * would otherwise keep its credential forever. Naming it once more is the only way to
- * reach it.
+ * id that leaves both lists at once — a deleted request — would otherwise keep its
+ * credential forever. Naming it once more is the only way to reach it.
  */
 let lastKeep: string[] = []
 /**
@@ -143,11 +100,10 @@ let secretsReadFailed = false
  * has nothing to do with what was edited. The id list is part of the signature
  * because deleting a request also has to delete its entry.
  */
-const secretsSignature = (documents: Record<string, RequestDocument>, environments: readonly Environment[]) =>
-  JSON.stringify([secretsOf(documents), environmentSecretsOf(environments), secretKeysOf(documents, environments).sort()])
+const secretsSignature = (documents: Record<string, RequestDocument>) => JSON.stringify([secretsOf(documents), Object.keys(documents).sort()])
 
-function scheduleSecrets(documents: Record<string, RequestDocument>, environments: readonly Environment[]) {
-  const signature = secretsSignature(documents, environments)
+function scheduleSecrets(documents: Record<string, RequestDocument>) {
+  const signature = secretsSignature(documents)
   if (signature === lastSecrets) return
   lastSecrets = signature
 
@@ -156,10 +112,10 @@ function scheduleSecrets(documents: Record<string, RequestDocument>, environment
   // expensive than a file write, and nothing reads these back until a restart.
   secretsTimer = window.setTimeout(() => {
     secretsTimer = undefined
-    const live = secretKeysOf(documents, environments)
+    const live = Object.keys(documents)
     const keep = secretsReadFailed ? [] : [...new Set([...lastKeep, ...live])]
     lastKeep = live
-    void WorkspaceService.SaveSecrets([...secretsOf(documents), ...environmentSecretsOf(environments)], keep).then(result => {
+    void WorkspaceService.SaveSecrets(secretsOf(documents), keep).then(result => {
       if (result.error) console.warn('[persistence] credential store:', result.error)
       useAppStore.getState().setSecretsAvailable(result.available)
     })
@@ -167,31 +123,29 @@ function scheduleSecrets(documents: Record<string, RequestDocument>, environment
 }
 
 /**
- * Installs the autosave subscriber. Called only on the success path of `hydrate`,
- * which is what stops a failed or slow load from writing an empty workspace over a
- * real one.
- */
-/**
- * The store fields that can make `workspace.json` dirty. A pre-filter and not the
- * decision — the serialise-and-compare below is what actually decides — but it is what
- * keeps the whole workspace from being stringified on every unrelated `set`, including
- * the `setSaveState` calls that re-enter this subscriber three times per write.
+ * The store fields that belong in `workspace.json`, as a pre-filter on the subscriber
+ * below: serialising the whole file on every store change would run on every keystroke.
  *
  * The check under it is the point of the list. A field added to `WorkspaceState` and
  * forgotten here would be written by `toWorkspaceFile` and never reach disk, with
  * nothing to notice; this makes forgetting a compile error instead.
  */
-const WORKSPACE_KEYS = ['tree', 'documents', 'environments'] as const satisfies readonly (keyof WorkspaceState)[]
+const WORKSPACE_KEYS = ['tree', 'documents'] as const satisfies readonly (keyof WorkspaceState)[]
 const workspaceKeysAreComplete: [Exclude<keyof WorkspaceState, (typeof WORKSPACE_KEYS)[number]>] extends [never] ? true : never = true
 void workspaceKeysAreComplete
 
+/**
+ * Installs the autosave subscriber. Called only on the success path of `hydrate`,
+ * which is what stops a failed or slow load from writing an empty workspace over a
+ * real one.
+ */
 function installAutosave(): void {
   let lastWorkspace = JSON.stringify(toWorkspaceFile(useAppStore.getState()))
   let lastPrefs = JSON.stringify(toPrefsFile(useAppStore.getState()))
   // Seeded from the just-hydrated state, so the first edit to anything else does
   // not look like a credential change and rewrite the keychain for nothing.
-  lastSecrets = secretsSignature(useAppStore.getState().documents, useAppStore.getState().environments)
-  lastKeep = secretKeysOf(useAppStore.getState().documents, useAppStore.getState().environments)
+  lastSecrets = secretsSignature(useAppStore.getState().documents)
+  lastKeep = Object.keys(useAppStore.getState().documents)
 
   useAppStore.subscribe((state, prev) => {
     if (WORKSPACE_KEYS.some(key => state[key] !== prev[key])) {
@@ -204,7 +158,7 @@ function installAutosave(): void {
         lastWorkspace = next
         workspaceWriter.schedule(next)
       }
-      if (state.documents !== prev.documents || state.environments !== prev.environments) scheduleSecrets(state.documents, state.environments)
+      if (state.documents !== prev.documents) scheduleSecrets(state.documents)
     }
 
     const nextPrefs = JSON.stringify(toPrefsFile(state))
@@ -255,67 +209,20 @@ export async function hydrate(): Promise<void> {
     }
 
     const collapsed = prefs.found ? readCollapsed(JSON.parse(prefs.payload)) : []
-    const loaded = workspace.found ? readWorkspace(JSON.parse(workspace.payload), collapsed) : { tree: [], documents: {}, environments: [] }
-    const layout = readPrefs(prefs.found ? JSON.parse(prefs.payload) : {}, loaded)
-
-    /*
-     * Reveal the active request, the way every other writer of `activeId` does.
-     *
-     * This was the one that did not, and it is why startup could show the rail on one
-     * collection while the active tab belonged to another, with no row selected in the
-     * tree. `selectCollection` moves the rail and clears the selection *without* touching
-     * `activeId`, and all three fields are persisted, so `ui.json` faithfully records a
-     * pair that disagrees — and `readPrefs` validates each field on its own, so it keeps
-     * both rather than reconciling them. Revealing here makes starting up mean the same
-     * thing as activating that tab.
-     *
-     * Before `installAutosave`, so the expanded tree is the baseline rather than an edit,
-     * and `workspace.json` is not rewritten just for having been opened.
-     *
-     * It returns its inputs unchanged when the request is not in the tree, so "no tab
-     * open" and "the tab's node was deleted" both need no branch here.
-     */
-    const revealed = revealPatch(loaded.tree, layout.activeId, layout.selectedNodeId, layout.activeCollectionId)
+    const savedWorkspace: unknown = workspace.found ? JSON.parse(workspace.payload) : null
+    const loaded = workspace.found ? readWorkspace(savedWorkspace, collapsed) : { tree: [], documents: {} }
+    const layout = readPrefs(prefs.found ? JSON.parse(prefs.payload) : {}, loaded.documents, loaded.tree)
 
     // Credentials come back from the OS store, keyed by request id, so a workspace
-    // copied to another machine keeps its requests and simply has no tokens. Locked
-    // environment variables ride along in the same call — it is one round trip on the
-    // startup path, which is why `LoadSecrets` takes a list at all.
+    // copied to another machine keeps its requests and simply has no tokens.
     const withAuth = Object.values(loaded.documents).filter(doc => doc.auth.type !== 'none')
-
-    // Built from our own key function rather than by parsing an id back apart, so a
-    // document whose id was hand-edited to start with `env:` cannot claim a variable's
-    // value.
-    const variableKeys = new Set<string>()
-    for (const env of loaded.environments) {
-      for (const variable of env.variables) {
-        const key = variable.key.trim()
-        if (variable.secret && key) variableKeys.add(environmentSecretKey(env.id, key))
-      }
-    }
-
-    let secretsAvailable = true
-    if (withAuth.length || variableKeys.size) {
-      const result = await WorkspaceService.LoadSecrets([...withAuth.map(doc => doc.id), ...variableKeys])
+    let secretsAvailable = false
+    if (withAuth.length) {
+      const result = await WorkspaceService.LoadSecrets(withAuth.map(doc => doc.id))
       secretsAvailable = result.available
-      const values = new Map<string, string>()
       for (const secret of result.secrets ?? []) {
-        // Environments first: those ids are ours and a document cannot shadow one.
-        if (variableKeys.has(secret.id)) {
-          values.set(secret.id, secret.token)
-          continue
-        }
         const doc = loaded.documents[secret.id]
         if (doc) loaded.documents[secret.id] = { ...doc, auth: { ...doc.auth, token: secret.token, password: secret.password } }
-      }
-      if (values.size) {
-        loaded.environments = loaded.environments.map(env => ({
-          ...env,
-          variables: env.variables.map(variable => {
-            const stored = variable.secret ? values.get(environmentSecretKey(env.id, variable.key.trim())) : undefined
-            return stored === undefined ? variable : { ...variable, value: stored }
-          }),
-        }))
       }
       if (result.error) {
         // Not just noise: an entry that could not be read loaded empty, and the next
@@ -323,15 +230,38 @@ export async function hydrate(): Promise<void> {
         secretsReadFailed = true
         console.warn('[persistence] credential store:', result.error)
       }
+    } else {
+      secretsAvailable = true
     }
 
-    // When no credential store is reachable at all, Go's `SaveSecrets` and
-    // `LoadSecrets` both return before touching anything — so the blank values loaded
-    // here are never written over real ones, and the `keep` sweep never runs. That is
-    // load-bearing, not incidental: do not "fix" either early return.
+    // Transitional, and goes with `legacySecretKeys`: the environment variables feature
+    // stored one credential per locked variable, nothing names them any more, and a
+    // store that cannot be enumerated cannot be swept later. `SaveSecrets` deletes every
+    // id in `keep` it was not asked to write — the same pass that clears a deleted
+    // request's token — so one round trip finishes it, and only while a workspace file
+    // still carries the field. Skipped after a failed read, the rule the debounced save
+    // follows for the same reason.
+    const orphans = legacySecretKeys(savedWorkspace)
+    if (orphans.length && !secretsReadFailed) {
+      const swept = await WorkspaceService.SaveSecrets(secretsOf(loaded.documents), [...Object.keys(loaded.documents), ...orphans])
+      if (swept.error) console.warn('[persistence] credential store:', swept.error)
+    }
+
+    /*
+     * Reveal the active request, the way every other writer of `activeId` does.
+     *
+     * `readPrefs` validates `activeId`, `selectedNodeId` and `activeCollectionId` one at
+     * a time, against the tree and the documents — each is a live id, and the three
+     * together can still disagree, because `selectCollection` moves the rail without
+     * touching the active tab and both fields are persisted. Hydration was the one
+     * writer of `activeId` that did not apply `revealPatch`, so a launch could show the
+     * rail on one collection while the active tab belonged to another, with no row
+     * selected.
+     */
+    const revealed = revealPatch(loaded.tree, layout.activeId, layout.selectedNodeId, layout.activeCollectionId)
+
     useAppStore.setState({
       documents: loaded.documents,
-      environments: loaded.environments,
       // Spread, not seventeen enumerated fields — and that is a correctness measure, not
       // brevity. `setState` takes a `Partial`, so a preference left out of the list was
       // saved correctly and loaded into nothing, with no type error anywhere: the comment

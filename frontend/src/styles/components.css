@@ -71,10 +71,8 @@
    *
    * Rings drawn some other way are not here and must not be added: `.tree-row` and
    * `.split-handle` set their own offsets, and the key/value cells swap the outline
-   * for an inset shadow — as does `.template-input`'s cell variant, while its `url`
-   * variant is in this group; it draws the same bordered box the URL `<input>` did
-   * before the field became a one-line editor. */
-  .template-input.url:focus-within,
+   * for an inset shadow. */
+  .url-input:focus-visible,
   .bar-btn:focus-visible,
   .add-row:focus-visible,
   .tree-rename:focus-visible,
@@ -82,97 +80,6 @@
   .select-trigger[data-variant='field']:focus-visible,
   .select-trigger[data-variant='method']:focus-visible {
     outline-offset: calc(var(--focus-ring-width) * -1);
-  }
-
-  /* ── Template input ────────────────────────────────────────────────────────── */
-  /* One class, two geometries, and no CodeMirror knowledge duplicated: `inputTheme` in
-   * `editorTheme.ts` reads `--ti-line` and `--ti-pad` and nothing else, and every box
-   * property is here beside the request-bar and `.technical-input` rules it has to agree
-   * with.
-   *
-   * In Shared primitives rather than at either of the two positions this class appears
-   * in, because it appears in *both* — the request bar and the key/value grid — and both
-   * of those later sections have to be able to override it on source order. Same
-   * argument `.icon-btn` makes for `.panel-toggle` and `.bar-btn`.
-   *
-   * `pre` and `hidden` on the static state to match `.cm-content` exactly — an `<input>`
-   * clips and never ellipsises — and the horizontal padding lives here, in one place,
-   * because the static line and the live `.cm-line` occupy the same box and any
-   * disagreement shows up as text jumping sideways on the first click. */
-  .template-input {
-    /* Three properties where there used to be one, and the split is the fix for a
-     * selection band that ran flush against the border.
-     *
-     * `--ti-box` is the field's content height and is what `--ti-line` used to be.
-     * `--ti-line` is now the *text's* line box — 1.5× the font size, which is exactly
-     * what the `<input>` in the description column inherits from Tailwind's preflight,
-     * so two neighbouring cells finally agree about how tall a selection is. A native
-     * `::selection` accepts no padding, no radius and no inset, so shrinking the line
-     * box is the only way to inset the band. `--ti-pad` is the slack, split evenly.
-     *
-     * Written as calcs against the same tokens the neighbouring rules use rather than as
-     * literals, so a change of row or control height cannot leave the text off-centre. */
-    --ti-box: calc(var(--h-row-kv) - 1px); /* `.kv-row` draws the 1px bottom border */
-    --ti-line: calc(var(--text-xs) * 1.5);
-    --ti-pad: calc((var(--ti-box) - var(--ti-line)) / 2);
-    min-width: 0;
-    height: 100%;
-    padding: 0 9px;
-    border-radius: var(--radius-xs);
-    color: var(--color-text);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    overflow: hidden;
-    white-space: pre;
-    /* Exactly one child either way — `.template-line` while static, `.cm-editor` once
-     * mounted — so there are no anonymous flex items to split the chips and the text
-     * runs between them. That is what the static render's wrapper span is for. */
-    display: flex;
-    align-items: center;
-  }
-
-  /* The static line, centred by the flex parent above. Its line height and the mounted
-   * editor's come from the same property, so the text does not shift vertically the
-   * first time a cell is clicked. */
-  .template-line {
-    min-width: 0;
-    line-height: var(--ti-line);
-  }
-
-  /* The same argument `.technical-input:focus-visible` makes: these cells sit inside
-   * `.request-panel { overflow: auto }`, so a positive `outline-offset` is clipped on
-   * the first and last column and the ring vanishes. Drawn inside instead.
-   *
-   * `:focus-within` and not `:focus-visible`, because the element that takes focus is
-   * `.cm-content`, a descendant — the construction `.response-search-field` already
-   * uses. Nothing is lost: for a text field `:focus-visible` matches on click anyway. */
-  .template-input:focus-within {
-    outline: none;
-    box-shadow: inset 0 0 0 var(--focus-ring-width) var(--color-focus);
-  }
-
-  .template-input.url {
-    --ti-box: calc(var(--h-control-lg) - 2px); /* its own 1px border, top and bottom */
-    --ti-line: calc(var(--text-sm) * 1.5);
-    flex: 1;
-    height: var(--h-control-lg);
-    padding: 0 11px;
-    border: 1px solid var(--color-border-control);
-    border-radius: var(--radius-md);
-    background: var(--color-surface-3);
-    font-size: var(--text-sm);
-  }
-
-  /* The URL variant draws a border, so it takes the outline pulled onto that border —
-   * the group above — rather than the cell's inset shadow. */
-  .template-input.url:focus-within {
-    box-shadow: none;
-    outline: var(--focus-ring-width) solid var(--color-focus);
-    border-color: var(--color-border-control);
-  }
-
-  .template-hint {
-    color: var(--color-text-faint);
   }
 
   .icon-btn.xs {
@@ -991,11 +898,10 @@
   }
 
   /* `align-items: center` is load-bearing, not tidying. Flex defaults to `stretch`, and
-   * the URL field was the one child of this row with no height of its own — so it took the
+   * `.url-input` was the one child of this row with no height of its own — so it took the
    * bar's content box (56px less 9px of padding top and bottom = 38px) and sat 2px taller
    * than the method picker, Send and the code button, which all declare 36px. The height of
-   * a control should not fall out of its container's padding. `.template-input.url` now
-   * declares 36px like the rest, but the rule still holds for whatever lands here next. */
+   * a control should not fall out of its container's padding. */
   .request-bar {
     height: var(--h-request-bar);
     padding: 9px 12px;
@@ -1003,6 +909,26 @@
     align-items: center;
     gap: 7px;
     border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .url-input {
+    flex: 1;
+    min-width: 0;
+    /* Declared, like every other control in the row, rather than inherited from the bar. */
+    height: var(--h-control-lg);
+    padding: 0 11px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+  }
+
+  /* The URL field takes the shared ring from the base layer; it only needs its
+   * border lifted so the control still reads as focused at a glance. */
+  .url-input:focus-visible {
+    border-color: var(--color-border-control);
   }
 
   /* The icon buttons in the request bar. It was `.save-btn` while Save owned it, which
@@ -1321,49 +1247,6 @@
   .form-grid .kv-row .select-trigger:focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 var(--focus-ring-width) var(--color-focus);
-  }
-
-  /* ── Environment variable grid ─────────────────────────────────────────── */
-  /* Beside the other override of the key/value template on purpose: anyone changing
-   * the base grid should see every column count that depends on it in one screen.
-   * Five columns, and the fourth is a lock rather than a description — so there is no
-   * container-query branch here, because the column the base rule hides at 560px does
-   * not exist in this grid. */
-  .var-grid .kv-header,
-  .var-grid .kv-row {
-    grid-template-columns: var(--h-control-xs) minmax(0, 1fr) minmax(0, 1.4fr) var(--h-control-xs) var(--h-control-xs);
-  }
-
-  @container (max-width: 560px) {
-    /* The base rule hides column 4, which here is the lock. It is the one column that
-     * cannot be dropped: it says where the value is stored. */
-    .var-grid .kv-header > :nth-child(4),
-    .var-grid .kv-row > :nth-child(4) {
-      display: revert;
-    }
-
-    .var-grid .kv-header,
-    .var-grid .kv-row {
-      grid-template-columns: var(--h-control-xs) minmax(0, 1fr) minmax(0, 1.4fr) var(--h-control-xs) var(--h-control-xs);
-    }
-  }
-
-  /* Unlike `.row-delete`, this one is always visible: it is state, not an action that
-   * appears on hover, and a row whose lock you cannot see is a row you cannot tell is
-   * holding a credential. */
-  .var-grid .row-secret {
-    color: var(--color-text-subtle);
-  }
-
-  .var-grid .row-secret.on {
-    color: var(--color-accent);
-    background: var(--color-surface-accent);
-  }
-
-  .env-session-note {
-    padding: 8px 2px 0;
-    color: var(--color-text-subtle);
-    font-size: var(--text-2xs);
   }
 
   /* ── Attached file ─────────────────────────────────────────────────────── */
@@ -3078,36 +2961,6 @@
     border-left: 1px solid var(--color-border-subtle);
   }
 
-  /* Left of the actions divider, so it reads as a mode the workspace is in rather than
-   * as another button in the cluster. */
-  .env-picker {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    /* Matches `.workspace-actions`' own padding, so the divider between the two has the
-     * same air on both sides. At 2px the layers button sat against the hairline while
-     * the split toggle on the far side of it had 6px, and the asymmetry read as the
-     * button being stuck to the line. */
-    padding-right: 6px;
-  }
-
-  /* The collection name, shown only while the picker's scope disagrees with the rail.
-   * Subtle on purpose: it is a disambiguation, not a control, and it sits beside a
-   * trigger that is already the loudest thing in this group. */
-  .env-scope {
-    max-width: 96px;
-    color: var(--color-text-subtle);
-    font-size: var(--text-2xs);
-  }
-
-  /* An environment's name is a name, not a code token — the one place the `inline`
-   * variant's mono is wrong. */
-  .env-picker .select-trigger[data-variant='inline'] {
-    max-width: 160px;
-    font-family: var(--font-sans);
-  }
-
   /* ── Sidebar search trigger ────────────────────────────────────────────── */
   /* The in-tree filter this replaces only matched direct children, so searching for
    * anything nested two levels deep emptied the whole tree. It now opens the
@@ -4106,202 +3959,6 @@
     right: 10px;
   }
 
-  /* ── Environments ──────────────────────────────────────────────────────── */
-  /* A one-for-one mirror of the Settings classes above, so whoever knows one knows the
-   * other: same plate, same two-column geometry, same absolutely-positioned dismiss. */
-  .env-dialog {
-    /* Viewport terms divided by `--zoom`, px caps left to grow. */
-    width: min(760px, calc(92vw / var(--zoom, 1)));
-    height: min(calc(74vh / var(--zoom, 1)), 560px);
-    margin: auto;
-    padding: 0;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-xl);
-    background: var(--color-surface-2);
-    color: var(--color-text);
-    box-shadow: var(--shadow-menu);
-    overflow: hidden;
-  }
-
-  /* Fixed, for the reason `.settings-shell` is: the variable count differs per
-   * environment, and an auto height would resize the dialog under the pointer every
-   * time the selected one changed. */
-  .env-shell {
-    position: relative;
-    height: 100%;
-    display: grid;
-    grid-template-columns: 196px minmax(0, 1fr);
-  }
-
-  /* The empty state has no list to sit beside, so it takes the whole plate. */
-  .env-shell-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .env-nav {
-    padding: 14px 8px;
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid var(--color-border);
-    background: var(--color-surface-3);
-  }
-
-  .env-title {
-    margin: 0 0 10px 8px;
-    color: var(--color-text-strong);
-    font-size: var(--text-sm);
-    font-weight: var(--font-weight-semibold);
-  }
-
-  .env-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    overflow: auto;
-  }
-
-  /* Scoped to the tablist, not the column, so `.env-add` below keeps the colour written
-   * for it — the trap `.settings-sections` documents. */
-  .env-list button {
-    min-height: var(--h-control-md);
-    padding: 5px 9px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 0 6px;
-    position: relative;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--color-text-muted);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .env-list button:hover {
-    background: var(--color-surface-hover);
-    color: var(--color-text);
-  }
-
-  /* The tree's rail again, so every "this is the row in question" mark in the app is
-   * one object. */
-  .env-list button.active {
-    background: var(--color-surface-accent);
-    color: var(--color-text-strong);
-  }
-
-  .env-list button.active::before {
-    content: '';
-    position: absolute;
-    left: 2px;
-    top: 50%;
-    translate: 0 -50%;
-    width: 2px;
-    height: 16px;
-    border-radius: var(--radius-full);
-    background: var(--color-accent);
-  }
-
-  .env-tab-count {
-    grid-column: 1;
-    color: var(--color-text-subtle);
-    font-size: var(--text-2xs);
-  }
-
-  /* Accent, and not a second green: this token already means "selected", and the
-   * environment that is applied to requests is the selected one. */
-  .env-tab-mark {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    display: inline-flex;
-    color: var(--color-accent);
-  }
-
-  .env-add {
-    margin-top: auto;
-    height: var(--h-control-md);
-    padding: 0 9px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--color-text-subtle);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .env-add:hover {
-    background: var(--color-surface-hover);
-    color: var(--color-text);
-  }
-
-  /* Top padding clears `.env-close`, as the settings panel's does. */
-  .env-panel {
-    min-width: 0;
-    padding: 42px 20px 20px;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .env-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .env-name {
-    flex: 1;
-    min-width: 0;
-    height: var(--h-control-sm);
-    padding: 0 8px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface-3);
-    font-family: var(--font-sans);
-  }
-
-  .env-activate {
-    height: var(--h-control-sm);
-    padding: 0 10px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface-3);
-    color: var(--color-text-muted);
-    font-size: var(--text-xs);
-    cursor: pointer;
-  }
-
-  .env-activate:hover:not(:disabled) {
-    background: var(--color-surface-hover);
-    color: var(--color-text);
-  }
-
-  /* Disabled means "already the active one", which is a statement and not a dead
-   * control — so it reads as the accent it is describing rather than as greyed out. */
-  .env-activate:disabled {
-    border-color: var(--color-border-accent);
-    background: var(--color-surface-accent);
-    color: var(--color-accent);
-    cursor: default;
-  }
-
-  .env-close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-  }
-
   /* ── Code view ─────────────────────────────────────────────────────────── */
   /* Same plate as the other three modals. Wider than Settings, because what it holds is
    * code at a width nobody chose: a Go snippet indents four levels and a bearer token is
@@ -4504,7 +4161,7 @@
       background-color var(--duration-fast) var(--ease-standard);
   }
 
-  .template-input.url,
+  .url-input,
   .search-trigger,
   .select-trigger,
   .auth-editor input {

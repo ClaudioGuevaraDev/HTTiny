@@ -423,14 +423,6 @@ export const en = {
   'command.newCollection.keywords': 'create add collection',
   'command.cancel.title': 'Cancel request',
   'command.cancel.keywords': 'stop abort halt',
-  'command.environments.title': 'Manage environments',
-  'command.environments.keywords': 'environment variables template baseurl token secret',
-  // Carries a `{name}` slot, so it cannot go through `action()` like its neighbours —
-  // see the `setMethod` loop in `useCommands`, which is built the same way.
-  'command.useEnvironment.title': 'Use {name}',
-  'command.useEnvironment.keywords': 'environment switch select {name}',
-  'command.noEnvironment.title': 'Use no environment',
-  'command.noEnvironment.keywords': 'environment none off clear disable variables',
   'command.send.title': 'Send request',
   'command.send.keywords': 'run execute fire',
   'command.save.title': 'Save now',
@@ -567,52 +559,6 @@ export const en = {
   'settings.language.label': 'Language',
   'settings.language.desc': 'Choose the interface language.',
 
-  // ── Environments ─────────────────────────────────────────────────────────────
-  // The picker's keys live here with the editor's rather than up in Workspace
-  // actions: one family in one place beats matching the DOM position of one trigger.
-  'env.picker.aria': 'Active environment',
-  // The scoped form, used whenever there is a collection to name — which is all the time
-  // in practice. The unscoped one above is the fallback for a workspace with none.
-  'env.picker.scoped.aria': 'Environment for {name}',
-  'env.picker.none': 'No environment',
-  'env.manage.aria': 'Manage environments',
-  'env.manage.title': 'Environments ({keys})',
-  'env.title': 'Environments',
-  'env.close': 'Close environments',
-  'env.list': 'Environments',
-  'env.new': 'New environment',
-  'env.name': 'Name',
-  'env.namePlaceholder': 'Environment name…',
-  'env.activate': 'Use this environment',
-  // Named, because "active" is now a question with an answer per collection. The unnamed
-  // pair above are the fallbacks for a workspace with no collections, where there is
-  // nothing for an environment to be active *in*.
-  'env.activateIn': 'Use in {name}',
-  'env.activeIn': 'Active in {name}',
-  'env.active': 'Active',
-  'env.duplicate': 'Duplicate',
-  'env.delete': 'Delete',
-  // Never names a button: the OK/Cancel labels come from the OS, so the question
-  // carries the whole meaning.
-  'env.delete.confirm': 'Delete «{name}» and its variables? Its stored secrets are removed from the credential store too.',
-  'env.count.one': '{count} variable',
-  'env.count.other': '{count} variables',
-  'env.empty.title': 'No environments yet',
-  'env.empty.desc':
-    'An environment is a set of variables you can use anywhere in a request as {example} — in the URL, a header, the body or the auth panel. One is active at a time, and a name that resolves to nothing is left standing so you can see it. Values are substituted once, so a variable inside another variable is not expanded.',
-  'env.empty.new': 'New environment',
-  'env.var.add': 'Add Variable',
-  'env.var.secret': 'Keep secret',
-  'env.var.secretNamed': 'Keep {name} secret',
-  // Shown under the grid when no OS credential store could be reached, so a locked
-  // value is typed for this session and gone on quit.
-  'env.var.sessionOnly': 'No credential store is available, so secret values last only for this session.',
-  // The completion dropdown's right-hand slot. `translate()` from a non-component is
-  // defensible exactly here: the source re-runs on every keystroke and the dropdown
-  // closes on blur, so nothing survives a change of language long enough to go stale.
-  'env.complete.secret': 'Secret',
-  'env.complete.empty': 'Empty',
-
   // ── Updates ──────────────────────────────────────────────────────────────────
   // The version is always a `{version}` parameter and never part of the message,
   // for the same reason the dev command is in `errors.ts`: a translator cannot
@@ -636,13 +582,11 @@ export const en = {
   'update.notes': 'What changed',
   'update.later': 'Later',
 
-  // ── Default names for new user data ──────────────────────────────────────────
+  // ── Default names for new nodes ──────────────────────────────────────────────
   // Written into workspace.json as user data: switching language later does not
   // rename what already exists, because by then it is content and not copy.
   'data.newRequest': 'New Request',
   'data.newCollection': 'New Collection',
   'data.newFolder': 'New Folder',
   'data.myCollection': 'My Collection',
-  'data.newEnvironment': 'New Environment',
-  'data.copyOf': '{name} copy',
 } as const
