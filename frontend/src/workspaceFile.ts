@@ -13,8 +13,24 @@ import type { BodyLanguage, BodyType, FormRow, HttpMethod, KeyValueRow, Locale, 
  *
  * With no test framework in this project, nothing catches a forgotten bump. The
  * validators are therefore written to degrade rather than throw.
+ *
+ * **2 is burnt, and the payload at 3 is otherwise identical to 1's.** A local build
+ * of the per-collection environments work (c00f4f8, reverted in d3d11f5) stamped 2
+ * onto disk; the revert took the constant back to 1, and every build after it then
+ * read that file as coming from the future. `hydrate` answers a newer file by
+ * refusing to write at all — correctly, since half-understanding a payload and
+ * saving the result truncates it — so the workspace went silently read-only and
+ * nothing persisted at all.
+ *
+ * Hence the rule this number now follows: it is a one-way ratchet, and a value that
+ * has ever been written to a disk is never re-issued, not even by a build that was
+ * never released. Reverting a feature reverts the payload; it cannot revert the
+ * files already stamped. Re-using the number instead would let two payload shapes
+ * claim it and leave the `>` guard meaningless. Skipping one integer costs nothing:
+ * a 2 file is read by the validators below, which ignore the `environments` key it
+ * carries, and `toWorkspaceFile` drops the key on the first save.
  */
-export const WORKSPACE_VERSION = 1
+export const WORKSPACE_VERSION = 3
 export const PREFS_VERSION = 1
 
 /**
@@ -449,9 +465,16 @@ export function readPrefs(payload: unknown, documents: Record<string, RequestDoc
  * was ever in the file.
  */
 export const legacySecretKeys = (payload: unknown): string[] => {
-  if (!isRecord(payload) || !Array.isArray(payload.environments)) return []
+  if (!isRecord(payload)) return []
+  // Two shapes reached disk under the same field name: one flat list of environments,
+  // and — from the build that stamped workspace version 2 — a map keyed by collection
+  // id. Reading only the list would walk straight past every credential the other one
+  // left behind, and this sweep has exactly one chance to run, because the first save
+  // rewrites the file without the field.
+  const stored: unknown = payload.environments
+  const environments: unknown[] = Array.isArray(stored) ? stored : isRecord(stored) ? Object.values(stored).flat() : []
   const out: string[] = []
-  for (const environment of payload.environments) {
+  for (const environment of environments) {
     if (!isRecord(environment)) continue
     const id = str(environment.id)
     if (!id || !Array.isArray(environment.variables)) continue
